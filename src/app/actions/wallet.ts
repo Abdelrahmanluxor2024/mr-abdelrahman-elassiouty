@@ -82,8 +82,97 @@ export async function redeemChargeCode(code: string): Promise<RedeemResult> {
 export async function startFawryCheckout(amount: number): Promise<{ ok: true; paymentUrl: string } | { ok: false; error: string }> {
   if (amount <= 0) return { ok: false, error: 'قيمة الشحن غير صالحة.' };
 
-  // In production, this hits the Fawry API. For the demo we return a
-  // synthetic URL pointing at our own payment-pending route.
   const paymentUrl = `/wallet/fawry-pending?amount=${amount}&ref=${crypto.randomUUID()}`;
   return { ok: true, paymentUrl };
 }
+
+/**
+ * Purchase and enroll in a course using wallet balance.
+ */
+export async function purchaseCourse(courseId: string): Promise<{ ok: true } | { ok: false; error: string; needsTopup?: boolean }> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'يجب تسجيل الدخول أولاً.' };
+  const studentId = user.id;
+
+  const admin = createAdminClient();
+
+  // 1. Check if already enrolled
+  const { data: existing } = await admin
+    .from('enrollments')
+    .select('id')
+    .eq('student_id', studentId)
+    .eq('course_id', courseId)
+    .maybeSingle();
+  if (existing) {
+    return { ok: true };
+  }
+
+  // 2. Fetch course price
+  const { data: course } = await admin
+    .from('courses')
+    .select('*')
+    .eq('id', courseId)
+    .single();
+  if (!course) return { ok: false, error: 'الكورس غير موجود.' };
+
+  if (course.is_free || Number(course.price) === 0) {
+    await admin.from('enrollments').insert({
+      student_id: studentId,
+      course_id: courseId,
+      progress_percentage: 0,
+      completed_lessons: 0,
+    });
+    revalidatePath(`/course/${courseId}`);
+    return { ok: true };
+  }
+
+  const price = Number(course.price);
+
+  // 3. Fetch student balance
+  const { data: student } = await admin
+    .from('students')
+    .select('wallet_balance')
+    .eq('id', studentId)
+    .single();
+
+  const balance = Number(student?.wallet_balance ?? 0);
+  if (balance < price) {
+    return {
+      ok: false,
+      error: `رصيدك الحالي (${balance} ج.م) غير كافٍ لشراء هذا الكورس (${price} ج.م). يرجى شحن المحفظة أولاً.`,
+      needsTopup: true,
+    };
+  }
+
+  const newBalance = balance - price;
+
+  // Deduct balance
+  await admin.from('students').update({ wallet_balance: newBalance }).eq('id', studentId);
+
+  // Record transaction
+  await admin.from('wallet_transactions').insert({
+    student_id: studentId,
+    amount: price,
+    transaction_type: 'course_purchase',
+    payment_method: 'wallet',
+    description: `شراء كورس: ${course.title}`,
+    balance_before: balance,
+    balance_after: newBalance,
+    status: 'completed',
+  });
+
+  // Create enrollment
+  await admin.from('enrollments').insert({
+    student_id: studentId,
+    course_id: courseId,
+    progress_percentage: 0,
+    completed_lessons: 0,
+  });
+
+  revalidatePath(`/course/${courseId}`);
+  revalidatePath('/wallet');
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
+

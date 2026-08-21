@@ -2,23 +2,55 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useLesson } from '@/lib/queries/useCourses';
+import { useLesson, useCourseEnrollment } from '@/lib/queries/useCourses';
 import { useStudent } from '@/lib/queries/useStudent';
 import { SecureVideoPlayer } from '@/components/course/secure-video-player';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { FileText, ClipboardList, BookOpen, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
+import { FileText, ClipboardList, BookOpen, ArrowRight, Sparkles, CheckCircle2, Lock, ShoppingCart } from 'lucide-react';
+import { formatCurrencyEGP } from '@/lib/utils';
 
 export default function LessonPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { data: lesson, isLoading } = useLesson(id);
   const { data: student } = useStudent();
+  const { data: enrollment, isLoading: enrollmentLoading } = useCourseEnrollment(lesson?.course_id ?? '');
 
-  if (isLoading) return <Skeleton className="h-96 w-full rounded-3xl" />;
+  if (isLoading || enrollmentLoading) return <Skeleton className="h-96 w-full rounded-3xl" />;
   if (!lesson) return <p className="text-slate-500">المحاضرة غير موجودة.</p>;
+
+  const isAuthorized = lesson.course?.is_free || lesson.is_free_preview || !!enrollment;
+
+  if (!isAuthorized) {
+    return (
+      <div className="mx-auto max-w-lg py-16 text-center" dir="rtl">
+        <div className="rounded-3xl border border-amber-300 dark:border-amber-700/80 bg-white dark:bg-[#0E172A] p-8 shadow-2xl space-y-6">
+          <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
+            <Lock className="h-10 w-10" />
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-black text-slate-900 dark:text-white">
+              هذه المحاضرة تتطلب الاشتراك في الكورس 🔒
+            </h2>
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              كورس &quot;{lesson.course?.title}&quot; كورس مدفوع ({formatCurrencyEGP(lesson.course?.price ?? 0)}). يرجى الاشتراك في الكورس للوصول إلى الفيديو والواجبات والامتحانات.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Button asChild className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3 rounded-2xl shadow-lg shadow-blue-500/30">
+              <Link href={`/course/${lesson.course_id}`}>
+                <ShoppingCart className="h-5 w-5 ms-2" />
+                الانتقال لصفحة الكورس للاشتراك
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const watermark = student ? `${student.full_name} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
   const exam = lesson.exam?.[0];
@@ -27,6 +59,7 @@ export default function LessonPage() {
   const isEmbed = lesson.video_url
     ? /vimeo\.com|youtube\.com|youtu\.be|bunnycdn|iframe\.mediadelivery/.test(lesson.video_url)
     : false;
+
 
   return (
     <div className="grid gap-6 lg:grid-cols-3" dir="rtl">

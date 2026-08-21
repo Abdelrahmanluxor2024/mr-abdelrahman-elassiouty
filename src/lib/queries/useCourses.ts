@@ -78,3 +78,23 @@ export function useEnrollments() {
     },
   });
 }
+
+export function useCourseEnrollment(courseId: string) {
+  return useQuery({
+    queryKey: ['enrollment', courseId],
+    enabled: !!courseId,
+    queryFn: async () => {
+      const supabase = browserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from('enrollments')
+        .select('*')
+        .eq('student_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+      return data as Enrollment | null;
+    },
+  });
+}
+
