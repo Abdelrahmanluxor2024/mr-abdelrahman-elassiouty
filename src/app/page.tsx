@@ -147,25 +147,25 @@ export default function HomePage() {
       </section>
 
       {/* ── Featured Courses Section (كورساتنا المميزة) ────────────────────── */}
-      <section className="relative bg-white py-16 text-slate-900 lg:py-24">
+      <section className="relative bg-[#070B14] py-16 text-white lg:py-24 border-t border-blue-500/10">
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Header */}
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end mb-12">
             <div>
-              <div className="inline-block rounded-full bg-purple-100 px-4 py-1 text-xs font-bold text-purple-800 mb-3">
+              <div className="inline-block rounded-full bg-blue-500/10 border border-blue-500/30 px-4 py-1 text-xs font-bold text-cyan-300 mb-3">
                 كل الكورسات
               </div>
-              <h2 className="font-display text-3xl font-black text-slate-900 sm:text-4xl">
+              <h2 className="font-display text-3xl font-black text-white sm:text-4xl">
                 كورساتنا المميزة
               </h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
+              <p className="mt-2 max-w-2xl text-sm text-slate-400 sm:text-base">
                 اختار الكورس المناسب لصفك وابدأ على طول - كل كورس فيه شرح وتمارين عملية ومتابعة مستمرة.
               </p>
             </div>
 
             <Link
               href="/courses"
-              className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-purple-800"
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500"
             >
               عرض الكل
               <ArrowLeft className="h-4 w-4" />
@@ -176,80 +176,81 @@ export default function HomePage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                id: '1',
-                title: 'كورس الشهر الأول - الصف الثاني الثانوي | عربي 2027',
-                tag: 'عربي',
-                price: '190',
-                date: 'السبت، ٨ أغسطس',
-                lessons: '12 حصة تفاعلية',
-              },
-              {
-                id: '2',
-                title: 'كورس الشهر الأول - الصف الثاني الثانوي | لغات 2027',
+                id: 'course-lang',
+                title: 'الكورس التأسيسي في البرمجة والذكاء الاصطناعي | لغات 2027',
                 tag: 'لغات',
-                price: '190',
-                date: 'السبت، ٨ أغسطس',
-                lessons: '12 حصة تفاعلية',
+                price: 'مجاناً',
+                image: '/images/course-foundation-languages.jpg',
+                lessons: '3 محاضرات + 3 امتحانات',
               },
               {
-                id: '3',
-                title: 'كورس مُجمّع 3 شهور - الصف الثاني الثانوي | عربي 2027',
+                id: 'course-paid',
+                title: 'كورس تجربة بالفلوس | الصف الثاني الثانوي 2027',
+                tag: 'تجريبي',
+                price: '50 ج.م',
+                image: '/images/teacher-hero.jpg',
+                lessons: 'حصة شاملة + امتحان',
+              },
+              {
+                id: 'course-ar',
+                title: 'الكورس التأسيسي في البرمجة والتفكير المنطقي | عربي 2027',
                 tag: 'عربي',
-                price: '450',
-                date: 'السبت، ٨ أغسطس',
-                lessons: '36 حصة شاملة',
+                price: 'مجاناً',
+                image: '/images/teacher-hero.jpg',
+                lessons: '3 محاضرات + 3 امتحانات',
               },
               {
-                id: '4',
-                title: 'كورس مُجمّع 3 شهور - الصف الثاني الثانوي | لغات 2027',
-                tag: 'لغات',
-                price: '450',
-                date: 'السبت، ٨ أغسطس',
-                lessons: '36 حصة شاملة',
+                id: 'course-month1',
+                title: 'كورس الشهر الأول - بايثون والذكاء الاصطناعي 2027',
+                tag: 'مكثف',
+                price: '190 ج.م',
+                image: '/images/teacher-hero.jpg',
+                lessons: '12 حصة تفاعلية',
               },
             ].map((c) => (
               <div
                 key={c.id}
-                className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+                className="group flex flex-col overflow-hidden rounded-3xl border border-blue-500/20 bg-[#0B1324] shadow-xl transition hover:-translate-y-1 hover:border-blue-400 hover:shadow-blue-500/20"
               >
                 {/* Course Banner */}
-                <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-purple-900 via-indigo-900 to-slate-900">
+                <div className="relative h-48 w-full overflow-hidden bg-slate-950">
                   <Image
-                    src="/images/teacher-hero.jpg"
+                    src={c.image}
                     alt={c.title}
                     fill
-                    className="object-cover opacity-80 transition duration-500 group-hover:scale-105"
+                    className="object-cover opacity-90 transition duration-500 group-hover:scale-105"
                   />
                   {/* Tag */}
-                  <span className="absolute top-3 right-3 rounded-lg bg-purple-700/90 px-3 py-1 text-xs font-bold text-white shadow backdrop-blur-sm">
+                  <span className="absolute top-3 right-3 rounded-xl bg-blue-600/90 px-3 py-1 text-xs font-bold text-white shadow backdrop-blur-sm">
                     {c.tag}
                   </span>
                   {/* Price */}
-                  <span className="absolute bottom-3 right-3 rounded-xl bg-black/60 px-3 py-1 font-display text-lg font-black text-white backdrop-blur-md">
-                    {c.price} <span className="text-xs font-normal">ج.م</span>
+                  <span className="absolute bottom-3 right-3 rounded-xl bg-black/70 px-3 py-1 font-display text-sm font-black text-cyan-400 backdrop-blur-md border border-white/10">
+                    {c.price}
                   </span>
                 </div>
 
                 {/* Content */}
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="font-bold text-slate-900 line-clamp-2 min-h-[44px]">
-                    {c.title}
-                  </h3>
+                <div className="flex flex-1 flex-col justify-between p-5 space-y-4">
+                  <div>
+                    <h3 className="font-bold text-white line-clamp-2 text-sm leading-snug">
+                      {c.title}
+                    </h3>
 
-                  <div className="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-3">
-                    <span>{c.date}</span>
-                    <span>{c.lessons}</span>
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-blue-500/10 pt-3">
+                      <span>الدفعة ٢٠٢٦ / ٢٠٢٧</span>
+                      <span className="text-cyan-400 font-semibold">{c.lessons}</span>
+                    </div>
                   </div>
 
                   <Link
-                    href={`/register`}
-                    className="mt-4 block w-full rounded-xl bg-purple-50 py-2.5 text-center text-sm font-bold text-purple-700 transition hover:bg-purple-700 hover:text-white"
+                    href={`/courses`}
+                    className="block w-full rounded-2xl bg-blue-600/20 border border-blue-500/40 py-2.5 text-center text-xs font-bold text-cyan-300 transition hover:bg-blue-600 hover:text-white"
                   >
-                    اشترك الآن
+                    الدخول للكورس
                   </Link>
                 </div>
               </div>
-            ))}
           </div>
         </div>
       </section>

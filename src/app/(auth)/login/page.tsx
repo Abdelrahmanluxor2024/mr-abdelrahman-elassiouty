@@ -66,19 +66,36 @@ function LoginForm() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-brand-gradient px-4">
-      <div className="w-full max-w-md rounded-3xl border border-white/15 bg-white/95 p-8 shadow-blue-glow backdrop-blur">
+    <main className="relative grid min-h-screen place-items-center px-4 overflow-hidden bg-[#070B14]">
+      {/* Background Image aaa.png with Cyber Overlay */}
+      <div className="absolute inset-0 -z-10">
+        <Image
+          src="/images/auth-bg.png"
+          alt="خلفية المنصة"
+          fill
+          priority
+          className="object-cover opacity-35"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#070B14]/80 via-[#070B14]/70 to-[#070B14]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-blue-500/30 bg-[#0B1324]/90 p-8 shadow-2xl shadow-blue-500/20 backdrop-blur-xl">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-white shadow-blue-soft">
-            <Lock className="h-6 w-6" />
+          <div className="relative mx-auto mb-3 h-16 w-20">
+            <Image
+              src="/images/logo.png"
+              alt="شعار مستر عبدالرحمن الأسيوطي"
+              fill
+              className="object-contain drop-shadow-lg"
+            />
           </div>
-          <h1 className="font-display text-2xl font-black text-brand-900">تسجيل الدخول</h1>
-          <p className="mt-1 text-sm text-slate-500">أهلاً بيك تاني، يلا نكمل المشوار 👋</p>
+          <h1 className="font-display text-2xl font-black text-white">تسجيل الدخول</h1>
+          <p className="mt-1 text-sm text-slate-400">أهلاً بيك تاني، يلا نكمل المشوار 👋</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="phone">رقم الهاتف</Label>
+          <div className="space-y-1.5 text-right">
+            <Label htmlFor="phone" className="text-slate-200">رقم الهاتف</Label>
             <div className="relative">
               <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -87,14 +104,14 @@ function LoginForm() {
                 placeholder="01xxxxxxxxx"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="ps-10"
+                className="ps-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
                 required
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="password">كلمة المرور</Label>
+          <div className="space-y-1.5 text-right">
+            <Label htmlFor="password" className="text-slate-200">كلمة المرور</Label>
             <div className="relative">
               <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -103,19 +120,19 @@ function LoginForm() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="ps-10"
+                className="ps-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
                 required
               />
             </div>
           </div>
 
           {displayError && (
-            <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
               {displayError}
             </p>
           )}
 
-          <Button type="submit" className="w-full" size="lg" disabled={isPending}>
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl shadow-lg shadow-blue-600/30" size="lg" disabled={isPending}>
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -130,9 +147,9 @@ function LoginForm() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-600">
+        <p className="mt-6 text-center text-sm text-slate-400">
           مش معاك حساب؟{' '}
-          <Link href="/register" className="font-semibold text-brand-700 hover:underline">
+          <Link href="/register" className="font-bold text-cyan-400 hover:underline">
             أنشئ حساب
           </Link>
         </p>
