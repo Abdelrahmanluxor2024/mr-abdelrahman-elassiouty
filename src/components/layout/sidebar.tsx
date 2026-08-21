@@ -183,6 +183,23 @@ export function Sidebar({ studentName, avatarUrl }: { studentName: string; avata
             <User className="h-5 w-5 shrink-0" />
             {!collapsed && <span className="text-sm">حسابي</span>}
           </Link>
+
+          {/* 6. الاستفسارات والدعم (WhatsApp) */}
+          <a
+            href="https://wa.me/201064106070?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20%D9%85%D8%B3%D8%AA%D8%B1%20%D8%B9%D8%A8%D8%AF%D8%A7%D9%84%D8%B1%D8%AD%D9%85%D9%86%D8%8C%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
+          >
+            <MessageSquare className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            {!collapsed && (
+              <div className="flex flex-col text-right">
+                <span className="text-sm">الاستفسارات والدعم</span>
+                <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal">واتساب: 01064106070</span>
+              </div>
+            )}
+          </a>
         </nav>
 
         {/* Bottom Student Card */}

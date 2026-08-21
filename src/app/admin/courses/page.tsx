@@ -18,7 +18,14 @@ export default function AdminCoursesPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
   const qc = useQueryClient();
-  const [form, setForm] = useState({ title: '', description: '', price: 0, is_free: true, duration_hours: 0 });
+  const [form, setForm] = useState({ 
+    title: '', 
+    description: '', 
+    price: 0, 
+    is_free: true, 
+    duration_hours: 0,
+    thumbnail_url: '/images/course-foundation-languages.jpg'
+  });
   const [pending, start] = useTransition();
 
   const { data: courses = [] } = useQuery({
@@ -30,15 +37,25 @@ export default function AdminCoursesPage() {
   });
 
   function onCreate() {
-    if (!form.title) return;
+    if (!form.title) {
+      toast.error('يرجى كتابة عنوان الكورس');
+      return;
+    }
     start(async () => {
       const res = await createCourse(form);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success('تم إنشاء الكورس');
-      setForm({ title: '', description: '', price: 0, is_free: true, duration_hours: 0 });
+      toast.success('تم إنشاء الكورس بنجاح');
+      setForm({ 
+        title: '', 
+        description: '', 
+        price: 0, 
+        is_free: true, 
+        duration_hours: 0,
+        thumbnail_url: '/images/course-foundation-languages.jpg'
+      });
       qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
     });
   }
@@ -50,7 +67,7 @@ export default function AdminCoursesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       <h1 className="font-display text-2xl font-black text-brand-900">إدارة الكورسات</h1>
 
       <Card>
@@ -59,27 +76,65 @@ export default function AdminCoursesPage() {
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>العنوان</Label>
-            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <Label>عنوان الكورس</Label>
+            <Input 
+              placeholder="مثال: الكورس التأسيسي في البرمجة"
+              value={form.title} 
+              onChange={(e) => setForm({ ...form, title: e.target.value })} 
+            />
           </div>
           <div>
             <Label>المدة (ساعات)</Label>
             <Input type="number" value={form.duration_hours} onChange={(e) => setForm({ ...form, duration_hours: Number(e.target.value) })} />
           </div>
+          
+          <div className="sm:col-span-2">
+            <Label>رابط / مسار صورة الكورس (Thumbnail URL)</Label>
+            <Input 
+              placeholder="مثال: /images/course-foundation-languages.jpg أو رابط صورة مباشر"
+              value={form.thumbnail_url} 
+              onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} 
+            />
+            <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+              <span>نماذج سريعة:</span>
+              <button 
+                type="button" 
+                onClick={() => setForm({ ...form, thumbnail_url: '/images/course-foundation-languages.jpg' })}
+                className="text-blue-600 hover:underline"
+              >
+                بوستر اللغات الجديد
+              </button>
+              <span>•</span>
+              <button 
+                type="button" 
+                onClick={() => setForm({ ...form, thumbnail_url: '/images/teacher-hero.jpg' })}
+                className="text-blue-600 hover:underline"
+              >
+                بوستر المستر مع الروبوت
+              </button>
+            </div>
+          </div>
+
           <div className="sm:col-span-2">
             <Label>الوصف</Label>
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <Textarea 
+              placeholder="اكتب نبذة ومحاور الكورس..."
+              value={form.description} 
+              onChange={(e) => setForm({ ...form, description: e.target.value })} 
+            />
           </div>
           <div>
-            <Label>السعر</Label>
+            <Label>السعر (ج.م)</Label>
             <Input type="number" disabled={form.is_free} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
           </div>
           <div className="flex items-end gap-3">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
               <input type="checkbox" checked={form.is_free} onChange={(e) => setForm({ ...form, is_free: e.target.checked })} />
-              مجاني
+              كورس مجاني
             </label>
-            <Button onClick={onCreate} disabled={pending}>{pending ? 'جاري الإنشاء...' : 'إضافة'}</Button>
+            <Button onClick={onCreate} disabled={pending} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6">
+              {pending ? 'جاري الإنشاء...' : 'إضافة الكورس'}
+            </Button>
           </div>
         </CardContent>
       </Card>

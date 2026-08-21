@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 import { AdminShell } from '@/components/layout/admin-shell';
 
@@ -7,8 +8,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?next=/admin');
 
-  const role = (user.app_metadata as { role?: string } | null)?.role;
-  if (role !== 'admin') redirect('/dashboard');
+  // Verify only authorized phone 01064106070 can access admin panel
+  const adminClient = createAdminClient();
+  const { data: student } = await adminClient
+    .from('students')
+    .select('phone, full_name, role')
+    .eq('id', user.id)
+    .maybeSingle();
 
-  return <AdminShell name={(user.user_metadata?.full_name as string) ?? user.email ?? 'Admin'}>{children}</AdminShell>;
+  const userPhone = student?.phone ?? user.phone ?? '';
+  const isMasterAdmin = userPhone === '01064106070' || user.email === '01064106070@mrass.app';
+
+  if (!isMasterAdmin && student?.role !== 'admin') {
+    redirect('/dashboard');
+  }
+
+  const displayName = student?.full_name ?? 'مستر عبدالرحمن الأسيوطي';
+
+  return <AdminShell name={displayName}>{children}</AdminShell>;
 }

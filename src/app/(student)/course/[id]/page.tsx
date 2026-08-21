@@ -192,28 +192,30 @@ export default function CoursePage() {
 
               {/* Expanded Content (Only when purchased) */}
               {isOpen && isPurchased && (
-                <div className="border-t border-white/20 bg-white dark:bg-[#0A101D]">
-                  {/* Watch Row */}
-                  <Link
-                    href={`/lesson/${lesson.id}`}
-                    className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                        مشاهدة
-                      </span>
-                      <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                        {lesson.title}
-                      </span>
-                    </div>
-                    <PlayCircle className="h-5 w-5 text-blue-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-                  </Link>
-
-                  {/* Exam Row */}
-                  {lesson.has_exam && (
+                <div className="border-t border-white/20 bg-white dark:bg-[#0A101D] divide-y divide-slate-100 dark:divide-slate-800">
+                  {/* Watch Row (Only if video exists) */}
+                  {lesson.video_url && (
                     <Link
-                      href={lesson.exam?.[0]?.id ? `/exam/${lesson.exam[0].id}` : `/lesson/${lesson.id}`}
-                      className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
+                      href={`/lesson/${lesson.id}`}
+                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                          مشاهدة
+                        </span>
+                        <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
+                          {lesson.title}
+                        </span>
+                      </div>
+                      <PlayCircle className="h-5 w-5 text-blue-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
+                    </Link>
+                  )}
+
+                  {/* Exam Row (Only if exam exists) */}
+                  {lesson.has_exam && lesson.exam && lesson.exam.length > 0 && (
+                    <Link
+                      href={`/exam/${lesson.exam[0].id}`}
+                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
                     >
                       <div className="flex items-center gap-3">
                         <span className="rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/60 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 group-hover:bg-blue-600 group-hover:text-white transition">
@@ -222,11 +224,29 @@ export default function CoursePage() {
                         <div className="flex items-center gap-1.5">
                           <span className="text-base">🔑</span>
                           <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                            {lesson.exam?.[0]?.title ?? 'quiz (1)'}
+                            {lesson.exam[0].title}
                           </span>
                         </div>
                       </div>
                       <ClipboardList className="h-5 w-5 text-blue-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
+                    </Link>
+                  )}
+
+                  {/* If neither video nor exam */}
+                  {!lesson.video_url && (!lesson.has_exam || !lesson.exam?.length) && (
+                    <Link
+                      href={`/lesson/${lesson.id}`}
+                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-lg bg-slate-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                          تفاصيل
+                        </span>
+                        <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
+                          {lesson.title}
+                        </span>
+                      </div>
+                      <PlayCircle className="h-5 w-5 text-slate-600 group-hover:scale-110 transition-transform" />
                     </Link>
                   )}
                 </div>

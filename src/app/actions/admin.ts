@@ -86,3 +86,33 @@ export async function gradeEssay(input: {
   revalidatePath('/admin/grading');
   return { ok: true as const };
 }
+
+export async function adminReplyToPost(input: { postId: string; content: string }) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { error: replyErr } = await admin.from('forum_replies').insert({
+    post_id: input.postId,
+    content: input.content,
+    is_admin_reply: true,
+  });
+
+  if (replyErr) return { ok: false as const, error: replyErr.message };
+
+  await admin.from('forum_posts').update({ is_answered: true }).eq('id', input.postId);
+
+  revalidatePath('/admin/forum');
+  revalidatePath('/forum');
+  return { ok: true as const };
+}
+
+export async function deleteForumPost(postId: string) {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from('forum_posts').delete().eq('id', postId);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath('/admin/forum');
+  revalidatePath('/forum');
+  return { ok: true as const };
+}
+

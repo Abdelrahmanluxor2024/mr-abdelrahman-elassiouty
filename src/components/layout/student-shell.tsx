@@ -12,7 +12,6 @@ export async function StudentShell({ children }: { children: React.ReactNode }) 
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar studentName={student.full_name} />
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8 bg-slate-50/50 dark:bg-[#070B14] transition-colors">{children}</main>
-        <WhatsAppButton />
       </div>
     </div>
   );
