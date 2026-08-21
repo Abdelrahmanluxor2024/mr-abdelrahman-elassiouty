@@ -1,0 +1,80 @@
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { createBrowserClient } from '@supabase/ssr';
+import type { Course, Lesson, Enrollment } from '@/types/supabase';
+
+function browserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+export function useCourses() {
+  return useQuery({
+    queryKey: ['courses', 'all'],
+    queryFn: async (): Promise<Course[]> => {
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('is_published', true)
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Course[];
+    },
+  });
+}
+
+export function useCourse(id: string) {
+  return useQuery({
+    queryKey: ['courses', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*, lessons:lessons(*, exam:exams(*))')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      return data as Course & { lessons: (Lesson & { exam?: { id: string; title: string }[] })[] };
+    },
+  });
+}
+
+export function useLesson(id: string) {
+  return useQuery({
+    queryKey: ['lessons', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('lessons')
+        .select('*, course:courses(*), exam:exams(*)')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      return data as Lesson & { course: Course; exam: { id: string; title: string; duration_minutes: number; total_marks: number }[] };
+    },
+  });
+}
+
+export function useEnrollments() {
+  return useQuery({
+    queryKey: ['enrollments', 'me'],
+    queryFn: async (): Promise<(Enrollment & { course: Course })[]> => {
+      const supabase = browserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('enrollments')
+        .select('*, course:courses(*)')
+        .eq('student_id', user.user_metadata.student_id ?? user.id)
+        .order('enrolled_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as (Enrollment & { course: Course })[];
+    },
+  });
+}

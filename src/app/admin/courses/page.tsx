@@ -1,0 +1,110 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createBrowserClient } from '@supabase/ssr';
+import { createCourse, publishCourse } from '@/app/actions/admin';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+
+export default function AdminCoursesPage() {
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const qc = useQueryClient();
+  const [form, setForm] = useState({ title: '', description: '', price: 0, is_free: true, duration_hours: 0 });
+  const [pending, start] = useTransition();
+
+  const { data: courses = [] } = useQuery({
+    queryKey: ['admin', 'courses'],
+    queryFn: async () => {
+      const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  function onCreate() {
+    if (!form.title) return;
+    start(async () => {
+      const res = await createCourse(form);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success('تم إنشاء الكورس');
+      setForm({ title: '', description: '', price: 0, is_free: true, duration_hours: 0 });
+      qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
+    });
+  }
+
+  async function toggle(id: string, is_published: boolean) {
+    const res = await publishCourse(id, is_published);
+    if (!res.ok) toast.error(res.error);
+    else qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="font-display text-2xl font-black text-brand-900">إدارة الكورسات</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>إضافة كورس جديد</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>العنوان</Label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          </div>
+          <div>
+            <Label>المدة (ساعات)</Label>
+            <Input type="number" value={form.duration_hours} onChange={(e) => setForm({ ...form, duration_hours: Number(e.target.value) })} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label>الوصف</Label>
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div>
+            <Label>السعر</Label>
+            <Input type="number" disabled={form.is_free} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
+          </div>
+          <div className="flex items-end gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.is_free} onChange={(e) => setForm({ ...form, is_free: e.target.checked })} />
+              مجاني
+            </label>
+            <Button onClick={onCreate} disabled={pending}>{pending ? 'جاري الإنشاء...' : 'إضافة'}</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>الكورسات ({courses.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="divide-y divide-slate-100">
+          {courses.map((c: { id: string; title: string; is_published: boolean; is_free: boolean; price: number }) => (
+            <div key={c.id} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-bold">{c.title}</p>
+                <p className="text-xs text-slate-500">{c.is_free ? 'مجاني' : `${c.price} ج.م`}</p>
+              </div>
+              <Badge variant={c.is_published ? 'success' : 'warning'}>
+                {c.is_published ? 'منشور' : 'مسودة'}
+              </Badge>
+              <Button size="sm" variant="outline" onClick={() => toggle(c.id, !c.is_published)}>
+                {c.is_published ? 'إخفاء' : 'نشر'}
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
