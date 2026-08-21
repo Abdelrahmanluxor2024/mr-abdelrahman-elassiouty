@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Phone, Lock, ArrowLeft, Loader2 } from 'lucide-react';
