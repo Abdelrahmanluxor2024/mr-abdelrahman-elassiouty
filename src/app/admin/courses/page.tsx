@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useTransition } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createBrowserClient } from '@supabase/ssr';
