@@ -161,7 +161,7 @@ export default function ExamResultPage() {
 
                 <p className="font-bold text-slate-900 text-sm leading-relaxed">{q.question_text}</p>
 
-                {q.question_type === 'mcq' ? (
+                {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? (
                   <div className="rounded-2xl bg-slate-50 p-3.5 text-xs space-y-1.5 border border-slate-100">
                     <p className="text-slate-600">
                       إجابتك: <span className={`font-bold ${isCorrect ? 'text-emerald-700' : 'text-rose-600'}`}>{a?.answer_text ?? 'لم يتم الإجابة'}</span>

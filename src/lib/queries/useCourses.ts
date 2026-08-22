@@ -35,7 +35,7 @@ export function useCourse(id: string) {
       const supabase = browserClient();
       const { data, error } = await supabase
         .from('courses')
-        .select('*, lessons:lessons(*, exams(*))')
+        .select('*, lessons:lessons(*, exams(*), exam:exams(*))')
         .eq('id', id)
         .order('order_index', { referencedTable: 'lessons', ascending: true })
         .single();
@@ -108,19 +108,31 @@ export function useStudentPassedExams() {
       const supabase = browserClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return new Set<string>();
-      const studentId = user.user_metadata?.student_id ?? user.id;
+      
+      // Also get student id from students table if different
+      const { data: studentRecord } = await supabase
+        .from('students')
+        .select('id')
+        .or(`id.eq.${user.id},phone.eq.${user.phone || user.email?.split('@')[0]}`)
+        .maybeSingle();
 
+      const studentIds = Array.from(new Set([user.id, user.user_metadata?.student_id, studentRecord?.id].filter(Boolean)));
+      
       const { data, error } = await supabase
         .from('exam_attempts')
-        .select('exam_id, is_passed, percentage, score, status')
-        .or(`student_id.eq.${user.id},student_id.eq.${studentId}`);
+        .select('exam_id, percentage, score, status')
+        .in('student_id', studentIds);
 
-      if (error) return new Set<string>();
+      if (error) {
+        console.error('Error fetching passed exams:', error);
+        return new Set<string>();
+      }
+      
       const passed = new Set<string>();
       (data ?? []).forEach((att: any) => {
         const pct = Number(att.percentage ?? 0);
         const score = Number(att.score ?? 0);
-        if (att.is_passed === true || pct >= 50 || score > 0 || att.status === 'graded') {
+        if (pct >= 50 || score > 0 || att.status === 'graded') {
           passed.add(att.exam_id);
         }
       });

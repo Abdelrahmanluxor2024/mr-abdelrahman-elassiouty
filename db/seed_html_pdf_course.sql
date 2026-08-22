@@ -1,8 +1,8 @@
-﻿-- ====================================================================
+-- ====================================================================
 -- 🎓 إنشاء كورس لغة HTML والويب بـ PDF وامتحان كود واختياري (150 ج.م)
 -- ====================================================================
 
-DO 
+DO $$
 DECLARE
   v_course_id UUID := '77777777-7777-7777-7777-777777777777';
   v_lesson_id UUID := '77777777-aaaa-7777-aaaa-777777777777';
@@ -95,7 +95,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'ما هو الوسم الصحيح المستخدم لإنشاء رابط تشعبي (Hyperlink) في لغة HTML؟',
-    'mcq',
+    'multiple_choice',
     4,
     'html_basics',
     '[
@@ -114,7 +114,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'ما هي الخاصية المستخدمة لتحديد مسار الصورة البديل في وسم <img> عند عدم ظهورها؟',
-    'mcq',
+    'multiple_choice',
     4,
     'html_basics',
     '[
@@ -133,7 +133,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'أي من الوسوم التالية يُستخدم لإنشاء قائمة مرتبة ومرقمة (Ordered List)؟',
-    'mcq',
+    'multiple_choice',
     4,
     'html_basics',
     '[
@@ -152,7 +152,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'ما هو الوسم الذي يُستخدم لإدراج سطر جديد ونزول للسطر التالي دون إنشاء فقرة جديدة؟',
-    'mcq',
+    'multiple_choice',
     4,
     'html_basics',
     '[
@@ -171,7 +171,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'أين يجب وضع وسم <title> في بنية مستند HTML؟',
-    'mcq',
+    'multiple_choice',
     4,
     'html_basics',
     '[
@@ -190,7 +190,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'ما هو الوسم الصحيح لإنشاء جدول في HTML وتعريف صف وعمود بداخله؟',
-    'mcq',
+    'multiple_choice',
     5,
     'html_basics',
     '[
@@ -209,7 +209,7 @@ BEGIN
   VALUES (
     v_exam_id,
     'ما هو تصريح نوع المستند (DOCTYPE) القياسي في HTML5؟',
-    'mcq',
+    'multiple_choice',
     5,
     'html_basics',
     '[
@@ -223,4 +223,4 @@ BEGIN
     9
   );
 
-END ;
+END $$;

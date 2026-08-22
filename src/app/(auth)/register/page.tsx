@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { registerStudent } from '@/app/actions/auth';
 import { getDeviceFingerprint } from '@/lib/device';
 import { createClient } from '@/lib/supabase/client';
-import { phoneToEmail } from '@/lib/utils';
+import { phoneToEmail, cn } from '@/lib/utils';
 
 const EGYPTIAN_GOVERNORATES = [
   'القاهرة', 'الجيزة', 'الإسكندرية', 'الأقصر', 'أسوان', 'قنا', 'سوهاج', 'أسيوط',
@@ -28,6 +28,7 @@ export default function RegisterPage() {
     phone: '',
     password: '',
     parent_phone: '',
+    gender: 'male',
     governorate: 'القاهرة',
     school: '',
     grade: '1st_bac' as string,
@@ -149,6 +150,36 @@ export default function RegisterPage() {
                 className="ps-10 text-slate-900 font-bold bg-slate-50 border-slate-300 placeholder:text-slate-400 focus:bg-white" 
                 placeholder="01xxxxxxxxx" 
               />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="gender" className="text-slate-800 font-bold text-xs sm:text-sm">النوع (الجنس)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onChange('gender', 'male')}
+                className={cn(
+                  'h-10 rounded-xl font-bold text-sm border transition-all flex items-center justify-center gap-1.5',
+                  form.gender === 'male'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25'
+                    : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                )}
+              >
+                <span>👨‍🎓 ذكر</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange('gender', 'female')}
+                className={cn(
+                  'h-10 rounded-xl font-bold text-sm border transition-all flex items-center justify-center gap-1.5',
+                  form.gender === 'female'
+                    ? 'bg-pink-600 text-white border-pink-600 shadow-md shadow-pink-500/25'
+                    : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                )}
+              >
+                <span>👩‍🎓 أنثى</span>
+              </button>
             </div>
           </div>
 

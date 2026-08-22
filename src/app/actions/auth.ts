@@ -61,6 +61,11 @@ export async function registerStudent(input: {
 
   const userId = authData.user.id;
 
+  // Map grade to DB supported value if DB has strict check constraint
+  let dbGrade = input.grade ?? '3rd_secondary';
+  if (dbGrade === '1st_bac') dbGrade = '1st_secondary';
+  if (dbGrade === '2nd_bac') dbGrade = '2nd_secondary';
+
   // 2) Create students row with same id
   const { data: student, error: insertError } = await admin
     .from('students')
@@ -72,7 +77,7 @@ export async function registerStudent(input: {
       parent_phone: input.parent_phone ?? null,
       governorate: input.governorate ?? null,
       school: input.school ?? null,
-      grade: input.grade ?? '3rd_secondary',
+      grade: dbGrade,
       device_id_1: input.device_fingerprint,
     })
     .select('id, full_name, phone')

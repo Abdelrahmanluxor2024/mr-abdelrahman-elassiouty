@@ -195,14 +195,14 @@ export default function ExamRunnerPage() {
         <CardHeader className="bg-slate-50/50 dark:bg-slate-900/40 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-2">
             <span className="rounded-lg bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
-              {q.question_type === 'mcq' ? 'اختيار من متعدد' : '💻 سؤال كتابة كود برمجية'}
+              {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? 'اختيار من متعدد' : '💻 سؤال كتابة كود برمجية'}
             </span>
             <span className="text-xs text-slate-400 font-medium">الدرجة: {q.marks}</span>
           </div>
           <CardTitle className="leading-relaxed text-base font-bold text-slate-900 dark:text-white">{q.question_text}</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          {q.question_type === 'mcq' ? (
+          {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? (
             <div className="space-y-3">
               {(q.options ?? []).map((opt) => {
                 const selected = answers[q.id] === opt.key;

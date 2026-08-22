@@ -166,6 +166,26 @@ export function Sidebar({ studentName, avatarUrl }: { studentName: string; avata
             {!collapsed && <span className="text-sm">المنتدى والأسئلة</span>}
           </Link>
 
+          {/* 4. جروب المنصة (Community Group) */}
+          <Link
+            href="/community"
+            onClick={() => setMobileOpen(false)}
+            className={cn(
+              'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
+              pathname === '/community'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+            )}
+          >
+            <Sparkles className="h-5 w-5 shrink-0 text-cyan-500" />
+            {!collapsed && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm">جروب المنصة</span>
+                <span className="rounded-md bg-blue-500/20 text-blue-600 dark:text-cyan-300 text-[10px] px-1.5 py-0.2">جديد</span>
+              </div>
+            )}
+          </Link>
+
           {/* 4. المحفظة (Wallet) */}
           <Link
             href="/wallet"

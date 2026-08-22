@@ -134,7 +134,9 @@ export async function submitExam(input: {
     if (!branchScores[branch]) branchScores[branch] = { correct: 0, total: 0 };
     branchScores[branch].total += 1;
 
-    if (q.question_type === 'mcq') {
+    const isChoiceQuestion = q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice';
+
+    if (isChoiceQuestion) {
       if (!studentAns) {
         unanswered += 1;
         toInsert.push({ attempt_id: input.attemptId, question_id: q.id, answer_text: null, is_correct: null, marks_obtained: 0, status: 'auto_graded' });
