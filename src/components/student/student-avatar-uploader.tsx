@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useTransition } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
@@ -26,16 +26,43 @@ export function StudentAvatarUploader({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setAvatar(base64);
-      startTransition(async () => {
-        const res = await updateStudentAvatar(base64);
-        if (!res.ok) {
-          toast.error(res.error);
-          return;
+      const src = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 250;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
         }
-        toast.success('تم تحديث صورتك الشخصية بنجاح 🎉');
-      });
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+        setAvatar(compressedBase64);
+        startTransition(async () => {
+          const res = await updateStudentAvatar(compressedBase64);
+          if (!res.ok) {
+            toast.error(res.error);
+            return;
+          }
+          toast.success('تم تحديث صورتك الشخصية بنجاح 🎉');
+        });
+      };
+      img.src = src;
     };
     reader.readAsDataURL(file);
   }

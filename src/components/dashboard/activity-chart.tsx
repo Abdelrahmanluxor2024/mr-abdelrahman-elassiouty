@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import {
   LineChart,
@@ -10,40 +10,46 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const data = [
-  { day: 'الأربعاء', current: 0, previous: 0 },
-  { day: 'الخميس', current: 0, previous: 0 },
-  { day: 'الجمعة', current: 0, previous: 0 },
-  { day: 'السبت', current: 0, previous: 0 },
-  { day: 'الأحد', current: 0, previous: 0 },
-  { day: 'الإثنين', current: 0, previous: 0 },
-  { day: 'الثلاثاء', current: 0, previous: 0 },
+export interface ActivityDay {
+  day: string;
+  current: number;
+  previous: number;
+}
+
+const defaultData: ActivityDay[] = [
+  { day: 'السبت', current: 30, previous: 20 },
+  { day: 'الأحد', current: 65, previous: 40 },
+  { day: 'الإثنين', current: 45, previous: 35 },
+  { day: 'الثلاثاء', current: 80, previous: 50 },
+  { day: 'الأربعاء', current: 70, previous: 60 },
+  { day: 'الخميس', current: 90, previous: 75 },
+  { day: 'الجمعة', current: 85, previous: 70 },
 ];
 
-export function DashboardActivityChart() {
+export function DashboardActivityChart({ data = defaultData }: { data?: ActivityDay[] }) {
   return (
     <div className="h-64 w-full pt-4">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
           <XAxis
             dataKey="day"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748B', fontSize: 12 }}
+            tick={{ fill: '#94A3B8', fontSize: 12 }}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748B', fontSize: 12 }}
+            tick={{ fill: '#94A3B8', fontSize: 12 }}
             domain={[0, 100]}
-            ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+            ticks={[0, 20, 40, 60, 80, 100]}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: '#1E1B4B',
-              borderRadius: '12px',
-              border: 'none',
+              backgroundColor: '#0F172A',
+              borderRadius: '16px',
+              border: '1px solid #334155',
               color: '#fff',
               fontSize: '12px',
             }}
@@ -60,9 +66,9 @@ export function DashboardActivityChart() {
             type="monotone"
             dataKey="current"
             name="الأسبوع الحالي"
-            stroke="#EF4444"
-            strokeWidth={2.5}
-            dot={{ r: 4, fill: '#EF4444' }}
+            stroke="#3B82F6"
+            strokeWidth={3}
+            dot={{ r: 5, fill: '#3B82F6' }}
           />
         </LineChart>
       </ResponsiveContainer>

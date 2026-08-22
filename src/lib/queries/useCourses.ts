@@ -35,11 +35,12 @@ export function useCourse(id: string) {
       const supabase = browserClient();
       const { data, error } = await supabase
         .from('courses')
-        .select('*, lessons:lessons(*, exam:exams(*))')
+        .select('*, lessons:lessons(*, exams(*))')
         .eq('id', id)
+        .order('order_index', { referencedTable: 'lessons', ascending: true })
         .single();
       if (error) throw error;
-      return data as Course & { lessons: (Lesson & { exam?: { id: string; title: string }[] })[] };
+      return data as Course & { lessons: (Lesson & { exams?: { id: string; title: string; passing_marks?: number; total_marks?: number }[]; exam?: { id: string; title: string }[] })[] };
     },
   });
 }
@@ -52,11 +53,11 @@ export function useLesson(id: string) {
       const supabase = browserClient();
       const { data, error } = await supabase
         .from('lessons')
-        .select('*, course:courses(*), exam:exams(*)')
+        .select('*, course:courses(*), exams(*)')
         .eq('id', id)
         .single();
       if (error) throw error;
-      return data as Lesson & { course: Course; exam: { id: string; title: string; duration_minutes: number; total_marks: number }[] };
+      return data as Lesson & { course: Course; exams?: { id: string; title: string; duration_minutes: number; total_marks: number }[]; exam?: { id: string; title: string; duration_minutes: number; total_marks: number }[] };
     },
   });
 }
@@ -101,18 +102,25 @@ export function useCourseEnrollment(courseId: string) {
 export function useStudentPassedExams() {
   return useQuery({
     queryKey: ['student', 'passed_exams'],
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const supabase = browserClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return new Set<string>();
+      const studentId = user.user_metadata?.student_id ?? user.id;
+
       const { data, error } = await supabase
         .from('exam_attempts')
-        .select('exam_id, is_passed, percentage')
-        .eq('student_id', user.id);
+        .select('exam_id, is_passed, percentage, score, status')
+        .or(`student_id.eq.${user.id},student_id.eq.${studentId}`);
+
       if (error) return new Set<string>();
       const passed = new Set<string>();
       (data ?? []).forEach((att: any) => {
-        if (att.is_passed || Number(att.percentage) >= 50) {
+        const pct = Number(att.percentage ?? 0);
+        const score = Number(att.score ?? 0);
+        if (att.is_passed === true || pct >= 50 || score > 0 || att.status === 'graded') {
           passed.add(att.exam_id);
         }
       });
@@ -120,5 +128,6 @@ export function useStudentPassedExams() {
     },
   });
 }
+
 
 

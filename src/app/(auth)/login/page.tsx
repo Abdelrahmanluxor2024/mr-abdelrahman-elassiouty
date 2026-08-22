@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Phone, Lock, ArrowLeft, Loader2 } from 'lucide-react';
+import { Phone, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,7 @@ function LoginForm() {
   const nextPath = search.get('next') ?? '/dashboard';
 
   const [phone, setPhone] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -112,18 +113,26 @@ function LoginForm() {
           </div>
 
           <div className="space-y-1.5 text-right">
-            <Label htmlFor="password" className="text-slate-200">كلمة المرور</Label>
+            <Label htmlFor="password" className="text-slate-200 font-bold text-xs sm:text-sm">كلمة المرور</Label>
             <div className="relative">
               <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="ps-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
+                className="ps-10 pe-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 font-bold"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
           </div>
 

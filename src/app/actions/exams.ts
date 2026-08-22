@@ -150,6 +150,7 @@ export async function submitExam(input: {
 
   const hasEssays = (questions as Question[]).some((q) => q.question_type === 'essay');
   const finalStatus: 'submitted' | 'graded' = hasEssays ? 'submitted' : 'graded';
+  const isPassed = percentage >= 50;
 
   const { error: updateError } = await admin
     .from('exam_attempts')
@@ -157,6 +158,7 @@ export async function submitExam(input: {
       submitted_at: new Date().toISOString(),
       score,
       percentage,
+      is_passed: isPassed,
       correct_count: correct,
       wrong_count: wrong,
       unanswered_count: unanswered,
@@ -169,6 +171,9 @@ export async function submitExam(input: {
 
   revalidatePath('/profile');
   revalidatePath('/dashboard');
+  revalidatePath('/courses');
+  revalidatePath('/course/[id]', 'page');
+  revalidatePath('/exam/[id]', 'page');
 
   return {
     ok: true,

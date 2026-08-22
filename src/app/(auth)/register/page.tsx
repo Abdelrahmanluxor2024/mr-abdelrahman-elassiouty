@@ -4,24 +4,31 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Phone, Lock, User, Loader2, UserPlus, MapPin, School } from 'lucide-react';
+import { Phone, Lock, User, Loader2, UserPlus, MapPin, School, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { registerStudent } from '@/app/actions/auth';
 import { getDeviceFingerprint } from '@/lib/device';
-
 import { createClient } from '@/lib/supabase/client';
 import { phoneToEmail } from '@/lib/utils';
 
+const EGYPTIAN_GOVERNORATES = [
+  'القاهرة', 'الجيزة', 'الإسكندرية', 'الأقصر', 'أسوان', 'قنا', 'سوهاج', 'أسيوط',
+  'المنيا', 'بني سويف', 'الفيوم', 'القليوبية', 'الشرقية', 'الدقهلية', 'الغربية',
+  'المنوفية', 'كفر الشيخ', 'دمياط', 'بورسعيد', 'الإسماعيلية', 'السويس',
+  'البحر الأحمر', 'شمال سيناء', 'جنوب سيناء', 'مطروح', 'الوادي الجديد', 'البحيرة'
+];
+
 export default function RegisterPage() {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     full_name: '',
     phone: '',
     password: '',
     parent_phone: '',
-    governorate: '',
+    governorate: 'القاهرة',
     school: '',
     grade: '3rd_secondary' as '1st_secondary' | '2nd_secondary' | '3rd_secondary',
   });
@@ -64,76 +71,129 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-brand-gradient px-4 py-8">
-      <div className="w-full max-w-2xl rounded-3xl border border-white/15 bg-white/95 p-8 shadow-blue-glow backdrop-blur">
+    <main className="grid min-h-screen place-items-center bg-brand-gradient px-4 py-8" dir="rtl">
+      <div className="w-full max-w-2xl rounded-3xl border border-white/15 bg-white p-6 sm:p-8 shadow-2xl backdrop-blur">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-600 text-white shadow-blue-soft">
-            <UserPlus className="h-6 w-6" />
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/30">
+            <UserPlus className="h-7 w-7" />
           </div>
-          <h1 className="font-display text-2xl font-black text-brand-900">حساب جديد</h1>
-          <p className="mt-1 text-sm text-slate-500">ابدأ رحلتك مع مستر عبدالرحمن الأسيوطي</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-black text-slate-900">حساب جديد</h1>
+          <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-500">ابدأ رحلتك التعليمية مع مستر عبدالرحمن الأسيوطي</p>
         </div>
 
         <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="full_name">الاسم بالكامل</Label>
+            <Label htmlFor="full_name" className="text-slate-800 font-bold text-xs sm:text-sm">الاسم بالكامل</Label>
             <div className="relative">
-              <User className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input id="full_name" value={form.full_name} onChange={(e) => onChange('full_name', e.target.value)} className="ps-10" required />
+              <User className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input 
+                id="full_name" 
+                value={form.full_name} 
+                onChange={(e) => onChange('full_name', e.target.value)} 
+                className="ps-10 text-slate-900 font-bold bg-slate-50 border-slate-300 placeholder:text-slate-400 focus:bg-white" 
+                placeholder="اكتب اسمك الثلاثي أو الرباعي"
+                required 
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="phone">رقم الهاتف</Label>
+            <Label htmlFor="phone" className="text-slate-800 font-bold text-xs sm:text-sm">رقم الهاتف</Label>
             <div className="relative">
-              <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input id="phone" inputMode="tel" value={form.phone} onChange={(e) => onChange('phone', e.target.value)} className="ps-10" placeholder="01xxxxxxxxx" required />
+              <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input 
+                id="phone" 
+                inputMode="tel" 
+                value={form.phone} 
+                onChange={(e) => onChange('phone', e.target.value)} 
+                className="ps-10 text-slate-900 font-bold bg-slate-50 border-slate-300 placeholder:text-slate-400 focus:bg-white" 
+                placeholder="010xxxxxxxx" 
+                required 
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">كلمة المرور</Label>
+            <Label htmlFor="password" className="text-slate-800 font-bold text-xs sm:text-sm">كلمة المرور</Label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input id="password" type="password" value={form.password} onChange={(e) => onChange('password', e.target.value)} className="ps-10" required />
+              <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input 
+                id="password" 
+                type={showPassword ? 'text' : 'password'} 
+                value={form.password} 
+                onChange={(e) => onChange('password', e.target.value)} 
+                className="ps-10 pe-10 text-slate-900 font-bold bg-slate-50 border-slate-300 placeholder:text-slate-400 focus:bg-white" 
+                placeholder="••••••••" 
+                required 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="parent_phone">رقم ولي الأمر (اختياري)</Label>
+            <Label htmlFor="parent_phone" className="text-slate-800 font-bold text-xs sm:text-sm">رقم ولي الأمر (اختياري)</Label>
             <div className="relative">
-              <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input id="parent_phone" inputMode="tel" value={form.parent_phone} onChange={(e) => onChange('parent_phone', e.target.value)} className="ps-10" />
+              <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input 
+                id="parent_phone" 
+                inputMode="tel" 
+                value={form.parent_phone} 
+                onChange={(e) => onChange('parent_phone', e.target.value)} 
+                className="ps-10 text-slate-900 font-bold bg-slate-50 border-slate-300 placeholder:text-slate-400 focus:bg-white" 
+                placeholder="01xxxxxxxxx" 
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="grade">الصف الدراسي</Label>
+            <Label htmlFor="grade" className="text-slate-800 font-bold text-xs sm:text-sm">الصف الدراسي</Label>
             <select
               id="grade"
               value={form.grade}
               onChange={(e) => onChange('grade', e.target.value)}
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="h-10 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             >
-              <option value="1st_secondary">أولى ثانوي</option>
-              <option value="2nd_secondary">تانية ثانوي</option>
-              <option value="3rd_secondary">تالتة ثانوي</option>
+              <option value="1st_secondary">الصف الأول الثانوي (أولى ثانوي)</option>
+              <option value="2nd_secondary">الصف الثاني الثانوي (تانية ثانوي)</option>
+              <option value="3rd_secondary">الصف الثالث الثانوي (تالتة ثانوي)</option>
             </select>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="governorate">المحافظة</Label>
+            <Label htmlFor="governorate" className="text-slate-800 font-bold text-xs sm:text-sm">المحافظة</Label>
             <div className="relative">
-              <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input id="governorate" value={form.governorate} onChange={(e) => onChange('governorate', e.target.value)} className="ps-10" placeholder="القاهرة" />
+              <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <select
+                id="governorate"
+                value={form.governorate}
+                onChange={(e) => onChange('governorate', e.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-300 bg-slate-50 ps-10 pe-3 text-sm font-bold text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                {EGYPTIAN_GOVERNORATES.map((gov) => (
+                  <option key={gov} value={gov}>{gov}</option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="school">المدرسة</Label>
+            <Label htmlFor="school" className="text-slate-800 font-bold text-xs sm:text-sm">المدرسة (اختياري)</Label>
             <div className="relative">
-              <School className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input id="school" value={form.school} onChange={(e) => onChange('school', e.target.value)} className="ps-10" />
+              <School className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input 
+                id="school" 
+                value={form.school} 
+                onChange={(e) => onChange('school', e.target.value)} 
+                className="ps-10 text-slate-900 font-bold bg-slate-50 border-slate-300 placeholder:text-slate-400 focus:bg-white" 
+                placeholder="اسم مدرستك"
+              />
             </div>
           </div>
 

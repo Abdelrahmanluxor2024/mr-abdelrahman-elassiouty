@@ -134,6 +134,9 @@ export default function CoursePage() {
         </div>
 
         {data.lessons.map((lesson, i) => {
+          const getExamId = (l: any) => l.exams?.[0]?.id || l.exam?.[0]?.id;
+          const lessonExamId = getExamId(lesson);
+
           // Sequential Lock Check:
           let isLessonUnlocked = isPurchased;
           let lockReason = '';
@@ -145,8 +148,9 @@ export default function CoursePage() {
             // Must have passed exam for all previous lessons
             for (let prevIdx = 0; prevIdx < i; prevIdx++) {
               const prev = data.lessons[prevIdx];
-              if (prev.has_exam && prev.exam?.[0]?.id) {
-                if (!passedExams.has(prev.exam[0].id)) {
+              const prevExamId = getExamId(prev);
+              if (prev.has_exam && prevExamId) {
+                if (!passedExams.has(prevExamId)) {
                   isLessonUnlocked = false;
                   lockReason = `يجب اجتياز امتحان "${prev.title}" أولاً بنجاح`;
                   break;
@@ -155,7 +159,7 @@ export default function CoursePage() {
             }
           }
 
-          const hasPassedThisExam = lesson.has_exam && lesson.exam?.[0]?.id && passedExams.has(lesson.exam[0].id);
+          const hasPassedThisExam = !!lessonExamId && passedExams.has(lessonExamId);
           const isOpen = openLesson === lesson.id && isLessonUnlocked;
 
           return (
@@ -252,23 +256,26 @@ export default function CoursePage() {
                   )}
 
                   {/* Exam Row (Only if exam exists) */}
-                  {lesson.has_exam && lesson.exam && lesson.exam.length > 0 && (
+                  {lesson.has_exam && lessonExamId && (
                     <Link
-                      href={`/exam/${lesson.exam[0].id}`}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
+                      href={`/exam/${lessonExamId}`}
+                      className="flex items-center justify-between px-5 py-3.5 hover:bg-emerald-50 dark:hover:bg-slate-900 transition group"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/60 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 group-hover:bg-blue-600 group-hover:text-white transition">
-                          امتحن
+                        <span className={cn(
+                          "rounded-lg px-3 py-1 text-xs font-bold text-white shadow-sm",
+                          hasPassedThisExam ? "bg-emerald-600" : "bg-cyan-600"
+                        )}>
+                          {hasPassedThisExam ? "امتحان مجتاز ✅" : "امتحان إجباري"}
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-base">🔑</span>
+                          <span className="text-base">📝</span>
                           <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                            {lesson.exam[0].title}
+                            امتحان المحاضرة (شرط لفتح الدرس التالي)
                           </span>
                         </div>
                       </div>
-                      <ClipboardList className="h-5 w-5 text-blue-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
+                      <ClipboardList className="h-5 w-5 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
                     </Link>
                   )}
 

@@ -31,6 +31,30 @@ export async function createChargeCodes(input: { count: number; amount: number; 
   return { ok: true as const, codes: data };
 }
 
+export async function getAdminChargeCodes() {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('charge_codes')
+    .select('*, used_by_student:students!used_by(full_name, phone)')
+    .order('created_at', { ascending: false })
+    .limit(300);
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getAdminStudents() {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('students')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(300);
+  if (error) return [];
+  return data ?? [];
+}
+
 export async function createCourse(input: {
   title: string;
   description: string;
@@ -154,5 +178,78 @@ export async function grantStudentExamAttempt(input: { studentPhone: string; exa
     message: `تم فتح محاولة جديدة بنجاح للطالب ${student.full_name}` 
   };
 }
+
+export async function updateCourse(input: {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  is_free: boolean;
+  duration_hours: number;
+  thumbnail_url?: string;
+}) {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('courses')
+    .update({
+      title: input.title,
+      description: input.description,
+      price: input.price,
+      is_free: input.is_free,
+      duration_hours: input.duration_hours,
+      thumbnail_url: input.thumbnail_url,
+    })
+    .eq('id', input.id)
+    .select('*')
+    .single();
+
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath('/admin/courses');
+  revalidatePath('/courses');
+  revalidatePath(`/course/${input.id}`);
+  return { ok: true as const, course: data };
+}
+
+export async function deleteCourse(courseId: string) {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from('courses').delete().eq('id', courseId);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath('/admin/courses');
+  revalidatePath('/courses');
+  return { ok: true as const };
+}
+
+export async function manualChargeStudent(input: { studentPhone: string; amount: number; reason?: string }) {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const cleanPhone = input.studentPhone.trim();
+  const { data: student, error: studentErr } = await admin
+    .from('students')
+    .select('id, full_name, wallet_balance')
+    .eq('phone', cleanPhone)
+    .maybeSingle();
+
+  if (studentErr || !student) {
+    return { ok: false as const, error: 'لم يتم العثور على طالب بهذا الرقم' };
+  }
+
+  const newBalance = Number(student.wallet_balance) + Number(input.amount);
+  const { error } = await admin.from('students').update({ wallet_balance: newBalance }).eq('id', student.id);
+  if (error) return { ok: false as const, error: error.message };
+
+  await admin.from('wallet_transactions').insert({
+    student_id: student.id,
+    amount: input.amount,
+    type: 'admin_adjustment',
+    status: 'completed',
+    description: input.reason || 'شحن يدوي مباشر من الإدارة',
+  });
+
+  revalidatePath('/admin/students');
+  return { ok: true as const, studentName: student.full_name, newBalance };
+}
+
 
 

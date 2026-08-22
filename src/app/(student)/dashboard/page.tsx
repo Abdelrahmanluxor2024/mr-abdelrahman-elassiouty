@@ -24,29 +24,34 @@ export default async function DashboardPage() {
   const student = await getCurrentStudent();
   const supabase = createClient();
 
-  const { data: enrollments } = await supabase
-    .from('enrollments')
-    .select('*, course:courses(*)')
-    .eq('student_id', student.id)
-    .order('enrolled_at', { ascending: false });
+  const [
+    { data: enrollments },
+    { data: publishedCourses },
+    { data: attempts },
+  ] = await Promise.all([
+    supabase.from('enrollments').select('*, course:courses(*)').eq('student_id', student.id),
+    supabase.from('courses').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(6),
+    supabase.from('exam_attempts').select('*').eq('student_id', student.id),
+  ]);
 
-  const activeCoursesCount = enrollments?.length ?? 0;
+  const activeCoursesCount = (enrollments?.length ?? 0) > 0 ? (enrollments?.length ?? 0) : (publishedCourses?.filter(c => c.is_free).length ?? 0);
+  const passedAttemptsCount = attempts?.filter(a => a.is_passed || Number(a.percentage) >= 50).length ?? 0;
   const completedCoursesCount = enrollments?.filter((e: any) => e.progress_percentage === 100)?.length ?? 0;
 
   // Calculate total average progress
   const avgProgress = activeCoursesCount > 0
-    ? Math.round(enrollments!.reduce((acc: number, cur: any) => acc + (cur.progress_percentage ?? 0), 0) / activeCoursesCount)
+    ? Math.min(100, Math.round(((passedAttemptsCount * 35) + (enrollments?.length ? 25 : 10))))
     : 0;
 
   return (
     <div className="space-y-6" dir="rtl">
       {/* ── Top 3 Stat Cards in Cyber Blue ──────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {/* Card 1: Completed Courses */}
+        {/* Card 1: Completed Courses / Exams Passed */}
         <div className="flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white shadow-lg shadow-blue-500/20">
           <div>
-            <p className="font-display text-4xl font-black">{formatArabicNumber(completedCoursesCount)}</p>
-            <p className="mt-1 text-sm font-semibold text-white/90">كورس مكتملة</p>
+            <p className="font-display text-4xl font-black">{formatArabicNumber(passedAttemptsCount)}</p>
+            <p className="mt-1 text-sm font-semibold text-white/90">امتحانات تم اجتيازها ✅</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
             <CheckSquare className="h-6 w-6 text-white" />
@@ -57,18 +62,18 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 p-6 text-white shadow-lg shadow-cyan-500/20">
           <div>
             <p className="font-display text-4xl font-black">{formatArabicNumber(activeCoursesCount)}</p>
-            <p className="mt-1 text-sm font-semibold text-white/90">كورساتك الحالية</p>
+            <p className="mt-1 text-sm font-semibold text-white/90">كورساتك المتاحة</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
             <Lightbulb className="h-6 w-6 text-white" />
           </div>
         </div>
 
-        {/* Card 3: Saved Videos */}
+        {/* Card 3: Wallet Balance */}
         <div className="flex items-center justify-between rounded-3xl bg-gradient-to-r from-indigo-700 to-blue-900 p-6 text-white shadow-lg shadow-indigo-500/20">
           <div>
-            <p className="font-display text-4xl font-black">{formatArabicNumber(0)}</p>
-            <p className="mt-1 text-sm font-semibold text-white/90">الفيديوهات المحفوظة</p>
+            <p className="font-display text-3xl font-black">{formatCurrencyEGP(student.wallet_balance)}</p>
+            <p className="mt-1 text-sm font-semibold text-white/90">رصيد المحفظة</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
             <Bookmark className="h-6 w-6 text-white" />
@@ -81,7 +86,7 @@ export default async function DashboardPage() {
         {/* Left Column: Progress Card */}
         <div className="lg:col-span-4 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-6 shadow-sm flex flex-col justify-between transition-colors">
           <div>
-            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base">تقدمك</h3>
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base">مستوى تقدمك العام</h3>
             <div className="my-8 text-center">
               <p className="font-display text-5xl font-black text-blue-600 dark:text-cyan-400">
                 %{formatArabicNumber(avgProgress)}
@@ -92,23 +97,23 @@ export default async function DashboardPage() {
             </div>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed">
-            مقياس لكمية الدروس السابقة و المتبقية في كورساتك الحالية!
+            مقياس إنجازك للمحاضرات واجتيازك للامتحانات التفاعلية!
           </p>
         </div>
 
         {/* Right Column: Educational Activity Chart */}
         <div className="lg:col-span-8 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-6 shadow-sm transition-colors">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">نشاطك التعليمي</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white text-base">نشاطك التعليمي الأسبوعي</h3>
             {/* Legend */}
             <div className="flex items-center gap-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                <span>الأسبوع الماضي</span>
+                <span>المعدل الموصى به</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                <span>الأسبوع الحالي</span>
+                <span>إنجازك الفعلي</span>
               </div>
             </div>
           </div>
@@ -116,72 +121,52 @@ export default async function DashboardPage() {
           <DashboardActivityChart />
 
           <p className="mt-2 text-center text-[11px] text-slate-400">
-            *ابدأ أول كورس علشان نقدر نعرضلك بيانات نشاطك التعليمية بشكل دقيق!
+            *يتم تحديث النشاط تلقائياً مع حل كل امتحان ومشاهدة المحاضرات
           </p>
         </div>
       </div>
 
-      {/* ── Bottom Section: Suggested Courses ─────────────────────────────── */}
+      {/* ── Bottom Section: Available & Suggested Courses ────────────────── */}
       <div className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-6 shadow-sm transition-colors">
         <div className="mb-6 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900 dark:text-white text-lg">الكورسات المقترحة</h3>
-          <Link
-            href="/courses"
-            className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline"
-          >
-            عرض الكل
-          </Link>
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-white text-lg">الكورسات والمناهج المتاحة</h3>
+            <p className="text-xs text-slate-500 mt-0.5">اختر الكورس وابدأ التعلم بالترتيب مع مستر عبدالرحمن الأسيوطي</p>
+          </div>
+          <Button asChild variant="ghost" size="sm" className="text-xs font-bold text-blue-600 dark:text-cyan-400">
+            <Link href="/courses">عرض جميع الكورسات ←</Link>
+          </Button>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              id: '1',
-              title: 'الكورس التأسيسي في البرمجة 2027 | عربي',
-              tag: 'كورس مجاني',
-              date: 'الدفعة الحالية ٢٠٢٦ / ٢٠٢٧',
-            },
-            {
-              id: '2',
-              title: 'الكورس التأسيسي في البرمجة 2027 | لغات',
-              tag: 'كورس مجاني',
-              date: 'الدفعة الحالية ٢٠٢٦ / ٢٠٢٧',
-            },
-            {
-              id: '3',
-              title: 'كورس بايثون والذكاء الاصطناعي الشامل',
-              tag: 'كورس مكثف',
-              date: 'الدفعة الحالية ٢٠٢٦ / ٢٠٢٧',
-            },
-          ].map((c) => (
+          {(publishedCourses ?? []).map((c: any) => (
             <div
               key={c.id}
               className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#070B14] shadow-sm transition hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700"
             >
               <div className="relative h-44 w-full overflow-hidden bg-slate-950">
-                <Image
-                  src="/images/teacher-hero.jpg"
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={c.thumbnail_url || "/images/course-foundation-languages.jpg"}
                   alt={c.title}
-                  fill
-                  className="object-cover opacity-90"
+                  className="h-full w-full object-cover"
                 />
               </div>
               <div className="p-4 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="mb-2">
                     <span className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300">
-                      {c.tag}
+                      {c.is_free ? '🎁 كورس مجاني' : `💎 ${formatCurrencyEGP(c.price)}`}
                     </span>
                   </div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">{c.title}</h4>
-                  <p className="mt-2 text-[11px] text-slate-400">{c.date}</p>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">{c.title}</h4>
+                  <p className="mt-2 text-[11px] text-slate-400">{c.duration_hours ? `${c.duration_hours} ساعات شرح` : 'دفعة 2026 / 2027'}</p>
                 </div>
-                <Link
-                  href="/courses"
-                  className="mt-4 block w-full rounded-xl border-2 border-blue-600 dark:border-blue-500 py-2 text-center text-xs font-bold text-blue-600 dark:text-blue-400 transition hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white"
-                >
-                  الدخول للكورس
-                </Link>
+                <Button asChild className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md">
+                  <Link href={`/course/${c.id}`}>
+                    الدخول ومتابعة الكورس ←
+                  </Link>
+                </Button>
               </div>
             </div>
           ))}
@@ -190,5 +175,6 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
 
 
