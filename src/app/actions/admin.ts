@@ -116,3 +116,43 @@ export async function deleteForumPost(postId: string) {
   return { ok: true as const };
 }
 
+export async function grantStudentExamAttempt(input: { studentPhone: string; examId?: string }) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const cleanPhone = input.studentPhone.trim();
+  if (!cleanPhone) {
+    return { ok: false as const, error: 'يرجى إدخال رقم هاتف الطالب' };
+  }
+
+  // Find student by phone
+  const { data: student, error: studentErr } = await admin
+    .from('students')
+    .select('id, full_name, phone')
+    .eq('phone', cleanPhone)
+    .maybeSingle();
+
+  if (studentErr || !student) {
+    return { ok: false as const, error: 'لم يتم العثور على طالب بهذا الرقم' };
+  }
+
+  // Delete previous failed / terminated attempts for this student on the exam
+  let query = admin.from('exam_attempts').delete().eq('student_id', student.id);
+  if (input.examId && input.examId !== 'all') {
+    query = query.eq('exam_id', input.examId);
+  }
+
+  const { error: deleteErr } = await query;
+  if (deleteErr) {
+    return { ok: false as const, error: deleteErr.message };
+  }
+
+  revalidatePath('/admin/exams');
+  return { 
+    ok: true as const, 
+    studentName: student.full_name,
+    message: `تم فتح محاولة جديدة بنجاح للطالب ${student.full_name}` 
+  };
+}
+
+

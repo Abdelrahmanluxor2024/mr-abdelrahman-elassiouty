@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ChevronRight, 
   ChevronLeft, 
@@ -24,6 +24,15 @@ export function Sidebar({ studentName, avatarUrl }: { studentName: string; avata
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Listen to mobile toggle from Navbar
+  useEffect(() => {
+    function handleToggle() {
+      setMobileOpen((prev) => !prev);
+    }
+    window.addEventListener('toggle-sidebar', handleToggle);
+    return () => window.removeEventListener('toggle-sidebar', handleToggle);
+  }, []);
+
   const isHome = pathname === '/dashboard';
   const isCourses = pathname.startsWith('/course') || pathname === '/my-courses' || pathname === '/courses';
   const isProfile = pathname.startsWith('/profile');
@@ -32,33 +41,24 @@ export function Sidebar({ studentName, avatarUrl }: { studentName: string; avata
 
   return (
     <>
-      {/* Mobile Menu Trigger */}
-      <button
-        type="button"
-        aria-label="فتح القائمة"
-        onClick={() => setMobileOpen(true)}
-        className="fixed right-4 top-4 z-40 grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-500/30 lg:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay Backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-100 bg-white dark:border-slate-800/80 dark:bg-[#0A101D] transition-all duration-300 lg:sticky lg:top-0 lg:h-screen',
-          collapsed ? 'w-20' : 'w-64',
+          'fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-100 bg-white dark:border-slate-800/80 dark:bg-[#0A101D] shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shadow-none',
+          collapsed ? 'w-20' : 'w-72 sm:w-64',
           mobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         )}
       >
         {/* Top Header / Collapse bar */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 px-4 py-3.5">
+          {/* Desktop Collapse Button */}
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
@@ -67,17 +67,29 @@ export function Sidebar({ studentName, avatarUrl }: { studentName: string; avata
             <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
               {collapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </span>
-            {!collapsed && <span>تصغير النافذة</span>}
+            {!collapsed && <span>تصغير القائمة</span>}
           </button>
 
-          {/* Close for mobile */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen(false)}
-            className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {/* Mobile Header Inside Sidebar */}
+          <div className="flex items-center justify-between w-full lg:hidden">
+            <div className="flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white font-black text-xs">
+                {studentName?.[0] ?? 'ط'}
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-900 dark:text-white leading-none">{studentName}</p>
+                <span className="text-[10px] text-cyan-500 font-bold">القائمة الرئيسية</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-50 hover:text-red-600 transition"
+              aria-label="إغلاق القائمة"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation list */}

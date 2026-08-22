@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Upload, Sparkles } from 'lucide-react';
 
 export default function AdminCoursesPage() {
   const supabase = createBrowserClient(
@@ -88,19 +89,71 @@ export default function AdminCoursesPage() {
             <Input type="number" value={form.duration_hours} onChange={(e) => setForm({ ...form, duration_hours: Number(e.target.value) })} />
           </div>
           
-          <div className="sm:col-span-2">
-            <Label>رابط / مسار صورة الكورس (Thumbnail URL)</Label>
+          <div className="sm:col-span-2 space-y-3">
+            <Label className="font-bold">صورة الكورس / البوستر (Thumbnail)</Label>
+            
+            {/* File Upload from PC */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:from-blue-500 hover:to-cyan-500 transition">
+                <Upload className="h-4 w-4" />
+                <span>اختر صورة من جهاز الكمبيوتر</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 3 * 1024 * 1024) {
+                        toast.error('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 3 ميجابايت');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const base64 = event.target?.result as string;
+                        setForm({ ...form, thumbnail_url: base64 });
+                        toast.success('تم اختيار الصورة بنجاح');
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+              </label>
+
+              <span className="text-xs text-slate-400">أو اكتب رابط الصورة مباشرة:</span>
+            </div>
+
             <Input 
               placeholder="مثال: /images/course-foundation-languages.jpg أو رابط صورة مباشر"
               value={form.thumbnail_url} 
               onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })} 
+              className="text-xs"
             />
-            <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
-              <span>نماذج سريعة:</span>
+
+            {/* Thumbnail Preview */}
+            {form.thumbnail_url && (
+              <div className="flex items-center gap-4 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+                <div className="relative h-20 w-32 shrink-0 rounded-xl overflow-hidden border border-blue-500/30 bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={form.thumbnail_url} 
+                    alt="معاينة صورة الكورس" 
+                    className="h-full w-full object-cover" 
+                  />
+                </div>
+                <div className="text-xs space-y-1">
+                  <p className="font-bold text-slate-900 dark:text-white">معاينة غلاف الكورس الحالي</p>
+                  <p className="text-slate-500">ستظهر هذه الصورة للطلاب كبوستر رئيسي للكورس</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>نماذج جاهزة سريعة:</span>
               <button 
                 type="button" 
                 onClick={() => setForm({ ...form, thumbnail_url: '/images/course-foundation-languages.jpg' })}
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline font-semibold"
               >
                 بوستر اللغات الجديد
               </button>
@@ -108,7 +161,7 @@ export default function AdminCoursesPage() {
               <button 
                 type="button" 
                 onClick={() => setForm({ ...form, thumbnail_url: '/images/teacher-hero.jpg' })}
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline font-semibold"
               >
                 بوستر المستر مع الروبوت
               </button>
