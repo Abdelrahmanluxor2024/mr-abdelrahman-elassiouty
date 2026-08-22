@@ -28,7 +28,7 @@ export async function registerStudent(input: {
   parent_phone?: string;
   governorate?: string;
   school?: string;
-  grade?: '1st_secondary' | '2nd_secondary' | '3rd_secondary';
+  grade?: '1st_secondary' | '2nd_secondary' | '3rd_secondary' | '1st_bac' | '2nd_bac' | string;
   device_fingerprint: string;
 }): Promise<AuthResult> {
   if (!isEgyptianPhone(input.phone)) {

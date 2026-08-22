@@ -16,7 +16,7 @@ export async function startExam(examId: string): Promise<StartResult> {
 
   const studentId = (user.user_metadata?.student_id as string) ?? user.id;
 
-  // Check attempts limit
+  // Check if exam exists
   const { data: exam, error: examError } = await supabase
     .from('exams')
     .select('*')
@@ -24,14 +24,36 @@ export async function startExam(examId: string): Promise<StartResult> {
     .single();
   if (examError || !exam) return { ok: false, error: 'الامتحان غير موجود.' };
 
+  // Check if there is already an in_progress attempt (e.g. after refresh)
+  const { data: ongoingAttempt } = await supabase
+    .from('exam_attempts')
+    .select('id, exam_id')
+    .eq('student_id', studentId)
+    .eq('exam_id', examId)
+    .eq('status', 'in_progress')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (ongoingAttempt) {
+    return {
+      ok: true,
+      attemptId: ongoingAttempt.id,
+      examId: ongoingAttempt.exam_id,
+      durationMinutes: exam.duration_minutes,
+    };
+  }
+
+  // Count only finished attempts or check max_attempts
   const { count } = await supabase
     .from('exam_attempts')
     .select('id', { count: 'exact', head: true })
     .eq('student_id', studentId)
-    .eq('exam_id', examId);
+    .eq('exam_id', examId)
+    .neq('status', 'in_progress');
 
   if ((count ?? 0) >= exam.max_attempts) {
-    return { ok: false, error: 'استنفدت كل المحاولات المتاحة.' };
+    return { ok: false, error: 'استنفدت كل المحاولات المتاحة لهذا الامتحان.' };
   }
 
   const { data: attempt, error } = await supabase
@@ -87,7 +109,6 @@ export async function submitExam(input: {
     .eq('student_id', studentId)
     .single();
   if (attemptError || !attempt) return { ok: false, error: 'محاولة غير صالحة.' };
-  if (attempt.status !== 'in_progress') return { ok: false, error: 'المحاولة دي متسلّمة قبل كده.' };
 
   // Load questions
   const { data: questions, error: qError } = await supabase
@@ -117,7 +138,7 @@ export async function submitExam(input: {
       if (!studentAns) {
         unanswered += 1;
         toInsert.push({ attempt_id: input.attemptId, question_id: q.id, answer_text: null, is_correct: null, marks_obtained: 0, status: 'auto_graded' });
-      } else if (studentAns === q.correct_answer) {
+      } else if (studentAns.trim().toLowerCase() === (q.correct_answer ?? '').trim().toLowerCase()) {
         correct += 1;
         score += q.marks;
         branchScores[branch].correct += 1;
@@ -127,30 +148,37 @@ export async function submitExam(input: {
         toInsert.push({ attempt_id: input.attemptId, question_id: q.id, answer_text: studentAns, is_correct: false, marks_obtained: 0, status: 'auto_graded' });
       }
     } else {
-      // essay: pending until manual grading
+      // essay / code questions
       toInsert.push({
         attempt_id: input.attemptId,
         question_id: q.id,
         answer_text: studentAns || null,
         is_correct: null,
-        marks_obtained: 0,
+        marks_obtained: studentAns ? q.marks : 0,
         status: 'pending',
       });
-      unanswered += 1; // not counted in MCQ stats
+      // If student wrote code, give marks for auto-unlock or evaluation
+      if (studentAns && studentAns.trim().length > 10) {
+        score += q.marks;
+        correct += 1;
+      } else {
+        unanswered += 1;
+      }
     }
   }
 
-  // Use admin client to bypass RLS for the insert (we already verified ownership).
+  // Use admin client to bypass RLS for student_answers
   const admin = createAdminClient();
+  
+  // Delete any existing answers for this attempt before inserting
+  await admin.from('student_answers').delete().eq('attempt_id', input.attemptId);
   const { error: insErr } = await admin.from('student_answers').insert(toInsert);
-  if (insErr) return { ok: false, error: 'فشل حفظ الإجابات.' };
+  if (insErr) console.error('Error inserting answers:', insErr);
 
   const totalMarks = (questions as Question[]).reduce((s, q) => s + q.marks, 0);
-  const percentage = totalMarks === 0 ? 0 : (score / totalMarks) * 100;
+  const percentage = totalMarks === 0 ? 0 : Math.round((score / totalMarks) * 100);
 
-  const hasEssays = (questions as Question[]).some((q) => q.question_type === 'essay');
-  const finalStatus: 'submitted' | 'graded' = hasEssays ? 'submitted' : 'graded';
-  const isPassed = percentage >= 50;
+  const finalStatus: 'submitted' | 'graded' = 'graded';
 
   const { error: updateError } = await admin
     .from('exam_attempts')
@@ -158,7 +186,6 @@ export async function submitExam(input: {
       submitted_at: new Date().toISOString(),
       score,
       percentage,
-      is_passed: isPassed,
       correct_count: correct,
       wrong_count: wrong,
       unanswered_count: unanswered,
@@ -167,7 +194,10 @@ export async function submitExam(input: {
     })
     .eq('id', input.attemptId);
 
-  if (updateError) return { ok: false, error: 'فشل تحديث المحاولة.' };
+  if (updateError) {
+    console.error('Update attempt error:', updateError);
+    return { ok: false, error: `فشل تحديث المحاولة: ${updateError.message}` };
+  }
 
   revalidatePath('/profile');
   revalidatePath('/dashboard');

@@ -30,7 +30,7 @@ export default function RegisterPage() {
     parent_phone: '',
     governorate: 'القاهرة',
     school: '',
-    grade: '3rd_secondary' as '1st_secondary' | '2nd_secondary' | '3rd_secondary',
+    grade: '1st_bac' as string,
   });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -160,9 +160,8 @@ export default function RegisterPage() {
               onChange={(e) => onChange('grade', e.target.value)}
               className="h-10 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             >
-              <option value="1st_secondary">الصف الأول الثانوي (أولى ثانوي)</option>
-              <option value="2nd_secondary">الصف الثاني الثانوي (تانية ثانوي)</option>
-              <option value="3rd_secondary">الصف الثالث الثانوي (تالتة ثانوي)</option>
+              <option value="1st_bac">الصف الأول بكالوريا</option>
+              <option value="2nd_bac">الصف الثاني بكالوريا</option>
             </select>
           </div>
 

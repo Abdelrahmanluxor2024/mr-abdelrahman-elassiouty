@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrencyEGP, formatArabicNumber } from '@/lib/utils';
 import { DashboardActivityChart } from '@/components/dashboard/activity-chart';
+import { PlatformGroupFeed } from '@/components/community/platform-group-feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -171,6 +172,11 @@ export default async function DashboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Platform Group Community Section (جروب المنصة) ───────────────── */}
+      <div className="pt-2">
+        <PlatformGroupFeed />
       </div>
     </div>
   );

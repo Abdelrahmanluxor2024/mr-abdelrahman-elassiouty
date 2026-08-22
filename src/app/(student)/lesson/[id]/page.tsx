@@ -66,11 +66,34 @@ export default function LessonPage() {
       {/* ── Main Content: Video Player + Lesson Details ──────────── */}
       <div className="space-y-4 lg:col-span-2">
         {lesson.video_url ? (
-          <div className="overflow-hidden rounded-3xl border border-slate-100 bg-black shadow-lg">
+          <div className="overflow-hidden rounded-3xl border border-slate-100 dark:border-slate-800 bg-black shadow-lg">
             <SecureVideoPlayer src={lesson.video_url} watermarkText={watermark} embed={isEmbed} />
           </div>
+        ) : lesson.pdf_url ? (
+          <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-xl">
+            <div className="bg-slate-800/90 px-4 py-3 border-b border-slate-700 flex items-center justify-between text-white text-xs">
+              <span className="font-bold flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-400" />
+                مستند ومذكرة المحاضرة (PDF)
+              </span>
+              <a
+                href={lesson.pdf_url}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl font-bold text-white transition"
+              >
+                فتح في نافذة كاملة ↗
+              </a>
+            </div>
+            <iframe
+              src={lesson.pdf_url.includes('drive.google.com') ? lesson.pdf_url.replace('/view?usp=sharing', '/preview').replace('/view', '/preview') : lesson.pdf_url}
+              className="w-full h-[550px] bg-slate-950 border-0"
+              title="مستند المحاضرة"
+              allow="autoplay"
+            />
+          </div>
         ) : (
-          <div className="grid aspect-video place-items-center rounded-3xl bg-gradient-to-tr from-purple-900 to-indigo-800 text-white p-8">
+          <div className="grid aspect-video place-items-center rounded-3xl bg-gradient-to-tr from-blue-900 to-indigo-800 text-white p-8">
             <div className="text-center">
               <span className="rounded-full bg-white/20 px-3.5 py-1 text-xs font-bold text-white backdrop-blur-md">
                 محاضرة تفاعلية
@@ -82,24 +105,24 @@ export default function LessonPage() {
         )}
 
         {/* Lesson Info Card */}
-        <Card className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <Card className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="font-display text-xl font-black text-slate-900">{lesson.title}</h1>
+                <h1 className="font-display text-xl font-black text-slate-900 dark:text-white">{lesson.title}</h1>
                 {lesson.is_free_preview && (
                   <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
                     مجاني
                   </span>
                 )}
               </div>
-              <p className="text-xs text-purple-700 font-semibold">{lesson.course.title}</p>
+              <p className="text-xs text-blue-600 dark:text-cyan-400 font-semibold">{lesson.course?.title}</p>
             </div>
           </div>
 
           <div className="pt-4 space-y-4">
             {lesson.description && (
-              <p className="text-sm leading-relaxed text-slate-600">{lesson.description}</p>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{lesson.description}</p>
             )}
 
             {lesson.pdf_url && (
@@ -107,9 +130,9 @@ export default function LessonPage() {
                 href={lesson.pdf_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-2xl bg-purple-50 px-4 py-2.5 text-xs font-bold text-purple-800 transition hover:bg-purple-100"
+                className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-4 py-2.5 text-xs font-bold text-blue-700 dark:text-cyan-300 transition hover:bg-blue-100"
               >
-                <FileText className="h-4 w-4 text-purple-700" />
+                <FileText className="h-4 w-4 text-blue-600" />
                 تحميل ملخص ومذكرة المحاضرة PDF
               </a>
             )}

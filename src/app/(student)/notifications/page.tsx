@@ -29,39 +29,60 @@ export default function NotificationsPage() {
       </header>
 
       {isLoading ? (
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full rounded-3xl" />
       ) : !data || data.length === 0 ? (
-        <Card>
+        <Card className="rounded-3xl border border-slate-200 dark:border-slate-800">
           <CardContent className="p-10 text-center text-slate-500">
             <Bell className="mx-auto h-8 w-8 text-slate-400" />
-            <p className="mt-2">مفيش إشعارات.</p>
+            <p className="mt-2 text-sm font-semibold">لا توجد إشعارات جديدة حالياً.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {data.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              onClick={() => {
-                markRead(n.id);
-                if (n.link) window.location.href = n.link;
-              }}
-              className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-right transition-colors ${
-                n.is_read ? 'border-slate-100 bg-white' : 'border-brand-200 bg-brand-50/60'
-              }`}
-            >
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-100 text-brand-700">
-                <Bell className="h-4 w-4" />
+        <div className="space-y-3">
+          {data.map((n) => {
+            const hasImage = n.link?.startsWith('image:') ? n.link.replace('image:', '') : null;
+            const linkUrl = n.link && !n.link.startsWith('image:') ? n.link : null;
+
+            return (
+              <div
+                key={n.id}
+                onClick={() => {
+                  markRead(n.id);
+                  if (linkUrl) window.location.href = linkUrl;
+                }}
+                className={`flex flex-col sm:flex-row items-start gap-4 rounded-3xl border p-5 text-right transition-all ${
+                  n.is_read
+                    ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A]'
+                    : 'border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/30 shadow-md shadow-blue-500/5'
+                }`}
+              >
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-cyan-400 font-bold">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-900 dark:text-white text-base">{n.title}</p>
+                    {!n.is_read && (
+                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        جديد
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{n.message}</p>
+                  
+                  {/* Attached Image */}
+                  {hasImage && (
+                    <div className="mt-3 relative max-h-72 w-full max-w-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-black">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={hasImage} alt="مرفق الإشعار" className="max-h-72 w-full object-contain" />
+                    </div>
+                  )}
+
+                  <p className="mt-1 text-[11px] text-slate-400">{new Date(n.created_at).toLocaleString('ar-EG')}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-slate-900">{n.title}</p>
-                <p className="text-sm text-slate-600">{n.message}</p>
-                <p className="mt-1 text-xs text-slate-400">{new Date(n.created_at).toLocaleString('ar-EG')}</p>
-              </div>
-              {!n.is_read && <span className="mt-1 h-2 w-2 rounded-full bg-brand-500" />}
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

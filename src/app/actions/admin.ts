@@ -251,5 +251,81 @@ export async function manualChargeStudent(input: { studentPhone: string; amount:
   return { ok: true as const, studentName: student.full_name, newBalance };
 }
 
+export async function sendBroadcastNotification(input: {
+  title: string;
+  message: string;
+  targetGrade?: string;
+  imageUrl?: string;
+}) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  let query = admin.from('students').select('id, grade');
+  if (input.targetGrade && input.targetGrade !== 'all') {
+    query = query.eq('grade', input.targetGrade);
+  }
+
+  const { data: students, error: sErr } = await query;
+  if (sErr || !students || students.length === 0) {
+    return { ok: false as const, error: 'لم يتم العثور على طلاب في هذا الصف' };
+  }
+
+  const rows = students.map((s) => ({
+    student_id: s.id,
+    title: input.title,
+    message: input.message,
+    type: 'broadcast',
+    link: input.imageUrl ? `image:${input.imageUrl}` : null,
+    is_read: false,
+  }));
+
+  const { error } = await admin.from('notifications').insert(rows);
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/notifications');
+  revalidatePath('/dashboard');
+  return { ok: true as const, count: students.length };
+}
+
+export async function createTeacherCommunityPost(input: {
+  title: string;
+  content: string;
+  imageUrl?: string;
+}) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { data: teacher } = await admin
+    .from('students')
+    .select('id')
+    .eq('phone', '01064106070')
+    .maybeSingle();
+
+  const teacherStudentId = teacher?.id ?? (await admin.from('students').select('id').limit(1).single()).data?.id;
+
+  const contentWithImage = input.imageUrl 
+    ? `${input.content}\n\n[IMG]${input.imageUrl}[/IMG]`
+    : input.content;
+
+  const { data, error } = await admin
+    .from('forum_posts')
+    .insert({
+      student_id: teacherStudentId,
+      title: `📢 [جروب المنصة]: ${input.title}`,
+      content: contentWithImage,
+      is_answered: true,
+    })
+    .select('*')
+    .single();
+
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/');
+  revalidatePath('/dashboard');
+  revalidatePath('/forum');
+  return { ok: true as const, post: data };
+}
+
+
 
 

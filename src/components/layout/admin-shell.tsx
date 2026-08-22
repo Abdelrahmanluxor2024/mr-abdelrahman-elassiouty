@@ -12,6 +12,8 @@ const ADMIN_NAV = [
   { href: '/admin/courses', label: 'الكورسات' },
   { href: '/admin/exams', label: 'الامتحانات' },
   { href: '/admin/grading', label: 'تصحيح مقالي' },
+  { href: '/admin/community', label: '📢 جروب المنصة والمنشورات' },
+  { href: '/admin/notifications', label: '🔔 إرسال الإشعارات' },
   { href: '/admin/forum', label: 'المنتدى والرد على الأسئلة' },
   { href: '/admin/charge-codes', label: 'أكواد الشحن' },
 ];

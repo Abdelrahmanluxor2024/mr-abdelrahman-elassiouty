@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { WhatsAppButton } from '@/components/common/whatsapp-button';
+import { PlatformGroupFeed } from '@/components/community/platform-group-feed';
 
 export default function HomePage() {
   return (
@@ -253,6 +254,13 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Platform Group Community Section (جروب المنصة) ───────────────── */}
+      <section className="relative bg-[#050811] py-16 text-white border-t border-blue-500/10">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <PlatformGroupFeed />
         </div>
       </section>
 
