@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, Plus, Send, ChevronDown, ChevronUp, Sparkles, CheckCircle2, User, Loader2, Heart } from 'lucide-react';
+import { MessageSquare, Plus, Send, ChevronDown, ChevronUp, Sparkles, CheckCircle2, User, Loader2, Heart, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
