@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useTransition } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -165,9 +165,33 @@ export default function AdminForumPage() {
 
               <CardContent className="pt-5 space-y-6">
                 {/* Question Details */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                  {currentPost.content}
-                </div>
+                {(() => {
+                  const imgMatch = currentPost.content?.match(/\[ATTACHED_IMG\]:([\s\S]+)$/);
+                  const attachedImgUrl = imgMatch ? imgMatch[1].trim() : null;
+                  const cleanContent = currentPost.content ? currentPost.content.replace(/\[ATTACHED_IMG\]:[\s\S]+$/, '').trim() : '';
+
+                  return (
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-3">
+                      {cleanContent && (
+                        <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
+                          {cleanContent}
+                        </p>
+                      )}
+
+                      {attachedImgUrl && (
+                        <div>
+                          <p className="text-xs font-bold text-blue-600 dark:text-cyan-400 mb-2">📸 صورة المسألة المرفقة من الطالب:</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={attachedImgUrl}
+                            alt="صورة السؤال من الطالب"
+                            className="max-h-96 rounded-2xl border border-blue-500/30 object-contain bg-black shadow-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Replies Thread */}
                 <div className="space-y-3">

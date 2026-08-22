@@ -21,12 +21,40 @@ export default function ForumPage() {
   const { data: student } = useStudent();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [creating, startCreate] = useTransition();
   const qc = useQueryClient();
 
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 3 ميجابايت');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setAttachedImage(base64);
+      toast.success('تم إرفاق صورة السؤال بنجاح');
+    };
+    reader.readAsDataURL(file);
+  }
+
   function onCreate() {
-    if (!title.trim() || !content.trim()) return;
+    if (!title.trim() && !attachedImage) {
+      toast.error('يرجى كتابة عنوان السؤال أو إرفاق صورة');
+      return;
+    }
+    const finalTitle = title.trim() || 'سؤال واستفسار مع صورة مرفقة';
+    let finalContent = content.trim();
+    if (attachedImage) {
+      finalContent = `${finalContent}\n\n[ATTACHED_IMG]:${attachedImage}`;
+    }
+
     startCreate(async () => {
       const supabase = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,8 +64,8 @@ export default function ForumPage() {
       if (!user) return;
       const { error } = await supabase.from('forum_posts').insert({
         student_id: user.id,
-        title: title.trim(),
-        content: content.trim(),
+        title: finalTitle,
+        content: finalContent,
       });
       if (error) {
         toast.error(error.message);
@@ -46,6 +74,7 @@ export default function ForumPage() {
       toast.success('تم نشر سؤالك في المنتدى بنجاح 🎉');
       setTitle('');
       setContent('');
+      setAttachedImage(null);
       qc.invalidateQueries({ queryKey: ['forum', 'posts'] });
     });
   }
@@ -60,7 +89,7 @@ export default function ForumPage() {
             <span className="text-xl">💬</span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            اطرح سؤالك هنا وهيتم الرد عليك مباشرة من مستر عبدالرحمن وفريق العمل.
+            اطرح سؤالك هنا نصياً أو ارفع صورة المسألة وسيتم الرد عليك مباشرة من مستر عبدالرحمن.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -75,26 +104,55 @@ export default function ForumPage() {
         <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
             <Plus className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
-            اطرح سؤالاً أو استفساراً جديداً
+            اطرح سؤالاً أو ارفع صورة مسألة
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4 space-y-3">
           <Input 
-            placeholder="عنوان السؤال باختصار (مثال: سؤال بخصوص شروط if في بايثون)" 
+            placeholder="عنوان السؤال باختصار (مثال: استفسار بخصوص التمرين الثالث)" 
             value={title} 
             onChange={(e) => setTitle(e.target.value)} 
             className="rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 text-sm"
           />
           <Textarea 
-            placeholder="اشرح سؤالك بالتفصيل، واكتب كودك أو المشكلة التي واجهتك..." 
+            placeholder="اشرح سؤالك أو اكتب ملاحظاتك (اختياري في حال إرفاق صورة)..." 
             value={content} 
             onChange={(e) => setContent(e.target.value)} 
-            className="min-h-[100px] rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 text-sm leading-relaxed"
+            className="min-h-[90px] rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 text-sm leading-relaxed"
           />
-          <div className="flex justify-end">
+
+          {/* Attached Image Preview */}
+          {attachedImage && (
+            <div className="relative inline-block rounded-2xl overflow-hidden border-2 border-blue-500/40 shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={attachedImage} alt="صورة السؤال" className="max-h-48 rounded-xl object-contain bg-black" />
+              <button
+                type="button"
+                onClick={() => setAttachedImage(null)}
+                className="absolute top-2 right-2 rounded-xl bg-red-600 px-2.5 py-1 text-xs font-bold text-white shadow hover:bg-red-700"
+              >
+                إلغاء الصورة ✕
+              </button>
+            </div>
+          )}
+
+          {/* Actions Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer rounded-2xl border border-blue-500/30 bg-blue-50/80 dark:bg-blue-950/60 px-4 py-2 text-xs font-bold text-blue-700 dark:text-cyan-300 hover:bg-blue-100 transition">
+              <Camera className="h-4 w-4 text-blue-600 dark:text-cyan-400" />
+              <span>{attachedImage ? 'تغيير صورة السؤال' : '📸 إرفاق صورة للمسألة / السؤال'}</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={creating}
+                onChange={handleImageUpload}
+              />
+            </label>
+
             <Button 
               onClick={onCreate} 
-              disabled={creating || !title.trim() || !content.trim()}
+              disabled={creating || (!title.trim() && !content.trim() && !attachedImage)}
               className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 shadow-md shadow-blue-600/20"
             >
               {creating ? <><Loader2 className="h-4 w-4 animate-spin ms-2" /> جاري النشر...</> : 'نشر السؤال'}
@@ -174,6 +232,10 @@ function PostCard({
     });
   }
 
+  const imgMatch = post.content?.match(/\[ATTACHED_IMG\]:([\s\S]+)$/);
+  const attachedImgUrl = imgMatch ? imgMatch[1].trim() : null;
+  const cleanContent = post.content ? post.content.replace(/\[ATTACHED_IMG\]:[\s\S]+$/, '').trim() : '';
+
   return (
     <Card className={cn(
       "rounded-3xl transition-all border overflow-hidden",
@@ -187,7 +249,7 @@ function PostCard({
         className="p-5 cursor-pointer select-none transition hover:bg-slate-50/50 dark:hover:bg-slate-900/40"
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1.5 flex-1">
+          <div className="space-y-2 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-bold text-base text-slate-900 dark:text-white leading-snug">
                 {post.title}
@@ -203,9 +265,27 @@ function PostCard({
                 </span>
               )}
             </div>
-            <p className={cn("text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed", !isExpanded && "line-clamp-2")}>
-              {post.content}
-            </p>
+
+            {cleanContent && (
+              <p className={cn("text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed", !isExpanded && "line-clamp-2")}>
+                {cleanContent}
+              </p>
+            )}
+
+            {/* Attached Image Preview */}
+            {attachedImgUrl && (
+              <div className="mt-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={attachedImgUrl}
+                  alt="صورة السؤال المرفقة"
+                  className={cn(
+                    "rounded-2xl border border-blue-500/30 object-contain bg-black shadow-md",
+                    isExpanded ? "max-h-96 w-auto" : "max-h-40 w-auto"
+                  )}
+                />
+              </div>
+            )}
           </div>
 
           <div className="shrink-0 pt-1 text-slate-400">

@@ -162,3 +162,22 @@ export async function logout() {
   revalidatePath('/', 'layout');
   redirect('/login');
 }
+
+export async function updateStudentAvatar(avatarUrl: string) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: 'يجب تسجيل الدخول أولاً' };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('students')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', user.id);
+
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/profile');
+  revalidatePath('/dashboard');
+  return { ok: true as const };
+}
+

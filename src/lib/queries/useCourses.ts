@@ -98,3 +98,27 @@ export function useCourseEnrollment(courseId: string) {
   });
 }
 
+export function useStudentPassedExams() {
+  return useQuery({
+    queryKey: ['student', 'passed_exams'],
+    queryFn: async () => {
+      const supabase = browserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return new Set<string>();
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select('exam_id, is_passed, percentage')
+        .eq('student_id', user.id);
+      if (error) return new Set<string>();
+      const passed = new Set<string>();
+      (data ?? []).forEach((att: any) => {
+        if (att.is_passed || Number(att.percentage) >= 50) {
+          passed.add(att.exam_id);
+        }
+      });
+      return passed;
+    },
+  });
+}
+
+

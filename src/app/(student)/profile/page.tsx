@@ -3,10 +3,10 @@ import { getCurrentStudent } from '@/lib/queries/useStudentServer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { InstructorAvatar } from '@/components/student/instructor-avatar';
+import { StudentAvatarUploader } from '@/components/student/student-avatar-uploader';
 import { logout } from '@/app/actions/auth';
 import { formatArabicNumber, formatCurrencyEGP } from '@/lib/utils';
-import { LogOut, Wallet, Trophy } from 'lucide-react';
+import { LogOut, Wallet, Trophy, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -22,24 +22,30 @@ export default async function ProfilePage() {
     .limit(20);
 
   return (
-    <div className="space-y-6">
-      <Card className="overflow-hidden">
-        <div className="bg-brand-gradient p-6">
-          <div className="flex items-center gap-4">
-            <InstructorAvatar src={student.avatar_url ?? '/images/instructor.png'} size="lg" rounded />
-            <div className="text-white">
-              <h1 className="font-display text-2xl font-black">{student.full_name}</h1>
-              <p className="text-sm text-white/80">{student.phone}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Badge variant="secondary">{student.grade.replace('_', ' ')}</Badge>
-                {student.governorate && <Badge variant="secondary">{student.governorate}</Badge>}
-                {student.school && <Badge variant="secondary">{student.school}</Badge>}
+    <div className="space-y-6 max-w-4xl mx-auto" dir="rtl">
+      <Card className="overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-md">
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 p-6 text-white relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 relative z-10 text-center sm:text-right">
+            <StudentAvatarUploader currentAvatar={student.avatar_url} studentName={student.full_name} />
+            <div className="text-white space-y-1.5 flex-1">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <h1 className="font-display text-2xl font-black">{student.full_name}</h1>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold backdrop-blur-md">
+                  <Sparkles className="h-3 w-3 text-cyan-300" />
+                  طالب مميز
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-cyan-200 font-mono" dir="ltr">{student.phone}</p>
+              <div className="mt-3 flex flex-wrap justify-center sm:justify-start gap-2 pt-1">
+                <Badge variant="secondary" className="bg-white/15 text-white border-0">{student.grade.replace('_', ' ')}</Badge>
+                {student.governorate && <Badge variant="secondary" className="bg-white/15 text-white border-0">{student.governorate}</Badge>}
+                {student.school && <Badge variant="secondary" className="bg-white/15 text-white border-0">{student.school}</Badge>}
               </div>
             </div>
           </div>
         </div>
-        <CardContent className="grid gap-3 p-5 sm:grid-cols-3">
-          <Stat icon={Wallet} label="رصيدك" value={formatCurrencyEGP(student.wallet_balance)} />
+        <CardContent className="grid gap-3 p-5 sm:grid-cols-3 bg-white dark:bg-[#0E172A]">
+          <Stat icon={Wallet} label="رصيدك الحالي" value={formatCurrencyEGP(student.wallet_balance)} />
           <Stat icon={Trophy} label="عدد الامتحانات" value={formatArabicNumber(attempts?.length ?? 0)} />
           <Stat
             label="نسبة النجاح العامة"
