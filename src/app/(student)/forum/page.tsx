@@ -294,10 +294,14 @@ function PostCard({
         </div>
 
         {/* Footer Meta */}
-        <div className="mt-4 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-3">
-          <div className="flex items-center gap-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-3 gap-2">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <span className="inline-flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200">
+              <User className="h-3.5 w-3.5 text-blue-600 dark:text-cyan-400" />
+              {(post as any).student?.full_name || 'طالب'}
+            </span>
             <span className="inline-flex items-center gap-1.5 font-semibold text-blue-600 dark:text-cyan-400">
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-3.5 w-3.5" />
               {post.replies_count ?? 0} {post.replies_count === 1 ? 'رد' : 'ردود'}
             </span>
             <span>{new Date(post.created_at).toLocaleDateString('ar-EG')}</span>

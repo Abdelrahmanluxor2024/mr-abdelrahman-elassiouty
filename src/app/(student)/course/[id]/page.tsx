@@ -255,10 +255,12 @@ export default function CoursePage() {
                     </Link>
                   )}
 
-                  {/* PDF / Document Row (If no video but has PDF) */}
-                  {!lesson.video_url && lesson.pdf_url && (
-                    <Link
-                      href={`/lesson/${lesson.id}`}
+                  {/* PDF / Document Row */}
+                  {lesson.pdf_url && (
+                    <a
+                      href={lesson.pdf_url}
+                      target="_blank"
+                      rel="noreferrer"
                       className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
                     >
                       <div className="flex items-center gap-3">
@@ -266,11 +268,13 @@ export default function CoursePage() {
                           مستند ومذكرة PDF 📄
                         </span>
                         <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                          عرض وقراءة مذكرة المحاضرة
+                          فتح وتحميل مذكرة المحاضرة مباشرة
                         </span>
                       </div>
-                      <PlayCircle className="h-5 w-5 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-                    </Link>
+                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
+                        فتح المستند ↗
+                      </span>
+                    </a>
                   )}
 
                   {/* Exam Row (Only if exam exists) */}

@@ -131,8 +131,7 @@ export function useStudentPassedExams() {
       const passed = new Set<string>();
       (data ?? []).forEach((att: any) => {
         const pct = Number(att.percentage ?? 0);
-        const score = Number(att.score ?? 0);
-        if (pct >= 50 || score > 0 || att.status === 'graded') {
+        if (pct >= 50) {
           passed.add(att.exam_id);
         }
       });

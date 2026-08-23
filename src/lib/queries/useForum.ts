@@ -18,11 +18,11 @@ export function useForumPosts() {
       const supabase = browserClient();
       const { data, error } = await supabase
         .from('forum_posts')
-        .select('*')
+        .select('*, student:students(full_name, phone)')
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []) as ForumPost[];
+      return (data ?? []) as (ForumPost & { student?: { full_name: string; phone: string } })[];
     },
   });
 }
@@ -35,11 +35,11 @@ export function useForumReplies(postId: string) {
       const supabase = browserClient();
       const { data, error } = await supabase
         .from('forum_replies')
-        .select('*')
+        .select('*, student:students(full_name, phone)')
         .eq('post_id', postId)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return (data ?? []) as ForumReply[];
+      return (data ?? []) as (ForumReply & { student?: { full_name: string; phone: string } })[];
     },
   });
 }
