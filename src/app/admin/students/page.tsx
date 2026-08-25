@@ -172,22 +172,23 @@ export default function AdminStudentsPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filtered.map((s: any) => (
                   <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition">
-                    <td className="p-3">
+                    <td className="p-3 min-w-[160px]">
                       <div className="flex items-center gap-2.5">
                         <div className="h-9 w-9 shrink-0 rounded-xl overflow-hidden bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 grid place-items-center font-black text-xs border border-blue-500/20">
                           {s.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={s.avatar_url} alt={s.full_name} className="h-full w-full object-cover" />
+                            <img src={s.avatar_url} alt={s.full_name ?? 'طالب'} className="h-full w-full object-cover" />
                           ) : (
-                            s.full_name?.[0] || 'ط'
+                            <span>{s.full_name?.[0]?.toUpperCase() ?? 'ط'}</span>
                           )}
                         </div>
-                        <div>
-                          <p className="font-bold text-slate-900 dark:text-white text-sm">{s.full_name}</p>
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 dark:text-white text-sm break-words leading-snug">{s.full_name ?? '—'}</p>
                           <p className="text-[11px] text-slate-400">{new Date(s.created_at).toLocaleDateString('ar-EG')}</p>
                         </div>
                       </div>
                     </td>
+
 
                     <td className="p-3 text-xs space-y-0.5">
                       <div className="flex items-center gap-1.5 font-mono font-bold text-blue-600 dark:text-cyan-400" dir="ltr">
@@ -199,12 +200,16 @@ export default function AdminStudentsPage() {
                       )}
                     </td>
 
-                    <td className="p-3 text-xs space-y-1">
+                    <td className="p-3 text-xs space-y-1 min-w-[130px]">
                       <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
-                        {s.grade?.replace('_', ' ') || 'عام'}
+                        {s.grade?.replace(/_/g, ' ') || 'عام'}
                       </Badge>
-                      <p className="text-slate-500 text-[11px]">{s.governorate || '—'} {s.school ? `• ${s.school}` : ''}</p>
+                      <p className="text-slate-500 text-[11px]">
+                        {s.governorate || 'محافظة غير محددة'}
+                        {s.school ? ` • ${s.school}` : ''}
+                      </p>
                     </td>
+
 
                     <td className="p-3">
                       <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 font-mono">

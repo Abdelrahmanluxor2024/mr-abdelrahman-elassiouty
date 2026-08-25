@@ -326,6 +326,68 @@ export async function createTeacherCommunityPost(input: {
   return { ok: true as const, post: data };
 }
 
+// ─── Notifications Management ───────────────────────────────────────────────
 
+export async function getAdminNotifications() {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  // Get all broadcast notifications grouped by title+message+created_at window
+  // We fetch all then group by (title, message, created_at date) on client
+  const { data, error } = await admin
+    .from('notifications')
+    .select('id, title, message, link, is_read, created_at, type, student_id')
+    .eq('type', 'broadcast')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function updateBroadcastNotification(input: {
+  title: string;
+  message: string;
+  newTitle: string;
+  newMessage: string;
+}) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from('notifications')
+    .update({
+      title: input.newTitle,
+      message: input.newMessage,
+    })
+    .eq('title', input.title)
+    .eq('message', input.message)
+    .eq('type', 'broadcast');
+
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath('/admin/notifications');
+  revalidatePath('/notifications');
+  return { ok: true as const };
+}
+
+export async function deleteBroadcastNotification(input: {
+  title: string;
+  message: string;
+}) {
+  await requireAdmin();
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from('notifications')
+    .delete()
+    .eq('title', input.title)
+    .eq('message', input.message)
+    .eq('type', 'broadcast');
+
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath('/admin/notifications');
+  revalidatePath('/notifications');
+  return { ok: true as const };
+}
 
 
