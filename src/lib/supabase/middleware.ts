@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+﻿import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/supabase';
 
@@ -83,10 +83,11 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // Redirect already-logged-in users away from auth pages
-    if (user && (pathname === '/login' || pathname === '/register')) {
+    // إذا كان المستخدم مسجل دخول بالفعل ويحاول فتح الصفحة الرئيسية (/) أو صفحات الدخول/التسجيل -> توجيهه مباشرة للـ dashboard
+    if (user && (pathname === '/' || pathname === '/login' || pathname === '/register')) {
       const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
+      const role = (user.app_metadata as { role?: string } | null)?.role;
+      url.pathname = role === 'admin' ? '/admin' : '/dashboard';
       return NextResponse.redirect(url);
     }
   } catch (err) {
