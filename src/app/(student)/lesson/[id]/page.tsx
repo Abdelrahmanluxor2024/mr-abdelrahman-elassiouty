@@ -56,7 +56,8 @@ export default function LessonPage() {
   const watermark = student ? `${student.full_name} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
     const exam = lesson.exam?.[0];
   const lessonExamId = exam?.id ?? (lesson as any)?.exams?.[0]?.id;
-  const hasPassedExam = !lesson.has_exam || !lessonExamId || passedExams.has(lessonExamId);
+  const isPdfLocked = Boolean((lesson as any)?.is_pdf_locked);
+  const hasPassedExam = !isPdfLocked || !lesson.has_exam || !lessonExamId || passedExams.has(lessonExamId);
 
   // تحويل روابط watch إلى embed تلقائياً إن وجدت
   let videoSrc = lesson.video_url || '';

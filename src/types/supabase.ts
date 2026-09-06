@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Supabase Database types — compatible with @supabase/supabase-js v2.
  * Hand-written to match db/schema.sql.
  * Regenerate with: supabase gen types typescript --project-id tkrygfflhrvgveiolhsl
@@ -100,6 +100,7 @@ export interface Lesson {
   has_exam: boolean;
   has_homework: boolean;
   pdf_url: string | null;
+  is_pdf_locked?: boolean;
   order_index: number;
   is_free_preview: boolean;
   created_at: string;

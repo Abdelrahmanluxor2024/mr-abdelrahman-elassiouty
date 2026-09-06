@@ -257,7 +257,7 @@ export default function CoursePage() {
 
                   {/* PDF / Document Row */}
                   {lesson.pdf_url && (
-                    hasPassedThisExam || !lesson.has_exam || !lessonExamId ? (
+                    !(lesson as any).is_pdf_locked || hasPassedThisExam || !lesson.has_exam || !lessonExamId ? (
                       <a
                         href={lesson.pdf_url}
                         target="_blank"
@@ -269,7 +269,7 @@ export default function CoursePage() {
                             مستند ومذكرة PDF 📄
                           </span>
                           <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                            تحميل المذكرة (مفتوح بعد اجتياز الامتحان ✅)
+                            تحميل وفتح مذكرة المحاضرة
                           </span>
                         </div>
                         <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
