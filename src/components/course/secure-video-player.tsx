@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { Maximize2, Pause, Play, Volume2, VolumeX } from 'lucide-react';
@@ -51,8 +51,9 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
       {embed ? (
         <iframe
           src={src}
-          allow="autoplay; encrypted-media; fullscreen"
-          className="aspect-video w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          allowFullScreen
+          className="aspect-video w-full border-0"
           title="مشغل الفيديو"
         />
       ) : (

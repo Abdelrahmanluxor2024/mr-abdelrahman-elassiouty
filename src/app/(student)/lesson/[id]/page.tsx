@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -55,9 +55,9 @@ export default function LessonPage() {
   const watermark = student ? `${student.full_name} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
   const exam = lesson.exam?.[0];
 
-  // كشف نوع الفيديو - Vimeo أو YouTube = iframe, غيره = HTML5
+  // كشف نوع الفيديو - iframe (Viemo, Vimeo, YouTube, إلخ) أو فيديو مباشر HTML5
   const isEmbed = lesson.video_url
-    ? /vimeo\.com|youtube\.com|youtu\.be|bunnycdn|iframe\.mediadelivery/.test(lesson.video_url)
+    ? /embed|viemo|vimeo\.com|youtube\.com|youtu\.be|bunnycdn|iframe\.mediadelivery/.test(lesson.video_url)
     : false;
 
 
