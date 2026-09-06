@@ -55,9 +55,15 @@ export default function LessonPage() {
   const watermark = student ? `${student.full_name} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
   const exam = lesson.exam?.[0];
 
+  // تحويل روابط watch إلى embed تلقائياً إن وجدت
+  let videoSrc = lesson.video_url || '';
+  if (videoSrc.includes('/watch/')) {
+    videoSrc = videoSrc.replace('/watch/', '/embed/');
+  }
+
   // كشف نوع الفيديو - iframe (Viemo, Vimeo, YouTube, إلخ) أو فيديو مباشر HTML5
-  const isEmbed = lesson.video_url
-    ? /embed|viemo|vimeo\.com|youtube\.com|youtu\.be|bunnycdn|iframe\.mediadelivery/.test(lesson.video_url)
+  const isEmbed = videoSrc
+    ? /embed|viemo|vimeo\.com|youtube\.com|youtu\.be|bunnycdn|iframe\.mediadelivery/.test(videoSrc)
     : false;
 
 
@@ -66,7 +72,7 @@ export default function LessonPage() {
       {/* ── Video Player / Interactive View ──────────── */}
       {lesson.video_url ? (
         <div className="overflow-hidden rounded-3xl border border-slate-100 dark:border-slate-800 bg-black shadow-xl">
-          <SecureVideoPlayer src={lesson.video_url} watermarkText={watermark} embed={isEmbed} />
+          <SecureVideoPlayer src={videoSrc} watermarkText={watermark} embed={isEmbed} />
         </div>
       ) : lesson.pdf_url ? (
         <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-xl">
