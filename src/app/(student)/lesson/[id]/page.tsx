@@ -78,28 +78,51 @@ export default function LessonPage() {
           <SecureVideoPlayer src={videoSrc} watermarkText={watermark} embed={isEmbed} />
         </div>
       ) : lesson.pdf_url ? (
-        <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-xl">
-          <div className="bg-slate-800/90 px-5 py-3.5 border-b border-slate-700 flex items-center justify-between text-white text-xs">
-            <span className="font-bold flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-400" />
-              مستند ومذكرة المحاضرة (PDF)
-            </span>
-            <a
-              href={lesson.pdf_url}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-xl font-bold text-white transition flex items-center gap-1.5"
-            >
-              فتح وقراءة المستند ↗
-            </a>
+        hasPassedExam ? (
+          <div className="overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-xl">
+            <div className="bg-slate-800/90 px-5 py-3.5 border-b border-slate-700 flex items-center justify-between text-white text-xs">
+              <span className="font-bold flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-400" />
+                مستند ومذكرة المحاضرة (PDF) ✅
+              </span>
+              <a
+                href={lesson.pdf_url}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 rounded-xl font-bold text-white transition flex items-center gap-1.5"
+              >
+                فتح المستند في صفحة كاملة ↗
+              </a>
+            </div>
+            <iframe
+              src={lesson.pdf_url.includes('drive.google.com') ? lesson.pdf_url.replace('/view?usp=sharing', '/preview').replace('/view', '/preview') : lesson.pdf_url}
+              className="w-full h-[580px] bg-slate-950 border-0"
+              title="مستند المحاضرة"
+              allow="autoplay"
+            />
           </div>
-          <iframe
-            src={lesson.pdf_url.includes('drive.google.com') ? lesson.pdf_url.replace('/view?usp=sharing', '/preview').replace('/view', '/preview') : lesson.pdf_url}
-            className="w-full h-[580px] bg-slate-950 border-0"
-            title="مستند المحاضرة"
-            allow="autoplay"
-          />
-        </div>
+        ) : (
+          <div className="grid aspect-video place-items-center rounded-3xl bg-gradient-to-tr from-slate-900 to-amber-950/80 text-white p-8 shadow-xl border border-amber-600/30">
+            <div className="text-center max-w-md space-y-4">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <Lock className="h-8 w-8" />
+              </div>
+              <p className="font-display text-xl font-black">مستند ومذكرة الـ PDF مقفلة 🔒</p>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                يجب عليك اجتياز امتحان المحاضرة أولاً بنسبة 50% على الأقل لتتمكن من قراءة وتحميل ملف الـ PDF.
+              </p>
+              {lessonExamId && (
+                <div className="pt-2">
+                  <Button asChild className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-2xl text-xs shadow-lg shadow-amber-600/30">
+                    <Link href={`/exam/${lessonExamId}`}>
+                      بدء الامتحان الآن ✍️
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
       ) : (
         <div className="grid aspect-video place-items-center rounded-3xl bg-gradient-to-tr from-blue-900 to-indigo-800 text-white p-8 shadow-xl">
           <div className="text-center">
@@ -135,35 +158,7 @@ export default function LessonPage() {
             <p className="text-xs text-slate-400">لا يوجد وصف إضافي لهذه المحاضرة.</p>
           )}
 
-          {lesson.pdf_url && (
-            <div className="pt-2">
-              {hasPassedExam ? (
-                <a
-                  href={lesson.pdf_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 px-5 py-3 text-xs font-bold text-emerald-700 dark:text-emerald-300 transition hover:bg-emerald-100 hover:scale-[1.01]"
-                >
-                  <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  تحميل وفتح ملخص ومذكرة المحاضرة PDF ↗
-                </a>
-              ) : (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl border border-amber-300 dark:border-amber-700/60 bg-amber-50/70 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300">
-                  <div className="flex items-center gap-2 text-xs font-bold">
-                    <Lock className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>ملف الـ PDF مقفل 🔒: يجب اجتياز امتحان المحاضرة أولاً بنسبة 50% أو أكثر لتحميل المذكرة.</span>
-                  </div>
-                  {lessonExamId && (
-                    <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shrink-0">
-                      <Link href={`/exam/${lessonExamId}`}>
-                        بدء الامتحان الآن ✍️
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+
         </div>
       </Card>
 
