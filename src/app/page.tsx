@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, BookOpen, Clock, Code, GraduationCap, MessageCircle, Moon, Sparkles, Star, Sun, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,8 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { WhatsAppButton } from '@/components/common/whatsapp-button';
 import { PlatformGroupFeed } from '@/components/community/platform-group-feed';
+import { createClient } from '@/lib/supabase/server';
+import { formatCurrencyEGP } from '@/lib/utils';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = createClient();
+  const { data: dbCourses } = await supabase
+    .from('courses')
+    .select('id, title, description, price, is_free, duration_hours, lessons_count, thumbnail_url, created_at')
+    .eq('is_published', true)
+    .order('created_at', { ascending: false });
+
+  const courses = dbCourses && dbCourses.length > 0 ? dbCourses : [];
   return (
     <div className="min-h-screen bg-[#070B14] text-white selection:bg-blue-600 selection:text-white" dir="rtl">
       {/* ── Top Floating Header ────────────────────────────────────────────── */}
@@ -175,84 +185,59 @@ export default function HomePage() {
 
           {/* Courses Grid */}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                id: 'course-lang',
-                title: 'الكورس التأسيسي في البرمجة والذكاء الاصطناعي | لغات 2027',
-                tag: 'لغات',
-                price: 'مجاناً',
-                image: '/images/course-foundation-languages.jpg',
-                lessons: '3 محاضرات + 3 امتحانات',
-              },
-              {
-                id: 'course-paid',
-                title: 'كورس تجربة بالفلوس | الصف الثاني الثانوي 2027',
-                tag: 'تجريبي',
-                price: '50 ج.م',
-                image: '/images/teacher-hero.jpg',
-                lessons: 'حصة شاملة + امتحان',
-              },
-              {
-                id: 'course-ar',
-                title: 'الكورس التأسيسي في البرمجة والتفكير المنطقي | عربي 2027',
-                tag: 'عربي',
-                price: 'مجاناً',
-                image: '/images/teacher-hero.jpg',
-                lessons: '3 محاضرات + 3 امتحانات',
-              },
-              {
-                id: 'course-month1',
-                title: 'كورس الشهر الأول - بايثون والذكاء الاصطناعي 2027',
-                tag: 'مكثف',
-                price: '190 ج.م',
-                image: '/images/teacher-hero.jpg',
-                lessons: '12 حصة تفاعلية',
-              },
-            ].map((c) => (
-              <div
-                key={c.id}
-                className="group flex flex-col overflow-hidden rounded-3xl border border-blue-500/20 bg-[#0B1324] shadow-xl transition hover:-translate-y-1 hover:border-blue-400 hover:shadow-blue-500/20"
-              >
-                {/* Course Banner */}
-                <div className="relative h-48 w-full overflow-hidden bg-slate-950">
-                  <Image
-                    src={c.image}
-                    alt={c.title}
-                    fill
-                    className="object-cover opacity-90 transition duration-500 group-hover:scale-105"
-                  />
-                  {/* Tag */}
-                  <span className="absolute top-3 right-3 rounded-xl bg-blue-600/90 px-3 py-1 text-xs font-bold text-white shadow backdrop-blur-sm">
-                    {c.tag}
-                  </span>
-                  {/* Price */}
-                  <span className="absolute bottom-3 right-3 rounded-xl bg-black/70 px-3 py-1 font-display text-sm font-black text-cyan-400 backdrop-blur-md border border-white/10">
-                    {c.price}
-                  </span>
-                </div>
-
-                {/* Content */}
-                <div className="flex flex-1 flex-col justify-between p-5 space-y-4">
-                  <div>
-                    <h3 className="font-bold text-white line-clamp-2 text-sm leading-snug">
-                      {c.title}
-                    </h3>
-
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-blue-500/10 pt-3">
-                      <span>الدفعة ٢٠٢٦ / ٢٠٢٧</span>
-                      <span className="text-cyan-400 font-semibold">{c.lessons}</span>
-                    </div>
+            {courses.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-slate-400">
+                <BookOpen className="mx-auto h-12 w-12 text-slate-600 mb-3" />
+                <p className="font-bold text-base">لا توجد كورسات منشورة حالياً</p>
+                <p className="text-xs text-slate-500 mt-1">تابعنا، سيتم نشر كورسات جديدة قريباً جداً!</p>
+              </div>
+            ) : (
+              courses.map((c: any) => (
+                <div
+                  key={c.id}
+                  className="group flex flex-col overflow-hidden rounded-3xl border border-blue-500/20 bg-[#0B1324] shadow-xl transition hover:-translate-y-1 hover:border-blue-400 hover:shadow-blue-500/20"
+                >
+                  {/* Course Banner */}
+                  <div className="relative h-48 w-full overflow-hidden bg-slate-950">
+                    <Image
+                      src={c.thumbnail_url || "/images/course-foundation-languages.jpg"}
+                      alt={c.title}
+                      fill
+                      className="object-cover opacity-90 transition duration-500 group-hover:scale-105"
+                    />
+                    {/* Tag */}
+                    <span className="absolute top-3 right-3 rounded-xl bg-blue-600/90 px-3 py-1 text-xs font-bold text-white shadow backdrop-blur-sm">
+                      {c.is_free ? 'مجاني' : 'مدفوع'}
+                    </span>
+                    {/* Price */}
+                    <span className="absolute bottom-3 right-3 rounded-xl bg-black/70 px-3 py-1 font-display text-sm font-black text-cyan-400 backdrop-blur-md border border-white/10">
+                      {c.is_free ? 'مجاناً' : formatCurrencyEGP(c.price)}
+                    </span>
                   </div>
 
-                  <Link
-                    href={`/courses`}
-                    className="block w-full rounded-2xl bg-blue-600/20 border border-blue-500/40 py-2.5 text-center text-xs font-bold text-cyan-300 transition hover:bg-blue-600 hover:text-white"
-                  >
-                    الدخول للكورس
-                  </Link>
+                  {/* Content */}
+                  <div className="flex flex-1 flex-col justify-between p-5 space-y-4">
+                    <div>
+                      <h3 className="font-bold text-white line-clamp-2 text-sm leading-snug">
+                        {c.title}
+                      </h3>
+
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-blue-500/10 pt-3">
+                        <span>الدفعة ٢٠٢٦ / ٢٠٢٧</span>
+                        <span className="text-cyan-400 font-semibold">{c.lessons_count || 0} محاضرة</span>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/course/${c.id}`}
+                      className="block w-full rounded-2xl bg-blue-600/20 border border-blue-500/40 py-2.5 text-center text-xs font-bold text-cyan-300 transition hover:bg-blue-600 hover:text-white"
+                    >
+                      الدخول للكورس
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>
