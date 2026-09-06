@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useLesson, useCourseEnrollment } from '@/lib/queries/useCourses';
+import { useLesson, useCourseEnrollment, useStudentPassedExams } from '@/lib/queries/useCourses';
 import { useStudent } from '@/lib/queries/useStudent';
 import { SecureVideoPlayer } from '@/components/course/secure-video-player';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ export default function LessonPage() {
   const { data: lesson, isLoading } = useLesson(id);
   const { data: student } = useStudent();
   const { data: enrollment, isLoading: enrollmentLoading } = useCourseEnrollment(lesson?.course_id ?? '');
+  const { data: passedExams = new Set<string>() } = useStudentPassedExams();
 
   if (isLoading || enrollmentLoading) return <Skeleton className="h-96 w-full rounded-3xl" />;
   if (!lesson) return <p className="text-slate-500">المحاضرة غير موجودة.</p>;
@@ -53,7 +54,9 @@ export default function LessonPage() {
   }
 
   const watermark = student ? `${student.full_name} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
-  const exam = lesson.exam?.[0];
+    const exam = lesson.exam?.[0];
+  const lessonExamId = exam?.id ?? (lesson as any)?.exams?.[0]?.id;
+  const hasPassedExam = !lesson.has_exam || !lessonExamId || passedExams.has(lessonExamId);
 
   // تحويل روابط watch إلى embed تلقائياً إن وجدت
   let videoSrc = lesson.video_url || '';
@@ -134,15 +137,31 @@ export default function LessonPage() {
 
           {lesson.pdf_url && (
             <div className="pt-2">
-              <a
-                href={lesson.pdf_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-5 py-3 text-xs font-bold text-blue-700 dark:text-cyan-300 transition hover:bg-blue-100 hover:scale-[1.01]"
-              >
-                <FileText className="h-4 w-4 text-blue-600 dark:text-cyan-400" />
-                تحميل وفتح ملخص ومذكرة المحاضرة PDF ↗
-              </a>
+              {hasPassedExam ? (
+                <a
+                  href={lesson.pdf_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 px-5 py-3 text-xs font-bold text-emerald-700 dark:text-emerald-300 transition hover:bg-emerald-100 hover:scale-[1.01]"
+                >
+                  <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  تحميل وفتح ملخص ومذكرة المحاضرة PDF ↗
+                </a>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl border border-amber-300 dark:border-amber-700/60 bg-amber-50/70 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300">
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <Lock className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>ملف الـ PDF مقفل 🔒: يجب اجتياز امتحان المحاضرة أولاً بنسبة 50% أو أكثر لتحميل المذكرة.</span>
+                  </div>
+                  {lessonExamId && (
+                    <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shrink-0">
+                      <Link href={`/exam/${lessonExamId}`}>
+                        بدء الامتحان الآن ✍️
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

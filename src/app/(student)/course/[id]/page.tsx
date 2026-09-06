@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
@@ -257,24 +257,38 @@ export default function CoursePage() {
 
                   {/* PDF / Document Row */}
                   {lesson.pdf_url && (
-                    <a
-                      href={lesson.pdf_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                          مستند ومذكرة PDF 📄
+                    hasPassedThisExam || !lesson.has_exam || !lessonExamId ? (
+                      <a
+                        href={lesson.pdf_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between px-5 py-3.5 hover:bg-emerald-50 dark:hover:bg-slate-900 transition group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                            مستند ومذكرة PDF 📄
+                          </span>
+                          <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
+                            تحميل المذكرة (مفتوح بعد اجتياز الامتحان ✅)
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                          فتح المستند ↗
                         </span>
-                        <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                          فتح وتحميل مذكرة المحاضرة مباشرة
-                        </span>
+                      </a>
+                    ) : (
+                      <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50/70 dark:bg-slate-900/50 text-slate-400 cursor-not-allowed">
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-lg bg-slate-300 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-400">
+                            🔒 مذكرة PDF مقفلة
+                          </span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            يجب اجتياز امتحان المحاضرة أولاً بنسبة 50% لفتح المذكرة
+                          </span>
+                        </div>
+                        <Lock className="h-4 w-4 text-amber-500" />
                       </div>
-                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-                        فتح المستند ↗
-                      </span>
-                    </a>
+                    )
                   )}
 
                   {/* Exam Row (Only if exam exists) */}
