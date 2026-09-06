@@ -53,7 +53,6 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
           src={src}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
           allowFullScreen
-          referrerPolicy="no-referrer"
           className="aspect-video w-full border-0"
           title="مشغل الفيديو"
         />
