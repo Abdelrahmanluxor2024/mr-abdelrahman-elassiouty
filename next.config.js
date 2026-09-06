@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   images: {
@@ -20,7 +20,7 @@ const nextConfig = {
   },
   poweredByHeader: false,
   compress: true,
-  // السماح لـ Vimeo و YouTube بالظهور داخل iframe
+  // السماح لجميع مشغلات الفيديو والـ iframes الخارجية (Viemox, Vimeo, YouTube, إلخ)
   async headers() {
     return [
       {
@@ -28,7 +28,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "frame-src 'self' https://player.vimeo.com https://www.youtube.com https://www.youtube-nocookie.com;",
+            value: "frame-src 'self' https: http: blob: data:;",
           },
         ],
       },
