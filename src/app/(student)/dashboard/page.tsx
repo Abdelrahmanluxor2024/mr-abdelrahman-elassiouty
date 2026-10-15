@@ -4,19 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Bookmark,
-  BookOpen,
   CheckSquare,
   Lightbulb,
-  PlayCircle,
-  Sparkles,
-  ArrowLeft,
-  GraduationCap,
-  Clock,
-  Trophy
+  GraduationCap
 } from 'lucide-react';
 import { getCourses, getStudentPassedExams } from '@/lib/firebase/services';
 import type { FirebaseCourse } from '@/lib/firebase/types';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { formatArabicNumber } from '@/lib/utils';
 import { DashboardActivityChart } from '@/components/dashboard/activity-chart';
@@ -34,50 +27,51 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function load() {
       try {
-        // Get student info from cookie
-        const token = document.cookie
-          .split('; ')
-          .find(r => r.startsWith('token='))
-          ?.split('=')[1];
+        const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)token=([^;]*)/) : null;
+        const token = match ? decodeURIComponent(match[1]) : 'guest';
 
-        if (!token) {
-          window.location.href = '/login';
-          return;
-        }
-
-        // Load Firebase data in parallel
         const [coursesData, passedExams] = await Promise.all([
           getCourses(),
           getStudentPassedExams(token),
         ]);
 
-        // Try to get student profile
-        try {
-          const { getUserProfile } = await import('@/lib/firebase/auth-service');
-          const profile = await getUserProfile(token);
-          if (profile) {
-            setStudent({
-              uid: token,
-              full_name: profile.fullName || profile.full_name || 'طالب',
-              wallet_balance: profile.walletBalance || profile.wallet_balance || 0,
-            });
-          }
-        } catch {}
+        if (!isMounted) return;
 
         setCourses(coursesData.slice(0, 6));
         setPassedCount(passedExams.size);
+
+        if (token && token !== 'guest') {
+          try {
+            const { getUserProfile } = await import('@/lib/firebase/auth-service');
+            const profile = await getUserProfile(token);
+            if (profile && isMounted) {
+              setStudent({
+                uid: token,
+                full_name: profile.fullName || profile.full_name || 'طالب',
+                wallet_balance: profile.walletBalance || profile.wallet_balance || 0,
+              });
+            }
+          } catch {}
+        }
       } catch (err) {
         console.error('Dashboard load error:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
+
     load();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const avgProgress = Math.min(100, passedCount * 20);
+  const avgProgress = Math.min(100, passedCount * 25);
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -88,7 +82,7 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-black text-white mt-1">
             {isLoading ? '...' : student.full_name}
           </h2>
-          <p className="text-xs text-slate-500 mt-1">تابع مستواك واجتز الامتحانات لفتح المحاضرات الجديدة</p>
+          <p className="text-xs text-slate-400 mt-1">تابع مستواك واجتز الامتحانات لفتح المحاضرات الجديدة</p>
         </div>
         <div className="hidden sm:flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400">
           <GraduationCap className="h-8 w-8" />
@@ -144,7 +138,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          <p className="text-xs text-slate-500 text-center leading-relaxed">
+          <p className="text-xs text-slate-400 text-center leading-relaxed">
             مقياس إنجازك للمحاضرات واجتيازك للامتحانات التفاعلية!
           </p>
         </div>
@@ -175,7 +169,7 @@ export default function DashboardPage() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-white text-lg">الكورسات والمناهج المتاحة</h3>
-            <p className="text-xs text-slate-500 mt-0.5">اختر الكورس وابدأ التعلم بالترتيب مع مستر عبدالرحمن الأسيوطي</p>
+            <p className="text-xs text-slate-400 mt-0.5">اختر الكورس وابدأ التعلم بالترتيب مع مستر عبدالرحمن الأسيوطي</p>
           </div>
           <Link href="/courses" className="text-xs font-bold text-cyan-400 hover:underline">
             عرض جميع الكورسات ←

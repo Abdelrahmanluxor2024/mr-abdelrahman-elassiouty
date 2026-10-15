@@ -10,19 +10,15 @@ interface StudentInfo {
 }
 
 export function StudentShell({ children }: { children: React.ReactNode }) {
-  const [student, setStudent] = useState<StudentInfo>({ full_name: '' });
+  const [student, setStudent] = useState<StudentInfo>({ full_name: 'طالب' });
 
   useEffect(() => {
     async function loadStudent() {
-      const token = document.cookie
-        .split('; ')
-        .find(r => r.startsWith('token='))
-        ?.split('=')[1];
+      if (typeof document === 'undefined') return;
+      const match = document.cookie.match(/(?:^|;\s*)token=([^;]*)/);
+      const token = match ? decodeURIComponent(match[1]) : null;
 
-      if (!token) {
-        window.location.href = '/login';
-        return;
-      }
+      if (!token) return;
 
       try {
         const { getUserProfile } = await import('@/lib/firebase/auth-service');
@@ -32,11 +28,9 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
             full_name: profile.fullName || profile.full_name || 'طالب',
             avatar_url: profile.avatarUrl || profile.avatar_url || '',
           });
-        } else {
-          setStudent({ full_name: 'طالب' });
         }
-      } catch {
-        setStudent({ full_name: 'طالب' });
+      } catch (e) {
+        console.warn('StudentShell profile load error', e);
       }
     }
     loadStudent();

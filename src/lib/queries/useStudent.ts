@@ -1,31 +1,41 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
-import type { Student } from '@/types/supabase';
 import { useQuery } from '@tanstack/react-query';
+import { auth, db } from '@/lib/firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
-function browserClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+function getTokenFromCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  return document.cookie
+    .split('; ')
+    .find(r => r.startsWith('token='))
+    ?.split('=')[1] || null;
 }
 
-/* -------- client hooks (browser only) -------- */
 export function useStudent() {
   return useQuery({
     queryKey: ['student', 'me'],
     queryFn: async () => {
-      const supabase = browserClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('UNAUTHORIZED');
-      const { data } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      return data as Student;
+      const token = getTokenFromCookie();
+      if (!token) throw new Error('UNAUTHORIZED');
+      const snap = await getDoc(doc(db, 'users', token));
+      if (!snap.exists()) throw new Error('NOT_FOUND');
+      const data = snap.data();
+      return {
+        id: token,
+        uid: token,
+        full_name: data.fullName || data.full_name || 'طالب',
+        phone: data.phone || '',
+        wallet_balance: data.walletBalance || data.wallet_balance || 0,
+        role: data.role || 'student',
+        avatar_url: data.avatarUrl || data.avatar_url || null,
+        grade: data.grade || '',
+        governorate: data.governorate || '',
+      };
     },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -33,54 +43,43 @@ export function useStudentResults() {
   return useQuery({
     queryKey: ['student', 'results'],
     queryFn: async () => {
-      const supabase = browserClient();
-      const { data, error } = await supabase
-        .from('exam_attempts')
-        .select('*, exam:exams(title)')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data;
+      const token = getTokenFromCookie();
+      if (!token) return [];
+      // Firebase: get exam attempts
+      const { getDocs, collection, query, where, orderBy, limit } = await import('firebase/firestore');
+      const q = query(
+        collection(db, 'exam_attempts'),
+        where('studentId', '==', token),
+        orderBy('createdAt', 'desc'),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     },
+    retry: false,
   });
 }
 
 export async function fetchWalletBalance(): Promise<number> {
-  const supabase = browserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
-  const { data } = await supabase
-    .from('students')
-    .select('wallet_balance')
-    .eq('id', user.id)
-    .maybeSingle();
-  return Number(data?.wallet_balance ?? 0);
+  const token = getTokenFromCookie();
+  if (!token) return 0;
+  try {
+    const snap = await getDoc(doc(db, 'users', token));
+    if (!snap.exists()) return 0;
+    return Number(snap.data().walletBalance || snap.data().wallet_balance || 0);
+  } catch {
+    return 0;
+  }
 }
 
 export async function fetchUnreadCount(): Promise<number> {
-  const supabase = browserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
-  const { count } = await supabase
-    .from('notifications')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_id', user.id)
-    .eq('is_read', false);
-  return count ?? 0;
+  return 0; // Will be implemented with Firebase notifications later
 }
 
 export function useNotifications() {
   return useQuery({
     queryKey: ['notifications', 'list'],
-    queryFn: async () => {
-      const supabase = browserClient();
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () => [],
+    retry: false,
   });
 }
