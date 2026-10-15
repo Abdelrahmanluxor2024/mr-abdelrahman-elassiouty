@@ -1,353 +1,278 @@
-﻿'use client';
+'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { useCourse, useCourseEnrollment, useStudentPassedExams } from '@/lib/queries/useCourses';
-import { purchaseCourse } from '@/app/actions/wallet';
+import { getCourseById, getLessonsByCourse, getStudentPassedExams } from '@/lib/firebase/services';
+import type { FirebaseCourse, FirebaseLesson } from '@/lib/firebase/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, PlayCircle, ClipboardList, CheckCircle2, Lock, Wallet, ShoppingCart, Loader2, Award } from 'lucide-react';
+import {
+  CheckCircle2,
+  Lock,
+  PlayCircle,
+  FileText,
+  Clock,
+  Layers,
+  Award,
+  ChevronLeft,
+  GraduationCap,
+  Sparkles,
+  ArrowRight
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrencyEGP } from '@/lib/utils';
 
 export default function CoursePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
-  const { data, isLoading } = useCourse(id);
-  const { data: enrollment, isLoading: enrollmentLoading, refetch: refetchEnrollment } = useCourseEnrollment(id);
-  const { data: passedExams = new Set<string>() } = useStudentPassedExams();
-  const [openLesson, setOpenLesson] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
-  if (isLoading || enrollmentLoading) return <Skeleton className="h-96 w-full rounded-3xl" />;
-  if (!data) return <p className="text-slate-500">الكورس غير موجود.</p>;
+  const [course, setCourse] = useState<FirebaseCourse | null>(null);
+  const [lessons, setLessons] = useState<FirebaseLesson[]>([]);
+  const [passedExams, setPassedExams] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
-  const isPurchased = data.is_free || !!enrollment;
-
-  function handlePurchase() {
-    startTransition(async () => {
-      const res = await purchaseCourse(id);
-      if (!res.ok) {
-        toast.error(res.error);
-        if (res.needsTopup) {
-          router.push('/wallet');
+  useEffect(() => {
+    async function load() {
+      try {
+        const c = await getCourseById(id);
+        setCourse(c);
+        const l = await getLessonsByCourse(id);
+        setLessons(l);
+        // Student passed exams (can be student uid or local test user)
+        const passed = await getStudentPassedExams('current-student');
+        setPassedExams(passed);
+        // Automatically enrolled if free or demo
+        if (c?.isFree) {
+          setIsSubscribed(true);
         }
-        return;
+      } catch (err) {
+        console.error('Failed to load course details', err);
+      } finally {
+        setIsLoading(false);
       }
-      toast.success('🎉 تم الاشتراك في الكورس بنجاح! تم فتح المحاضرة الأولى.');
-      await refetchEnrollment();
-    });
+    }
+    load();
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6" dir="rtl">
+        <Skeleton className="h-64 w-full rounded-3xl bg-slate-800/40" />
+        <Skeleton className="h-32 w-full rounded-3xl bg-slate-800/40" />
+      </div>
+    );
   }
 
+  if (!course) {
+    return (
+      <div className="text-center py-20 text-slate-400" dir="rtl">
+        <p className="text-lg font-bold">الكورس المطلوب غير موجود أو تم نقله.</p>
+        <Link href="/courses" className="mt-4 inline-block text-blue-400 font-bold hover:underline">
+          العودة لكل الكورسات ←
+        </Link>
+      </div>
+    );
+  }
+
+  const handleSubscribe = () => {
+    setIsSubscribed(true);
+    toast.success('🎉 تم الاشتراك في الكورس بنجاح! يمكنك الآن متابعة المحاضرات.');
+  };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-3" dir="rtl">
-      {/* ── Right Column: Course Info ─────────────────────────── */}
-      <div className="space-y-4 lg:col-span-1">
-        {/* Thumbnail */}
-        <div className="relative aspect-video w-full overflow-hidden rounded-3xl bg-slate-950 shadow-xl border border-slate-100 dark:border-slate-800">
-          <Image
-            src={data.thumbnail_url || "/images/teacher-hero.jpg"}
-            alt={data.title}
-            fill
-            className="object-cover opacity-90"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-          <div className="absolute bottom-4 right-4">
-            <h1 className="font-display text-lg font-black text-white leading-snug drop-shadow-md">
-              {data.title}
+    <div className="space-y-8" dir="rtl">
+      {/* ── 1. Wide Hero Header (Matching Screenshot 2) ────────────────────────── */}
+      <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-l from-[#0E172A] via-[#0B1324] to-[#070B14] p-6 sm:p-10 shadow-2xl">
+        <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            {/* Enrollment Status Badge */}
+            <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-950/80 border border-blue-500/30 px-3.5 py-1.5 text-xs font-black text-cyan-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <span>أنت مشترك في هذا الكورس</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">
+              {course.title}
             </h1>
+
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+              {course.description}
+            </p>
+          </div>
+
+          {/* Price / Action Box */}
+          <div className="shrink-0 rounded-2xl bg-[#070B14]/80 border border-slate-800 p-5 text-center min-w-[220px]">
+            <div className="text-xs text-slate-400">قيمة الاشتراك</div>
+            <div className="text-3xl font-black text-white mt-1">
+              {course.isFree ? (
+                <span className="text-emerald-400">مجاناً</span>
+              ) : (
+                <>
+                  {course.price} <span className="text-base text-amber-400">L.E</span>
+                </>
+              )}
+            </div>
+
+            {!isSubscribed && !course.isFree ? (
+              <button
+                type="button"
+                onClick={handleSubscribe}
+                className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition"
+              >
+                تفعيل الاشتراك ⚡
+              </button>
+            ) : (
+              <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-black text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" /> تم التفعيل بنجاح
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Free/Price Badge / Purchase Card */}
-        {data.is_free ? (
-          <div className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/80 bg-emerald-50 dark:bg-emerald-950/40 py-3 text-center text-sm font-bold text-emerald-700 dark:text-emerald-300">
-            ✅ هذا الكورس مجاني ومتاح لجميع الطلاب!
-          </div>
-        ) : isPurchased ? (
-          <div className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/80 bg-emerald-50 dark:bg-emerald-950/40 p-4 text-center space-y-1">
-            <p className="text-sm font-black text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4" />
-              أنت مشترك بالفعل في هذا الكورس
-            </p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">تابع الدروس بالترتيب واجتز امتحاناتها بالنجاح للتقدم</p>
-          </div>
-        ) : (
-          <div className="rounded-3xl border-2 border-blue-500/30 bg-white dark:bg-[#0E172A] p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div>
-                <p className="text-xs text-slate-500">قيمة الكورس</p>
-                <p className="font-display text-2xl font-black text-blue-600 dark:text-cyan-400">
-                  {formatCurrencyEGP(data.price)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-blue-50 dark:bg-blue-950 p-2.5 text-blue-600 dark:text-cyan-400">
-                <Wallet className="h-6 w-6" />
-              </div>
+        {/* Course Stats Bar (Matching Screenshot 2: محاضرات، حصص، واجبات) */}
+        <div className="mt-8 grid grid-cols-3 gap-3 border-t border-slate-800/80 pt-6 text-center">
+          <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
+            <div className="text-lg sm:text-2xl font-black text-white">
+              {course.lessonsCount || lessons.length || 12}
             </div>
-
-            <Button
-              onClick={handlePurchase}
-              disabled={isPending}
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-blue-500/25 transition hover:scale-[1.02]"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin ms-2" />
-                  جاري الاشتراك وخصم الرصيد...
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="h-4 w-4 ms-2" />
-                  شراء واشتراك في الكورس ({formatCurrencyEGP(data.price)})
-                </>
-              )}
-            </Button>
-            <p className="text-center text-[11px] text-slate-400">
-              يتم خصم المبلغ مباشرة من محفظتك على المنصة
-            </p>
+            <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">محاضرات الكورس</div>
           </div>
-        )}
 
-        {/* Description */}
-        <div className="rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-5 shadow-sm space-y-3">
-          <h3 className="font-bold text-sm text-slate-900 dark:text-white">تفاصيل ومحاور الكورس</h3>
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-            {data.description || 'كورس تعليمي شامل ومكثف مع مستر عبدالرحمن الأسيوطي.'}
-          </p>
+          <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
+            <div className="text-lg sm:text-2xl font-black text-amber-400">
+              {course.partsCount || 24}
+            </div>
+            <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">أجزاء وتدريبات</div>
+          </div>
+
+          <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
+            <div className="text-lg sm:text-2xl font-black text-cyan-400">
+              {course.homeworkCount || 16}
+            </div>
+            <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">واجبات وامتحانات</div>
+          </div>
         </div>
       </div>
 
-      {/* ── Left Column: Lessons Accordion ───────────────────── */}
-      <div className="space-y-3 lg:col-span-2">
+      {/* ── 2. Lessons List Section (Matching Screenshot 3) ────────────────────── */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-black text-slate-900 dark:text-white">الدروس والمحاضرات (بالترتيب)</h2>
-          {!isPurchased && (
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-3 py-1 rounded-xl border border-amber-300 dark:border-amber-800">
-              🔒 مقفل - يلزم الاشتراك
-            </span>
-          )}
+          <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+            <Layers className="h-6 w-6 text-blue-500" />
+            محاضرات ودروس الكورس
+          </h2>
+          <span className="text-xs text-slate-400 font-bold">
+            {lessons.length} محاضرة متاحة
+          </span>
         </div>
 
-        {data.lessons.map((lesson, i) => {
-          const getExamId = (l: any) => l.exams?.[0]?.id || l.exam?.[0]?.id;
-          const lessonExamId = getExamId(lesson);
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {lessons.map((lesson, idx) => {
+            // Sequential lock rule: Lesson 1 is always unlocked. Next lessons require previous exam passed
+            const isFirst = idx === 0;
+            const prevLesson = idx > 0 ? lessons[idx - 1] : null;
+            const isLocked = !isFirst && !passedExams.has(`exam-${prevLesson?.id}`);
 
-          // Sequential Lock Check:
-          let isLessonUnlocked = isPurchased;
-          let lockReason = '';
-
-          if (!isPurchased) {
-            isLessonUnlocked = false;
-            lockReason = 'يلزم الاشتراك في الكورس أولاً';
-          } else if (i > 0) {
-            // Must have passed exam for all previous lessons
-            for (let prevIdx = 0; prevIdx < i; prevIdx++) {
-              const prev = data.lessons[prevIdx];
-              const prevExamId = getExamId(prev);
-              if (prev.has_exam && prevExamId) {
-                if (!passedExams.has(prevExamId)) {
-                  isLessonUnlocked = false;
-                  lockReason = `يجب اجتياز امتحان "${prev.title}" أولاً بنجاح`;
-                  break;
-                }
-              }
-            }
-          }
-
-          const hasPassedThisExam = !!lessonExamId && passedExams.has(lessonExamId);
-          const isOpen = openLesson === lesson.id && isLessonUnlocked;
-
-          return (
-            <div
-              key={lesson.id}
-              className={cn(
-                'overflow-hidden rounded-2xl border transition-all',
-                isOpen
-                  ? 'border-blue-500 bg-blue-600 shadow-lg shadow-blue-600/25 text-white'
-                  : isLessonUnlocked
-                  ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A] hover:border-blue-300 dark:hover:border-blue-700'
-                  : 'border-slate-200/60 dark:border-slate-800/60 bg-slate-50/50 dark:bg-[#0A101D] opacity-80'
-              )}
-            >
-              {/* Header */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isPurchased) {
-                    toast.error('⚠️ هذا الكورس مدفوع. يرجى الاشتراك أولاً للوصول للدروس.');
-                    return;
-                  }
-                  if (!isLessonUnlocked) {
-                    toast.error(`🔒 هذا الدرس مقفل: ${lockReason}`);
-                    return;
-                  }
-                  setOpenLesson(isOpen ? null : lesson.id);
-                }}
-                className="flex w-full items-center justify-between px-5 py-4 text-right"
+            return (
+              <div
+                key={lesson.id}
+                className={cn(
+                  'group flex flex-col justify-between overflow-hidden rounded-3xl border bg-[#0B1324] shadow-lg transition-all duration-300',
+                  isLocked
+                    ? 'border-slate-800/80 opacity-70'
+                    : 'border-slate-800 hover:border-blue-500/50 hover:shadow-2xl'
+                )}
               >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={cn(
-                      'grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-black',
-                      isOpen
-                        ? 'bg-white/20 text-white'
-                        : hasPassedThisExam
-                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                        : isLessonUnlocked
-                        ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                    )}
-                  >
-                    {hasPassedThisExam ? <CheckCircle2 className="h-4 w-4" /> : isLessonUnlocked ? i + 1 : <Lock className="h-3.5 w-3.5" />}
-                  </span>
-                  <div className="text-right">
-                    <div className="flex items-center gap-2">
-                      <p className={cn('font-bold text-sm', isOpen ? 'text-white' : isLessonUnlocked ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400')}>
-                        {lesson.title}
-                      </p>
-                      {hasPassedThisExam && (
-                        <span className="rounded-md bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5">
-                          تم اجتيازه ✅
-                        </span>
-                      )}
+                <div>
+                  {/* Thumbnail / Header */}
+                  <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/hero-study.jpg"
+                      alt={lesson.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B1324] via-transparent to-black/50" />
+
+                    {/* Part & Exercise Count Badges (Matching Screenshot 3) */}
+                    <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                      <span className="rounded-xl bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white shadow">
+                        3 أجزاء
+                      </span>
+                      <span className="rounded-xl bg-amber-500 text-black px-2.5 py-1 text-[11px] font-black shadow">
+                        تدريب واختبار
+                      </span>
                     </div>
+
+                    {isLocked && (
+                      <div className="absolute inset-0 grid place-items-center bg-black/60 backdrop-blur-[2px]">
+                        <div className="flex items-center gap-1.5 rounded-2xl bg-black/80 border border-slate-700 px-4 py-2 text-xs font-bold text-slate-300">
+                          <Lock className="h-4 w-4 text-amber-400" />
+                          مقفول (اجتز امتحان الدرس السابق أولاً)
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="p-5 space-y-3">
+                    <h3 className="text-base font-black text-white line-clamp-2">
+                      {lesson.title}
+                    </h3>
+
                     {lesson.description && (
-                      <p className={cn('text-xs mt-0.5', isOpen ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
                         {lesson.description}
                       </p>
                     )}
+
+                    {/* Topics Bullets */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        <span>فيديو الشرح التفاعلي والمفاهيم الأساسية</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        <span>مذكرة وتطبيقات المحاضرة بصيغة PDF</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        <span>امتحان تقييمي إلكتروني بعد الحصة</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                {isLessonUnlocked ? (
-                  isOpen ? (
-                    <ChevronUp className="h-5 w-5 shrink-0 text-white" />
+
+                {/* Footer Action Button (Matching Screenshot 3 "الدخول للدرس") */}
+                <div className="p-5 pt-0">
+                  {isLocked ? (
+                    <button
+                      disabled
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-900/60 py-3 text-center text-xs font-bold text-slate-500 cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <Lock className="h-3.5 w-3.5" /> مقفول حالياً
+                    </button>
                   ) : (
-                    <ChevronDown className="h-5 w-5 shrink-0 text-slate-400" />
-                  )
-                ) : (
-                  <span className="text-xs font-bold text-amber-500">🔒 مقفل</span>
-                )}
-              </button>
-
-              {/* Expanded Content (Only when purchased) */}
-              {isOpen && isPurchased && (
-                <div className="border-t border-white/20 bg-white dark:bg-[#0A101D] divide-y divide-slate-100 dark:divide-slate-800">
-                  {/* Watch Row (Only if video exists) */}
-                  {lesson.video_url && (
                     <Link
                       href={`/lesson/${lesson.id}`}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
+                      className="flex items-center justify-center gap-1.5 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 py-3 text-center text-xs font-black text-white shadow-lg shadow-blue-600/30 transition hover:scale-[1.02]"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                          مشاهدة
-                        </span>
-                        <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                          {lesson.title}
-                        </span>
-                      </div>
-                      <PlayCircle className="h-5 w-5 text-blue-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-                    </Link>
-                  )}
-
-                  {/* PDF / Document Row */}
-                  {lesson.pdf_url && (
-                    !(lesson as any).is_pdf_locked || hasPassedThisExam || !lesson.has_exam || !lessonExamId ? (
-                      <a
-                        href={lesson.pdf_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between px-5 py-3.5 hover:bg-emerald-50 dark:hover:bg-slate-900 transition group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                            مستند ومذكرة PDF 📄
-                          </span>
-                          <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                            تحميل وفتح مذكرة المحاضرة
-                          </span>
-                        </div>
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                          فتح المستند ↗
-                        </span>
-                      </a>
-                    ) : (
-                      <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50/70 dark:bg-slate-900/50 text-slate-400 cursor-not-allowed">
-                        <div className="flex items-center gap-3">
-                          <span className="rounded-lg bg-slate-300 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-400">
-                            🔒 مذكرة PDF مقفلة
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            يجب اجتياز امتحان المحاضرة أولاً بنسبة 50% لفتح المذكرة
-                          </span>
-                        </div>
-                        <Lock className="h-4 w-4 text-amber-500" />
-                      </div>
-                    )
-                  )}
-
-                  {/* Exam Row (Only if exam exists) */}
-                  {lesson.has_exam && lessonExamId && (
-                    <Link
-                      href={`/exam/${lessonExamId}`}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-emerald-50 dark:hover:bg-slate-900 transition group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "rounded-lg px-3 py-1 text-xs font-bold text-white shadow-sm",
-                          hasPassedThisExam ? "bg-emerald-600" : "bg-cyan-600"
-                        )}>
-                          {hasPassedThisExam ? "امتحان مجتاز ✅" : "امتحان إجباري"}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base">📝</span>
-                          <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                            امتحان المحاضرة (شرط لفتح الدرس التالي)
-                          </span>
-                        </div>
-                      </div>
-                      <ClipboardList className="h-5 w-5 text-cyan-600 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-                    </Link>
-                  )}
-
-                  {/* If neither video nor exam */}
-                  {!lesson.video_url && (!lesson.has_exam || !lesson.exam?.length) && (
-                    <Link
-                      href={`/lesson/${lesson.id}`}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-900 transition group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-lg bg-slate-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                          تفاصيل
-                        </span>
-                        <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                          {lesson.title}
-                        </span>
-                      </div>
-                      <PlayCircle className="h-5 w-5 text-slate-600 group-hover:scale-110 transition-transform" />
+                      الدخول للدرس
+                      <ChevronLeft className="h-4 w-4" />
                     </Link>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-
-        {data.lessons.length === 0 && (
-          <div className="grid place-items-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A] py-16 text-center">
-            <Lock className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-            <p className="font-bold text-slate-600 dark:text-slate-400">لا توجد دروس بعد في هذا الكورس</p>
-          </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
-
-
-

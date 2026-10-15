@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { RotateCcw, Key, Sparkles, CheckCircle2, UserCheck, Loader2 } from 'lucide-react';
+import { RotateCcw, Key, Sparkles, CheckCircle2, UserCheck, Loader2, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { formatArabicNumber } from '@/lib/utils';
 
 export default function AdminExamsPage() {
@@ -64,13 +65,23 @@ export default function AdminExamsPage() {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div>
-        <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">
-          إدارة الامتحانات والمحاولات 📝
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          يمكنك هنا متابعة الامتحانات ومنح محاولات إضافية للطلاب الذين رسبوا أو خرجوا من نافذة الامتحان.
-        </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">
+            إدارة الامتحانات والمحاولات 📝
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            يمكنك هنا إنشاء امتحانات تفاعلية جديدة ومنح محاولات إضافية للطلاب.
+          </p>
+        </div>
+
+        <Link
+          href="/admin/exams/create"
+          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 px-6 py-3 text-xs font-black text-white shadow-xl shadow-blue-600/30 transition hover:scale-105"
+        >
+          <Plus className="h-4 w-4" />
+          إنشاء امتحان جديد وبنك أسئلة 🚀
+        </Link>
       </div>
 
       {/* Grant Attempt Card */}
