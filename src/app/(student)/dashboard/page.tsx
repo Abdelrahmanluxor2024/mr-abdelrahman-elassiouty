@@ -12,12 +12,6 @@ import { getCourses, getStudentPassedExams } from '@/lib/firebase/services';
 import type { FirebaseCourse } from '@/lib/firebase/types';
 import { Progress } from '@/components/ui/progress';
 import { formatArabicNumber } from '@/lib/utils';
-import dynamic from 'next/dynamic';
-
-const DashboardActivityChart = dynamic(
-  () => import('@/components/dashboard/activity-chart').then(mod => mod.DashboardActivityChart),
-  { ssr: false, loading: () => <div className="h-64 w-full animate-pulse rounded-2xl bg-slate-800/40" /> }
-);
 
 interface StudentInfo {
   uid: string;
@@ -129,42 +123,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Progress + Activity Chart ──────────────── */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-4 rounded-3xl border border-slate-800 bg-[#0E172A] p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-slate-200 text-base">مستوى تقدمك العام</h3>
-            <div className="my-8 text-center">
-              <p className="font-display text-5xl font-black text-cyan-400">
-                {formatArabicNumber(avgProgress)}%
-              </p>
-              <div className="mt-4">
-                <Progress value={avgProgress} className="h-3 bg-slate-800" />
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 text-center leading-relaxed">
-            مقياس إنجازك للمحاضرات واجتيازك للامتحانات التفاعلية!
+      {/* ── Progress Card ───────────────────────────── */}
+      <div className="rounded-3xl border border-slate-800 bg-[#0E172A] p-6 shadow-sm">
+        <h3 className="font-bold text-slate-200 text-base">مستوى تقدمك العام</h3>
+        <div className="my-6 text-center max-w-md mx-auto">
+          <p className="font-display text-5xl font-black text-cyan-400">
+            {formatArabicNumber(avgProgress)}%
           </p>
-        </div>
-
-        <div className="lg:col-span-8 rounded-3xl border border-slate-800 bg-[#0E172A] p-6 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-bold text-white text-base">نشاطك التعليمي الأسبوعي</h3>
-            <div className="flex items-center gap-4 text-xs font-semibold text-slate-400">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                <span>المعدل الموصى به</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                <span>إنجازك الفعلي</span>
-              </div>
-            </div>
+          <div className="mt-4">
+            <Progress value={avgProgress} className="h-3 bg-slate-800" />
           </div>
-          <DashboardActivityChart />
-          <p className="mt-2 text-center text-[11px] text-slate-500">
-            *يتم تحديث النشاط تلقائياً مع حل كل امتحان ومشاهدة المحاضرات
+          <p className="text-xs text-slate-400 text-center leading-relaxed mt-3">
+            مقياس إنجازك للمحاضرات واجتيازك للامتحانات التفاعلية!
           </p>
         </div>
       </div>
