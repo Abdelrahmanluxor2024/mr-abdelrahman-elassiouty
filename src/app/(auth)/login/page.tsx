@@ -1,21 +1,20 @@
 'use client';
 
-import { Suspense, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { toast } from 'sonner';
 import { Phone, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { loginWithPhone } from '@/app/actions/auth';
-import { getDeviceFingerprint } from '@/lib/device';
-import { createClient } from '@/lib/supabase/client';
+import { loginWithPhone } from '@/lib/firebase/auth-service';
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="grid min-h-screen place-items-center bg-brand-gradient text-white">جاري التحميل...</div>}>
+    <Suspense fallback={<div className="grid min-h-screen place-items-center bg-[#070B14] text-white">جاري التحميل...</div>}>
       <LoginForm />
     </Suspense>
   );
@@ -27,49 +26,34 @@ function LoginForm() {
   const nextPath = search.get('next') ?? '/dashboard';
 
   const [phone, setPhone] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const urlError = search.get('error');
-  const displayError = error ?? urlError;
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await loginWithPhone({
-        phone,
-        password,
-        device_fingerprint: getDeviceFingerprint(),
-      });
+      const result = await loginWithPhone(phone.trim(), password);
       if (!result.ok) {
         setError(result.error);
         toast.error(result.error);
         return;
       }
-      
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: result.email,
-        password: password,
-      });
 
-      if (signInError) {
-        setError(signInError.message);
-        toast.error(signInError.message);
-        return;
-      }
+      // Set cookie so middleware knows the user is logged in
+      document.cookie = `token=${result.uid}; path=/; max-age=2592000`;
+      document.cookie = `user_role=${result.role}; path=/; max-age=2592000`;
 
-      toast.success('تم تسجيل الدخول بنجاح');
-      window.location.href = nextPath;
+      toast.success('تم تسجيل الدخول بنجاح 🎉');
+      window.location.href = result.role === 'admin' ? '/admin' : nextPath;
     });
   }
 
   return (
-    <main className="relative grid min-h-screen place-items-center px-4 overflow-hidden bg-[#070B14]">
-      {/* Background Image aaa.png with Cyber Overlay */}
+    <main className="relative grid min-h-screen place-items-center px-4 overflow-hidden bg-[#070B14]" dir="rtl">
+      {/* Background */}
       <div className="absolute inset-0 -z-10">
         <Image
           src="/images/auth-bg.png"
@@ -97,7 +81,7 @@ function LoginForm() {
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5 text-right">
-            <Label htmlFor="phone" className="text-slate-200">رقم الهاتف</Label>
+            <Label htmlFor="phone" className="text-slate-200 font-bold text-xs sm:text-sm">رقم الهاتف</Label>
             <div className="relative">
               <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -136,13 +120,18 @@ function LoginForm() {
             </div>
           </div>
 
-          {displayError && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-              {displayError}
+          {error && (
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400 text-center">
+              {error}
             </p>
           )}
 
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-2xl shadow-lg shadow-blue-600/30" size="lg" disabled={isPending}>
+          <Button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-blue-600/30"
+            size="lg"
+            disabled={isPending}
+          >
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
