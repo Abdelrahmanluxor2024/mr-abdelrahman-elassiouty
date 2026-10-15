@@ -368,6 +368,16 @@ export default function ExamRunnerPage() {
               <span className="text-xs text-slate-400 font-medium">الدرجة: {q.marks}</span>
             </div>
             <CardTitle className="leading-relaxed text-base font-bold text-slate-900 dark:text-white">{q.question_text}</CardTitle>
+            {((q as any).image_url || (q as any).imageUrl) && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-black/40 max-h-80 flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={(q as any).image_url || (q as any).imageUrl}
+                  alt="صورة السؤال"
+                  className="max-h-80 w-auto object-contain"
+                />
+              </div>
+            )}
           </CardHeader>
           <CardContent className="pt-6">
             {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? (
