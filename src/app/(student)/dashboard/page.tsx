@@ -12,7 +12,12 @@ import { getCourses, getStudentPassedExams } from '@/lib/firebase/services';
 import type { FirebaseCourse } from '@/lib/firebase/types';
 import { Progress } from '@/components/ui/progress';
 import { formatArabicNumber } from '@/lib/utils';
-import { DashboardActivityChart } from '@/components/dashboard/activity-chart';
+import dynamic from 'next/dynamic';
+
+const DashboardActivityChart = dynamic(
+  () => import('@/components/dashboard/activity-chart').then(mod => mod.DashboardActivityChart),
+  { ssr: false, loading: () => <div className="h-64 w-full animate-pulse rounded-2xl bg-slate-800/40" /> }
+);
 
 interface StudentInfo {
   uid: string;
