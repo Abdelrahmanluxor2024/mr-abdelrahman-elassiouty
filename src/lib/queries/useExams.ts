@@ -1,27 +1,29 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getExamById, getQuestionsByExam } from '@/lib/firebase/services';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { createBrowserClient } from '@supabase/ssr';
+import type { Exam, ExamAttempt, Question, StudentAnswer } from '@/types/supabase';
+
+function browserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
 export function useExam(examId: string) {
   return useQuery({
     queryKey: ['exams', examId],
     enabled: !!examId,
     queryFn: async () => {
-      const exam = await getExamById(examId);
-      if (!exam) throw new Error('NOT_FOUND');
-      return {
-        id: exam.id,
-        title: exam.title,
-        description: exam.description,
-        duration_minutes: exam.durationMinutes,
-        total_marks: exam.totalMarks,
-        passing_marks: exam.passingMarks,
-        max_attempts: exam.maxAttempts || 2,
-        questions_count: exam.questionsCount,
-      } as any;
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('id', examId)
+        .single();
+      if (error) throw error;
+      return data as Exam;
     },
   });
 }
@@ -30,20 +32,15 @@ export function useExamQuestions(examId: string) {
   return useQuery({
     queryKey: ['exams', examId, 'questions'],
     enabled: !!examId,
-    queryFn: async () => {
-      const questions = await getQuestionsByExam(examId);
-      return questions.map(q => ({
-        id: q.id,
-        exam_id: q.examId,
-        question_text: q.questionText,
-        question_type: q.questionType,
-        imageUrl: q.imageUrl,
-        image_url: q.imageUrl,
-        marks: q.marks,
-        options: q.options,
-        correct_answer: q.correctAnswer,
-        order_index: q.orderIndex,
-      })) as any[];
+    queryFn: async (): Promise<Question[]> => {
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Question[];
     },
   });
 }
@@ -52,31 +49,80 @@ export function useAttempt(attemptId: string) {
   return useQuery({
     queryKey: ['attempts', attemptId],
     enabled: !!attemptId,
-    queryFn: async () => {
-      try {
-        const snap = await getDoc(doc(db, 'exam_attempts', attemptId));
-        if (snap.exists()) {
-          const d = snap.data();
-          return {
-            id: snap.id,
-            score: d.score,
-            total_marks: d.totalMarks,
-            percentage: d.percentage,
-            is_passed: d.status === 'passed',
-            answers: d.answers,
-          } as any;
-        }
-      } catch (e) {
-        console.warn('useAttempt fallback', e);
+    queryFn: async (): Promise<ExamAttempt> => {
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .eq('id', attemptId)
+        .single();
+      if (error) throw error;
+      return data as ExamAttempt;
+    },
+  });
+}
+
+export function useLatestAttemptForExam(examId: string, explicitAttemptId?: string) {
+  return useQuery({
+    queryKey: ['attempts', 'latest', examId, explicitAttemptId],
+    enabled: !!examId || !!explicitAttemptId,
+    queryFn: async (): Promise<ExamAttempt | null> => {
+      const supabase = browserClient();
+      if (explicitAttemptId) {
+        const { data, error } = await supabase
+          .from('exam_attempts')
+          .select('*')
+          .eq('id', explicitAttemptId)
+          .single();
+        if (error) return null;
+        return data as ExamAttempt;
       }
-      return {
-        id: attemptId,
-        score: 18,
-        total_marks: 20,
-        percentage: 90,
-        is_passed: true,
-        answers: {},
-      } as any;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('student_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as ExamAttempt | null;
+    },
+  });
+}
+
+export function useAttemptAnswers(attemptId: string) {
+  return useQuery({
+    queryKey: ['attempts', attemptId, 'answers'],
+    enabled: !!attemptId,
+    queryFn: async (): Promise<StudentAnswer[]> => {
+      const supabase = browserClient();
+      const { data, error } = await supabase
+        .from('student_answers')
+        .select('*')
+        .eq('attempt_id', attemptId);
+      if (error) throw error;
+      return (data ?? []) as StudentAnswer[];
+    },
+  });
+}
+
+export function useMyAttempts() {
+  return useQuery({
+    queryKey: ['attempts', 'me'],
+    queryFn: async (): Promise<(ExamAttempt & { exam: Exam })[]> => {
+      const supabase = browserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select('*, exam:exams(*)')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return (data ?? []) as (ExamAttempt & { exam: Exam })[];
     },
   });
 }
