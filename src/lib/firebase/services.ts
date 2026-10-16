@@ -138,12 +138,22 @@ export const DEFAULT_LESSONS: Record<string, FirebaseLesson[]> = {
 
 // ======================== COURSES ========================
 export async function getCourses(): Promise<FirebaseCourse[]> {
-  try {
+  const fetchCourses = async () => {
     const q = query(collection(db, 'courses'));
     const snap = await getDocs(q);
     if (!snap.empty) {
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseCourse));
     }
+    return null;
+  };
+
+  const timeoutPromise = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), 1200)
+  );
+
+  try {
+    const data = await Promise.race([fetchCourses(), timeoutPromise]);
+    if (data && data.length > 0) return data;
   } catch (err) {
     console.warn('Firestore courses fallback to defaults', err);
   }
