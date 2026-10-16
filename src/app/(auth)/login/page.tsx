@@ -42,6 +42,29 @@ function LoginForm() {
         return;
       }
 
+      // Cache student profile in localStorage for 0ms paint
+      if (typeof window !== 'undefined') {
+        try {
+          const { getUserProfile } = await import('@/lib/firebase/auth-service');
+          const prof = await getUserProfile(result.uid);
+          if (prof) {
+            localStorage.setItem('mr_ass_student_profile', JSON.stringify({
+              id: result.uid,
+              fullName: prof.fullName || prof.full_name || 'طالب المنصة',
+              phone: prof.phone || phone.trim(),
+              grade: prof.grade || '2nd_bac',
+              governorate: prof.governorate || 'القاهرة',
+              school: prof.school || '',
+              walletBalance: prof.walletBalance || prof.wallet_balance || 0,
+              avatarUrl: prof.avatarUrl || prof.avatar_url || '',
+              role: prof.role || result.role,
+            }));
+          }
+        } catch (e) {
+          console.warn('Error pre-caching login profile', e);
+        }
+      }
+
       // Set cookie so middleware knows the user is logged in
       document.cookie = `token=${result.uid}; path=/; max-age=2592000`;
       document.cookie = `user_role=${result.role}; path=/; max-age=2592000`;

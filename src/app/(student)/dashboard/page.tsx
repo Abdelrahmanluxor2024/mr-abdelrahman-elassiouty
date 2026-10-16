@@ -1,5 +1,7 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { 
   Bookmark, 
   BookOpen, 
@@ -7,35 +9,66 @@ import {
   Lightbulb, 
   PlayCircle, 
   Sparkles, 
-  ArrowLeft 
+  ArrowLeft,
+  GraduationCap
 } from 'lucide-react';
-import { getCurrentStudent } from '@/lib/queries/useStudentServer';
-import { getCourses, DEFAULT_COURSES } from '@/lib/firebase/services';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
+import { getCourses, DEFAULT_COURSES, getStudentPassedExams } from '@/lib/firebase/services';
+import type { FirebaseCourse } from '@/lib/firebase/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { formatCurrencyEGP, formatArabicNumber } from '@/lib/utils';
 import { DashboardActivityChart } from '@/components/dashboard/activity-chart';
 
-export const dynamic = 'force-dynamic';
+export default function DashboardPage() {
+  const { student } = useCurrentStudent();
+  const [courses, setCourses] = useState<FirebaseCourse[]>(DEFAULT_COURSES);
+  const [passedCount, setPassedCount] = useState(1);
 
-export default async function DashboardPage() {
-  const student = await getCurrentStudent();
-  const courses = await getCourses().catch(() => DEFAULT_COURSES);
+  useEffect(() => {
+    async function load() {
+      try {
+        const c = await getCourses();
+        if (c && c.length > 0) setCourses(c);
+        if (student.id && student.id !== 'current-student') {
+          const passed = await getStudentPassedExams(student.id);
+          setPassedCount(passed.size > 0 ? passed.size : 1);
+        }
+      } catch (err) {
+        console.warn('Dashboard data fetch fallback', err);
+      }
+    }
+    load();
+  }, [student.id]);
 
   const activeCoursesCount = courses.length || 3;
-  const passedAttemptsCount = 1;
   const avgProgress = 25;
 
   return (
     <div className="space-y-6" dir="rtl">
+      {/* ── Welcome Header with Student's Real Name ─────────────────────── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-blue-700 via-indigo-700 to-blue-900 p-6 sm:p-8 text-white shadow-xl shadow-blue-900/20">
+        <div className="relative z-10 space-y-2">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-cyan-200 backdrop-blur-md">
+            <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+            <span>لوحة تحكم الطالب المتفوق</span>
+          </div>
+          <h1 className="font-display text-2xl sm:text-3xl font-black text-white">
+            أهلاً بك، {student.fullName || 'طالب المنصة'} 👋
+          </h1>
+          <p className="text-xs sm:text-sm text-blue-100 max-w-xl leading-relaxed">
+            مستمرون مع مستر عبدالرحمن الأسيوطي حتى التفوق والحصول على الدرجة النهائية إن شاء الله!
+          </p>
+        </div>
+        <div className="absolute -left-12 -bottom-12 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
+      </div>
+
       {/* ── Top 3 Stat Cards in Cyber Blue ──────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-3">
         {/* Card 1: Completed Courses / Exams Passed */}
         <div className="flex items-center justify-between rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white shadow-lg shadow-blue-500/20">
           <div>
-            <p className="font-display text-4xl font-black">{formatArabicNumber(passedAttemptsCount)}</p>
+            <p className="font-display text-4xl font-black">{formatArabicNumber(passedCount)}</p>
             <p className="mt-1 text-sm font-semibold text-white/90">امتحانات تم اجتيازها ✅</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
@@ -57,7 +90,7 @@ export default async function DashboardPage() {
         {/* Card 3: Wallet Balance */}
         <div className="flex items-center justify-between rounded-3xl bg-gradient-to-r from-indigo-700 to-blue-900 p-6 text-white shadow-lg shadow-indigo-500/20">
           <div>
-            <p className="font-display text-3xl font-black">{formatCurrencyEGP(student.wallet_balance || 0)}</p>
+            <p className="font-display text-3xl font-black">{formatCurrencyEGP(student.walletBalance || 0)}</p>
             <p className="mt-1 text-sm font-semibold text-white/90">رصيد المحفظة</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">

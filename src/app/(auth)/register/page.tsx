@@ -69,6 +69,24 @@ export default function RegisterPage() {
         return;
       }
 
+      // Cache profile locally for instant paint
+      if (typeof window !== 'undefined') {
+        const profile = {
+          id: result.uid,
+          fullName: form.fullName.trim(),
+          phone: form.phone.trim(),
+          grade: form.grade,
+          governorate: form.governorate,
+          school: form.school.trim() || '',
+          walletBalance: 0,
+          avatarUrl: '',
+          role: 'student',
+        };
+        try {
+          localStorage.setItem('mr_ass_student_profile', JSON.stringify(profile));
+        } catch {}
+      }
+
       // Set cookie for middleware auth check
       document.cookie = `token=${result.uid}; path=/; max-age=2592000`;
       document.cookie = `user_role=student; path=/; max-age=2592000`;

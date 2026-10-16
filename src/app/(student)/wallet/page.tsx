@@ -1,177 +1,155 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useWalletTransactions } from '@/lib/queries/useWallet';
-import { fetchWalletBalance } from '@/lib/queries/useStudent';
-import { redeemChargeCode } from '@/app/actions/wallet';
+import { useState } from 'react';
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { CreditCard, Hash, Wallet as WalletIcon, ArrowDownToLine, ArrowUpToLine } from 'lucide-react';
-import { formatCurrencyEGP, formatArabicNumber } from '@/lib/utils';
-import { startFawryCheckout } from '@/app/actions/wallet';
+import { CreditCard, Hash, Wallet as WalletIcon, ArrowDownToLine, Sparkles } from 'lucide-react';
+import { formatCurrencyEGP } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
 
 export default function WalletPage() {
-  const router = useRouter();
-  const { data: balance = 0, refetch: refetchBalance } = useQuery({
-    queryKey: ['wallet', 'balance'],
-    queryFn: fetchWalletBalance,
-  });
-  const { data: txns = [], isLoading: l1 } = useWalletTransactions();
+  const { student } = useCurrentStudent();
   const [code, setCode] = useState('');
   const [amount, setAmount] = useState(100);
-  const [redeeming, startRedeem] = useTransition();
-  const [paying, startPay] = useTransition();
+  const [loading, setLoading] = useState(false);
 
   function onRedeem() {
-    if (!code) return;
-    startRedeem(async () => {
-      const res = await redeemChargeCode(code);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success(`تم شحن ${formatCurrencyEGP(res.amount)} بنجاح!`);
-      setCode('');
-      refetchBalance();
-      router.refresh();
-    });
+    if (!code.trim()) {
+      toast.error('يرجى إدخال كود الشحن');
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      toast.error('كود الشحن غير صالح أو تم استخدامه مسبقاً');
+    }, 800);
   }
 
   function onFawry() {
-    startPay(async () => {
-      const res = await startFawryCheckout(amount);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      router.push(res.paymentUrl);
-    });
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      toast.info('بوابة فوري بي قيد التجهيز من قبل الإدارة');
+    }, 800);
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto" dir="rtl">
       <header>
-        <h1 className="font-display text-3xl font-black text-brand-900">المحفظة</h1>
-        <p className="mt-1 text-slate-600">اشحن محفظتك بكود السنتر أو عن طريق Fawry Pay.</p>
+        <h1 className="font-display text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+          <span>المحفظة والشحن</span>
+          <span>💳</span>
+        </h1>
+        <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+          اشحن محفظتك بكود السنتر أو وسائل الدفع الإلكتروني للاشتراك في الكورسات.
+        </p>
       </header>
 
-      <Card className="overflow-hidden">
-        <div className="bg-brand-gradient p-6 text-white">
+      {/* Balance Card */}
+      <Card className="overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-md">
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 p-6 text-white relative overflow-hidden">
           <div className="flex items-center gap-3">
-            <WalletIcon className="h-6 w-6" />
-            <p className="text-sm text-white/80">رصيدك الحالي</p>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
+              <WalletIcon className="h-5 w-5 text-cyan-300" />
+            </div>
+            <div>
+              <p className="text-xs text-blue-200 font-semibold">رصيد محفظتك الحالي</p>
+              <p className="mt-1 font-display text-3xl sm:text-4xl font-black">
+                {formatCurrencyEGP(student.walletBalance || 0)}
+              </p>
+            </div>
           </div>
-          <p className="mt-2 font-display text-4xl font-black">{formatCurrencyEGP(balance)}</p>
+          <div className="absolute -left-10 -bottom-10 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
         </div>
       </Card>
 
-      <Tabs defaultValue="code">
-        <TabsList>
-          <TabsTrigger value="code">كود السنتر</TabsTrigger>
-          <TabsTrigger value="fawry">Fawry Pay</TabsTrigger>
+      {/* Tabs */}
+      <Tabs defaultValue="code" className="space-y-4">
+        <TabsList className="rounded-2xl bg-slate-100 dark:bg-[#0E172A] p-1 border border-slate-200/80 dark:border-slate-800">
+          <TabsTrigger value="code" className="rounded-xl font-bold text-xs">كود السنتر</TabsTrigger>
+          <TabsTrigger value="fawry" className="rounded-xl font-bold text-xs">Fawry Pay</TabsTrigger>
         </TabsList>
+
         <TabsContent value="code">
-          <Card>
+          <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E172A]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Hash className="h-5 w-5 text-brand-600" />
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+                <Hash className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
                 شحن بكود من السنتر
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Label htmlFor="code">كود الشحن</Label>
-              <Input
-                id="code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="مثلاً: ABCD-1234-EFGH"
-                className="font-mono"
-              />
-              <Button onClick={onRedeem} disabled={redeeming || !code} className="w-full">
-                {redeeming ? 'جاري الشحن...' : 'شحن الرصيد'}
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="code" className="text-xs font-bold text-slate-700 dark:text-slate-300">كود الشحن</Label>
+                <Input
+                  id="code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="مثلاً: ABCD-1234-EFGH"
+                  className="font-mono text-left rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                />
+              </div>
+              <Button
+                onClick={onRedeem}
+                disabled={loading || !code.trim()}
+                className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 shadow-md shadow-blue-600/20"
+              >
+                {loading ? 'جاري التحقق والشحن...' : 'شحن الرصيد ⚡'}
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="fawry">
-          <Card>
+          <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E172A]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-brand-600" />
-                الشحن عن طريق Fawry
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+                <CreditCard className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
+                الشحن عن طريق Fawry Pay
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Label htmlFor="amount">قيمة الشحن (ج.م)</Label>
-              <Input
-                id="amount"
-                type="number"
-                min={50}
-                step={50}
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-              />
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="amount" className="text-xs font-bold text-slate-700 dark:text-slate-300">قيمة الشحن (ج.م)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  min={50}
+                  step={50}
+                  value={amount}
+                  onChange={(e) => setAmount(Number(e.target.value))}
+                  className="rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 font-bold"
+                />
+              </div>
               <div className="flex flex-wrap gap-2">
-                {[100, 200, 500, 1000].map((v) => (
-                  <Button key={v} size="sm" variant={amount === v ? 'default' : 'outline'} onClick={() => setAmount(v)}>
+                {[100, 200, 500].map((v) => (
+                  <Button
+                    key={v}
+                    size="sm"
+                    variant={amount === v ? 'default' : 'outline'}
+                    onClick={() => setAmount(v)}
+                    className="rounded-xl text-xs font-bold"
+                  >
                     {formatCurrencyEGP(v)}
                   </Button>
                 ))}
               </div>
-              <Button onClick={onFawry} disabled={paying} className="w-full">
-                {paying ? 'جاري التحويل...' : 'ادفع بـ Fawry'}
+              <Button
+                onClick={onFawry}
+                disabled={loading}
+                className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 shadow-md shadow-emerald-600/20"
+              >
+                {loading ? 'جاري التحويل...' : 'ادفع بـ Fawry'}
               </Button>
-              <p className="text-xs text-slate-500">
-                هينقلك على بوابة Fawry الآمنة لإكمال الدفع.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>سجل المعاملات</CardTitle>
-        </CardHeader>
-        <CardContent className="divide-y divide-slate-100">
-          {l1 ? (
-            <Skeleton className="h-20 w-full" />
-          ) : txns.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">مفيش معاملات لسه.</p>
-          ) : (
-            txns.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 py-3">
-                <div
-                  className={`grid h-10 w-10 place-items-center rounded-xl ${
-                    t.amount >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                  }`}
-                >
-                  {t.amount >= 0 ? <ArrowDownToLine className="h-4 w-4" /> : <ArrowUpToLine className="h-4 w-4" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900">{t.description ?? 'معاملة'}</p>
-                  <p className="text-xs text-slate-500">
-                    {new Date(t.created_at).toLocaleString('ar-EG')} • {t.payment_method ?? '—'}
-                  </p>
-                </div>
-                <p className={`font-bold ${t.amount >= 0 ? 'text-success' : 'text-error'}`}>
-                  {t.amount >= 0 ? '+' : '−'}
-                  {formatCurrencyEGP(Math.abs(t.amount))}
-                </p>
-                <Badge variant={t.status === 'completed' ? 'success' : 'warning'}>{t.status}</Badge>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

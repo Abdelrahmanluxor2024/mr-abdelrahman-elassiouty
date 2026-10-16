@@ -6,18 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { WhatsAppButton } from '@/components/common/whatsapp-button';
 import { PlatformGroupFeed } from '@/components/community/platform-group-feed';
-import { createClient } from '@/lib/supabase/server';
+import { getCourses, DEFAULT_COURSES } from '@/lib/firebase/services';
 import { formatCurrencyEGP } from '@/lib/utils';
 
 export default async function HomePage() {
-  const supabase = createClient();
-  const { data: dbCourses } = await supabase
-    .from('courses')
-    .select('id, title, description, price, is_free, duration_hours, lessons_count, thumbnail_url, created_at')
-    .eq('is_published', true)
-    .order('created_at', { ascending: false });
-
-  const courses = dbCourses && dbCourses.length > 0 ? dbCourses : [];
+  const courses = await getCourses().catch(() => DEFAULT_COURSES);
   return (
     <div className="min-h-screen bg-[#070B14] text-white selection:bg-blue-600 selection:text-white" dir="rtl">
       {/* ── Top Floating Header ────────────────────────────────────────────── */}
@@ -200,18 +193,18 @@ export default async function HomePage() {
                   {/* Course Banner */}
                   <div className="relative h-48 w-full overflow-hidden bg-slate-950">
                     <Image
-                      src={c.thumbnail_url || "/images/course-foundation-languages.jpg"}
+                      src={c.thumbnailUrl || c.thumbnail_url || "/images/course-foundation-languages.jpg"}
                       alt={c.title}
                       fill
                       className="object-cover opacity-90 transition duration-500 group-hover:scale-105"
                     />
                     {/* Tag */}
                     <span className="absolute top-3 right-3 rounded-xl bg-blue-600/90 px-3 py-1 text-xs font-bold text-white shadow backdrop-blur-sm">
-                      {c.is_free ? 'مجاني' : 'مدفوع'}
+                      {(c.isFree ?? c.is_free) ? 'مجاني' : 'مدفوع'}
                     </span>
                     {/* Price */}
                     <span className="absolute bottom-3 right-3 rounded-xl bg-black/70 px-3 py-1 font-display text-sm font-black text-cyan-400 backdrop-blur-md border border-white/10">
-                      {c.is_free ? 'مجاناً' : formatCurrencyEGP(c.price)}
+                      {(c.isFree ?? c.is_free) ? 'مجاناً' : formatCurrencyEGP(c.price)}
                     </span>
                   </div>
 
@@ -224,7 +217,7 @@ export default async function HomePage() {
 
                       <div className="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-blue-500/10 pt-3">
                         <span>الدفعة ٢٠٢٦ / ٢٠٢٧</span>
-                        <span className="text-cyan-400 font-semibold">{c.lessons_count || 0} محاضرة</span>
+                        <span className="text-cyan-400 font-semibold">{c.lessonsCount ?? c.lessons_count ?? 12} محاضرة</span>
                       </div>
                     </div>
 

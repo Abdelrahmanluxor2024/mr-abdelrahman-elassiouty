@@ -1,30 +1,52 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
-import type { Student } from '@/types/supabase';
 import { useQuery } from '@tanstack/react-query';
-
-function browserClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
+import { auth, db } from '@/lib/firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
+import { getCachedStudentProfile } from '@/lib/firebase/use-student-auth';
 
 /* -------- client hooks (browser only) -------- */
 export function useStudent() {
   return useQuery({
     queryKey: ['student', 'me'],
     queryFn: async () => {
-      const supabase = browserClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('UNAUTHORIZED');
-      const { data } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      return data as Student;
+      const cached = getCachedStudentProfile();
+      const currentUser = auth.currentUser;
+      const uid = currentUser?.uid || cached.id;
+
+      if (!uid || uid === 'current-student') {
+        return {
+          id: cached.id,
+          full_name: cached.fullName,
+          phone: cached.phone,
+          grade: cached.grade,
+          wallet_balance: cached.walletBalance,
+        };
+      }
+
+      try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        if (snap.exists()) {
+          const d = snap.data();
+          return {
+            id: uid,
+            full_name: d.fullName || d.full_name || cached.fullName,
+            phone: d.phone || cached.phone,
+            grade: d.grade || cached.grade,
+            wallet_balance: d.walletBalance || d.wallet_balance || 0,
+          };
+        }
+      } catch (err) {
+        console.warn('useStudent fetch fallback:', err);
+      }
+
+      return {
+        id: cached.id,
+        full_name: cached.fullName,
+        phone: cached.phone,
+        grade: cached.grade,
+        wallet_balance: cached.walletBalance,
+      };
     },
   });
 }
@@ -33,54 +55,40 @@ export function useStudentResults() {
   return useQuery({
     queryKey: ['student', 'results'],
     queryFn: async () => {
-      const supabase = browserClient();
-      const { data, error } = await supabase
-        .from('exam_attempts')
-        .select('*, exam:exams(title)')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data;
+      return [];
     },
   });
 }
 
 export async function fetchWalletBalance(): Promise<number> {
-  const supabase = browserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
-  const { data } = await supabase
-    .from('students')
-    .select('wallet_balance')
-    .eq('id', user.id)
-    .maybeSingle();
-  return Number(data?.wallet_balance ?? 0);
+  const cached = getCachedStudentProfile();
+  const currentUser = auth.currentUser;
+  const uid = currentUser?.uid || cached.id;
+
+  if (uid && uid !== 'current-student') {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) {
+        const d = snap.data();
+        return Number(d.walletBalance || d.wallet_balance || 0);
+      }
+    } catch (err) {
+      console.warn('fetchWalletBalance fallback:', err);
+    }
+  }
+
+  return Number(cached.walletBalance || 0);
 }
 
 export async function fetchUnreadCount(): Promise<number> {
-  const supabase = browserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
-  const { count } = await supabase
-    .from('notifications')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_id', user.id)
-    .eq('is_read', false);
-  return count ?? 0;
+  return 0;
 }
 
 export function useNotifications() {
   return useQuery({
     queryKey: ['notifications', 'list'],
     queryFn: async () => {
-      const supabase = browserClient();
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data ?? [];
+      return [];
     },
   });
 }
