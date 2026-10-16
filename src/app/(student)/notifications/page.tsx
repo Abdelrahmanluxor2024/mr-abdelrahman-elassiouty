@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useNotifications, useStudent } from '@/lib/queries/useStudent';
-import { createBrowserClient } from '@supabase/ssr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bell } from 'lucide-react';
@@ -14,11 +13,6 @@ export default function NotificationsPage() {
   const qc = useQueryClient();
 
   async function markRead(id: string) {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     qc.invalidateQueries({ queryKey: ['notifications'] });
   }
 

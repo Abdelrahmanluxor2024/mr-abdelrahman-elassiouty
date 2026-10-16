@@ -84,10 +84,19 @@ export async function fetchUnreadCount(): Promise<number> {
   return 0;
 }
 
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  link?: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
 export function useNotifications() {
   return useQuery({
     queryKey: ['notifications', 'list'],
-    queryFn: async () => {
+    queryFn: async (): Promise<NotificationItem[]> => {
       return [];
     },
   });
