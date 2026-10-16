@@ -15,11 +15,20 @@ import {
   Menu, 
   X,
   Sparkles,
-  GraduationCap
+  GraduationCap,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function Sidebar({ studentName, avatarUrl }: { studentName: string; avatarUrl?: string | null }) {
+export function Sidebar({ 
+  studentName, 
+  avatarUrl, 
+  role 
+}: { 
+  studentName: string; 
+  avatarUrl?: string | null; 
+  role?: string; 
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -94,6 +103,21 @@ export function Sidebar({ studentName, avatarUrl }: { studentName: string; avata
 
         {/* Navigation list */}
         <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto">
+          {/* Admin Panel Quick Access */}
+          {role === 'admin' && (
+            <Link
+              href="/admin"
+              onClick={() => {
+                document.cookie = 'user_role=admin; path=/; max-age=2592000';
+                setMobileOpen(false);
+              }}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3 font-black transition-all bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black shadow-lg shadow-amber-500/25 hover:scale-[1.02] mb-2"
+            >
+              <ShieldCheck className="h-5 w-5 shrink-0 text-black" />
+              {!collapsed && <span className="text-sm">لوحة التحكم (Admin) 👑</span>}
+            </Link>
+          )}
+
           {/* 1. الرئيسية (Dashboard) */}
           <Link
             href="/dashboard"

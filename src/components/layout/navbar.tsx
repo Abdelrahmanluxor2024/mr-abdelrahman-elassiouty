@@ -8,7 +8,15 @@ import { formatCurrencyEGP } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
 import { signOut } from '@/lib/firebase/auth-service';
 
-export function Navbar({ studentName, balance = 0 }: { studentName: string; balance?: number }) {
+export function Navbar({ 
+  studentName, 
+  balance = 0,
+  role
+}: { 
+  studentName: string; 
+  balance?: number;
+  role?: string;
+}) {
   const unread = 0;
 
   async function handleLogout() {
@@ -66,6 +74,19 @@ export function Navbar({ studentName, balance = 0 }: { studentName: string; bala
 
       {/* Left Actions on Navbar */}
       <div className="flex items-center gap-2.5">
+        {/* Admin Quick Link */}
+        {role === 'admin' && (
+          <Link
+            href="/admin"
+            onClick={() => {
+              document.cookie = 'user_role=admin; path=/; max-age=2592000';
+            }}
+            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 px-3.5 py-1.5 text-xs font-black text-black shadow-md shadow-amber-500/20 hover:scale-105 transition"
+          >
+            <span>لوحة التحكم 👑</span>
+          </Link>
+        )}
+
         {/* Wallet Pill */}
         <Link
           href="/wallet"

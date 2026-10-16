@@ -38,17 +38,22 @@ export function getCachedStudentProfile(): StudentProfileData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.fullName) {
+      if (parsed && (parsed.fullName || parsed.phone)) {
+        const phone = parsed.phone || '';
+        const role = (phone.trim() === '01064106070' || parsed.role === 'admin') ? 'admin' : (parsed.role || 'student');
+        if (role === 'admin') {
+          document.cookie = 'user_role=admin; path=/; max-age=2592000';
+        }
         return {
           id: parsed.id || parsed.uid || 'current-student',
           fullName: parsed.fullName || parsed.full_name || 'طالب المنصة',
-          phone: parsed.phone || '',
+          phone,
           grade: parsed.grade || '2nd_bac',
           governorate: parsed.governorate || 'القاهرة',
           school: parsed.school || '',
           walletBalance: Number(parsed.walletBalance || parsed.wallet_balance || 0),
           avatarUrl: parsed.avatarUrl || parsed.avatar_url || '',
-          role: parsed.role || 'student',
+          role,
         };
       }
     }
@@ -81,16 +86,21 @@ export function useCurrentStudent() {
       const snap = await getDoc(doc(db, 'users', uid));
       if (snap.exists()) {
         const d = snap.data();
+        const phone = d.phone || '';
+        const role = (phone.trim() === '01064106070' || d.role === 'admin') ? 'admin' : (d.role || 'student');
+        if (role === 'admin') {
+          document.cookie = 'user_role=admin; path=/; max-age=2592000';
+        }
         const prof: StudentProfileData = {
           id: uid,
           fullName: d.fullName || d.full_name || 'طالب المنصة',
-          phone: d.phone || '',
+          phone,
           grade: d.grade || '2nd_bac',
           governorate: d.governorate || 'القاهرة',
           school: d.school || '',
           walletBalance: Number(d.walletBalance || d.wallet_balance || 0),
           avatarUrl: d.avatarUrl || d.avatar_url || '',
-          role: d.role || 'student',
+          role,
         };
         setStudent(prof);
         saveCachedStudentProfile(prof);

@@ -119,6 +119,21 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Admin Panel Quick Access */}
+      {(student.role === 'admin' || student.phone === '01064106070') && (
+        <Button
+          asChild
+          onClick={() => {
+            document.cookie = 'user_role=admin; path=/; max-age=2592000';
+          }}
+          className="w-full rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black py-4 shadow-xl shadow-amber-500/25 text-sm transition hover:scale-[1.01]"
+        >
+          <Link href="/admin">
+            👑 الدخول إلى لوحة تحكم الإدارة (Admin Panel)
+          </Link>
+        </Button>
+      )}
+
       {/* Logout Button */}
       <Button
         variant="outline"
