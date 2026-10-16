@@ -19,7 +19,7 @@ export default function MyCoursesPage() {
     async function load() {
       try {
         const c = await getCourses();
-        if (c && c.length > 0) setCourses(c);
+        setCourses(c || []);
       } catch (err) {
         console.warn('MyCourses fallback:', err);
       }

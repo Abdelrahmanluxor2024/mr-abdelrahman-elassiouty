@@ -29,7 +29,7 @@ export default function DashboardPage() {
     async function load() {
       try {
         const c = await getCourses();
-        if (c && c.length > 0) setCourses(c);
+        setCourses(c || []);
         if (student.id && student.id !== 'current-student') {
           const passed = await getStudentPassedExams(student.id);
           setPassedCount(passed.size > 0 ? passed.size : 1);
@@ -41,7 +41,7 @@ export default function DashboardPage() {
     load();
   }, [student.id]);
 
-  const activeCoursesCount = courses.length || 3;
+  const activeCoursesCount = courses.length;
   const avgProgress = 25;
 
   return (
@@ -156,41 +156,49 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {(courses ?? []).map((c: any) => (
-            <div
-              key={c.id}
-              className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#070B14] shadow-sm transition hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700"
-            >
-              <div className="relative h-44 w-full overflow-hidden bg-slate-950">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={c.thumbnailUrl || c.thumbnail_url || "/images/course-foundation-languages.jpg"}
-                  alt={c.title}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="p-4 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="mb-2">
-                    <span className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300">
-                      {c.isFree || c.is_free ? '🎁 كورس مجاني' : `💎 ${formatCurrencyEGP(c.price)}`}
-                    </span>
-                  </div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">{c.title}</h4>
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    {c.durationHours ? `${c.durationHours} ساعات شرح` : 'دفعة 2026 / 2027'}
-                  </p>
+        {courses.length === 0 ? (
+          <div className="py-12 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 p-8">
+            <BookOpen className="mx-auto h-10 w-10 text-slate-400 dark:text-slate-600 mb-2" />
+            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">لا توجد كورسات متاحة حالياً</p>
+            <p className="text-xs text-slate-500 mt-1">سيتم إضافة ونشر كورسات ومناهج جديدة قريباً جداً من قبل مستر عبدالرحمن الأسيوطي.</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {courses.map((c: any) => (
+              <div
+                key={c.id}
+                className="flex flex-col overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#070B14] shadow-sm transition hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700"
+              >
+                <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={c.thumbnailUrl || c.thumbnail_url || "/images/course-foundation-languages.jpg"}
+                    alt={c.title}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-                <Button asChild className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md">
-                  <Link href={`/course/${c.id}`}>
-                    الدخول ومتابعة الكورس ←
-                  </Link>
-                </Button>
+                <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="mb-2">
+                      <span className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300">
+                        {c.isFree || c.is_free ? '🎁 كورس مجاني' : `💎 ${formatCurrencyEGP(c.price)}`}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm line-clamp-2">{c.title}</h4>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      {c.durationHours ? `${c.durationHours} ساعات شرح` : 'دفعة 2026 / 2027'}
+                    </p>
+                  </div>
+                  <Button asChild className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md">
+                    <Link href={`/course/${c.id}`}>
+                      الدخول ومتابعة الكورس ←
+                    </Link>
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

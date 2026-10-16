@@ -23,118 +23,9 @@ import type {
 } from './types';
 
 // ======================== DEFAULT COURSES SEED (FALLBACK) ========================
-export const DEFAULT_COURSES: FirebaseCourse[] = [
-  {
-    id: 'course-sec3-ar',
-    title: 'كورس الصف الثالث الثانوي - المنهج التأسيسي المتكامل لغة عربية',
-    description: 'شرح تفصيلي شامل لمنهج الثانوية العامة مع تدريبات دورية وامتحانات تتبع مستواك خطوة بخطوة',
-    price: 200,
-    isFree: false,
-    durationHours: 48,
-    thumbnailUrl: '/images/hero-study.jpg',
-    isPublished: true,
-    tag: 'الصف الثالث الثانوي',
-    discountPrice: 280,
-    features: [
-      'شرح تفصيلي لجميع فروع اللغة العربية (نحو، بلاغة، أدب، نصوص، قراءة)',
-      'اختبارات إلكترونية بعد كل جزء مع تصحيح فوري وتحليل نقاط الضعف',
-      'مذكرات وملخصات PDF احترافية مع أسلوب الخرائط الذهنية',
-      'متابعة دورية واختبارات قياس مستوى تراكمية'
-    ],
-    partsCount: 16,
-    lessonsCount: 12,
-    homeworkCount: 24,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'course-sec2-ar',
-    title: 'كورس الصف الثاني الثانوي - النحو والبلاغة التأسيسية',
-    description: 'تأسيس قوي لدفعة تانية ثانوي في أهم قواعد النحو والبلاغة مع تدريبات عملية وبنوك أسئلة',
-    price: 180,
-    isFree: false,
-    durationHours: 32,
-    thumbnailUrl: '/images/course-foundation-languages.jpg',
-    isPublished: true,
-    tag: 'الصف الثاني الثانوي',
-    discountPrice: 250,
-    features: [
-      'شرح مبسط ومباشر لقواعد النحو التراكمية',
-      'تدريبات تفاعلية بنظام الأسئلة الحديثة',
-      'ملفات وملازم PDF قابلة للعرض فور اجتياز الاختبار',
-      'دعم واستفسارات مستمرة على المنتدى'
-    ],
-    partsCount: 10,
-    lessonsCount: 8,
-    homeworkCount: 16,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'course-sec1-free',
-    title: 'كورس التأسيس الشامل المجاني في النحو والبلاغة',
-    description: 'كورس مجاني بالكامل هدية لجميع الطلاب لإتقان أساسيات الإعراب والتشبيه والاستعارة',
-    price: 0,
-    isFree: true,
-    durationHours: 15,
-    thumbnailUrl: '/images/teacher-hero.jpg',
-    isPublished: true,
-    tag: 'تأسيس مجاني',
-    discountPrice: 0,
-    features: [
-      'متاح مجاناً لكافة المراحل الدراسية',
-      'شرح القواعد الذهبية في الإعراب من الصفر',
-      'اختبار تدريبي لكل درس',
-      'ملخص PDF مجاني شامل'
-    ],
-    partsCount: 6,
-    lessonsCount: 4,
-    homeworkCount: 6,
-    createdAt: new Date().toISOString()
-  }
-];
+export const DEFAULT_COURSES: FirebaseCourse[] = [];
 
-export const DEFAULT_LESSONS: Record<string, FirebaseLesson[]> = {
-  'course-sec3-ar': [
-    {
-      id: 'lesson-1',
-      courseId: 'course-sec3-ar',
-      title: 'المحاضرة 1: همزة الوصل والقطع + مدخل علم البلاغة',
-      description: 'شرح شامل لقواعد الهمزات مع تطبيقات من نصوص الثانوية العامة ومراجعة على البلاغة التشبيه والاستعارة',
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      videoDuration: 65,
-      pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-      isPdfLocked: false,
-      orderIndex: 1,
-      isFreePreview: true,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'lesson-2',
-      courseId: 'course-sec3-ar',
-      title: 'المحاضرة 2: المشتقات العاملة وأعمال اسم الفاعل والمفعول',
-      description: 'إتقان المشتقات وإعمالها وصيغ المبالغة مع تدريب تطبيقي على أصعب نماذج الامتحانات',
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      videoDuration: 75,
-      pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-      isPdfLocked: true,
-      orderIndex: 2,
-      isFreePreview: false,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'lesson-3',
-      courseId: 'course-sec3-ar',
-      title: 'المحاضرة 3: الأدب في مدرسة الإحياء والبعث وجيل التطوير',
-      description: 'شرح مدرسة الإحياء وتلاميذ البارودي وأحمد شوقي وتطبيقات شعرية تفاعلية',
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      videoDuration: 55,
-      pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-      isPdfLocked: true,
-      orderIndex: 3,
-      isFreePreview: false,
-      createdAt: new Date().toISOString()
-    }
-  ]
-};
+export const DEFAULT_LESSONS: Record<string, FirebaseLesson[]> = {};
 
 // ======================== COURSES ========================
 export async function getCourses(): Promise<FirebaseCourse[]> {
@@ -187,21 +78,7 @@ export async function getLessonsByCourse(courseId: string): Promise<FirebaseLess
   } catch (err) {
     console.warn('Firestore lessons fallback to defaults', err);
   }
-  return DEFAULT_LESSONS[courseId] || [
-    {
-      id: `${courseId}-l1`,
-      courseId,
-      title: 'المحاضرة الأولى: التأسيس والمفاهيم الأساسية',
-      description: 'فيديو شرح المحاضرة الأولى مع تدريب وتطبيقات واختبار قياس المستوى',
-      videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      videoDuration: 60,
-      pdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-      isPdfLocked: false,
-      orderIndex: 1,
-      isFreePreview: true,
-      createdAt: new Date().toISOString()
-    }
-  ];
+  return DEFAULT_LESSONS[courseId] || [];
 }
 
 export async function getLessonById(lessonId: string): Promise<FirebaseLesson | null> {
