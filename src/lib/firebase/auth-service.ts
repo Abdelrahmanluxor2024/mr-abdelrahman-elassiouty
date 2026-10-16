@@ -48,6 +48,9 @@ export async function registerWithPhone(data: {
     const cred = await createUserWithEmailAndPassword(auth, email, data.password);
     const uid = cred.user.uid;
 
+    const isAdmin = data.phone.trim() === '01064106070';
+    const role = isAdmin ? 'admin' : 'student';
+
     // Save user profile to Firestore
     await setDoc(doc(db, 'users', uid), {
       uid,
@@ -58,13 +61,13 @@ export async function registerWithPhone(data: {
       governorate: data.governorate,
       school: data.school || '',
       grade: data.grade,
-      role: 'student',
+      role,
       walletBalance: 0,
       avatarUrl: '',
       createdAt: new Date().toISOString()
     });
 
-    return { ok: true, uid };
+    return { ok: true, uid, role };
   } catch (err: any) {
     console.error('Register error:', err);
     if (err.code === 'auth/email-already-in-use') {
@@ -90,7 +93,10 @@ export async function loginWithPhone(
 
     // Get role from Firestore
     const userDoc = await getDoc(doc(db, 'users', uid));
-    const role = userDoc.exists() ? (userDoc.data().role || 'student') : 'student';
+    let role = userDoc.exists() ? (userDoc.data().role || 'student') : 'student';
+    if (phone.trim() === '01064106070') {
+      role = 'admin';
+    }
 
     return { ok: true, uid, role };
   } catch (err: any) {

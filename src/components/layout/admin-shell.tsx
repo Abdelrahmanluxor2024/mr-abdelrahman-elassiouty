@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { logout } from '@/app/actions/auth';
 
 const ADMIN_NAV = [
   { href: '/admin', label: 'الإحصائيات' },
@@ -48,15 +47,25 @@ export function AdminShell({ children, name }: { children: React.ReactNode; name
               </Link>
             );
           })}
-          <form action={logout} className="pt-4">
+          <div className="pt-4">
             <button
-              type="submit"
+              type="button"
+              onClick={() => {
+                document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                if (typeof window !== 'undefined') {
+                  try {
+                    localStorage.removeItem('mr_ass_student_profile');
+                  } catch {}
+                  window.location.href = '/login';
+                }
+              }}
               className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10"
             >
               <LogOut className="h-4 w-4" />
               خروج
             </button>
-          </form>
+          </div>
         </nav>
       </aside>
       <main className="bg-soft p-6 lg:p-8">{children}</main>

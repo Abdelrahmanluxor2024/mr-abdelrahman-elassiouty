@@ -1,29 +1,19 @@
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AdminShell } from '@/components/layout/admin-shell';
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login?next=/admin');
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = cookies();
+  const token = cookieStore.get('token')?.value;
+  const userRole = cookieStore.get('user_role')?.value;
 
-  // Verify only authorized phone 01064106070 can access admin panel
-  const adminClient = createAdminClient();
-  const { data: student } = await adminClient
-    .from('students')
-    .select('phone, full_name, role')
-    .eq('id', user.id)
-    .maybeSingle();
+  if (!token) {
+    redirect('/login?next=/admin');
+  }
 
-  const userPhone = student?.phone ?? user.phone ?? '';
-  const isMasterAdmin = userPhone === '01064106070' || user.email === '01064106070@mrass.app';
-
-  if (!isMasterAdmin && student?.role !== 'admin') {
+  if (userRole !== 'admin') {
     redirect('/dashboard');
   }
 
-  const displayName = student?.full_name ?? 'مستر عبدالرحمن الأسيوطي';
-
-  return <AdminShell name={displayName}>{children}</AdminShell>;
+  return <AdminShell name="مستر عبدالرحمن الأسيوطي">{children}</AdminShell>;
 }

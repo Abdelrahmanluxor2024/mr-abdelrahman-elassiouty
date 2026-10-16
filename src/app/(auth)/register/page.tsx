@@ -69,6 +69,8 @@ export default function RegisterPage() {
         return;
       }
 
+      const assignedRole = (result as any).role || 'student';
+
       // Cache profile locally for instant paint
       if (typeof window !== 'undefined') {
         const profile = {
@@ -80,7 +82,7 @@ export default function RegisterPage() {
           school: form.school.trim() || '',
           walletBalance: 0,
           avatarUrl: '',
-          role: 'student',
+          role: assignedRole,
         };
         try {
           localStorage.setItem('mr_ass_student_profile', JSON.stringify(profile));
@@ -89,10 +91,10 @@ export default function RegisterPage() {
 
       // Set cookie for middleware auth check
       document.cookie = `token=${result.uid}; path=/; max-age=2592000`;
-      document.cookie = `user_role=student; path=/; max-age=2592000`;
+      document.cookie = `user_role=${assignedRole}; path=/; max-age=2592000`;
 
       toast.success('🎉 تم إنشاء الحساب وتسجيل الدخول بنجاح! مرحباً بك في المنصة.');
-      window.location.href = '/dashboard';
+      window.location.href = assignedRole === 'admin' ? '/admin' : '/dashboard';
     });
   }
 
