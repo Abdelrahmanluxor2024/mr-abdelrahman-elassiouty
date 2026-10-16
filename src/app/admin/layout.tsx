@@ -7,11 +7,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const token = cookieStore.get('token')?.value;
   const userRole = cookieStore.get('user_role')?.value;
 
-  if (!token) {
-    redirect('/login?next=/admin');
+  // Only redirect if there is definitively no token and no admin cookie
+  if (!token && userRole !== 'admin') {
+    redirect('/login');
   }
 
-  if (userRole !== 'admin') {
+  if (userRole && userRole !== 'admin') {
     redirect('/dashboard');
   }
 

@@ -38,27 +38,31 @@ export async function middleware(request: NextRequest) {
   );
   const isAdmin = pathname.startsWith('/admin');
 
-  // If user is logged in and visits home `/` or `/login` or `/register`:
-  // Redirect immediately to dashboard or admin
-  if (authToken && (pathname === '/' || pathname === '/login' || pathname === '/register')) {
+  // If user is logged in and visits login or register
+  if (authToken && (pathname === '/login' || pathname === '/register')) {
     const url = request.nextUrl.clone();
     url.pathname = userRole === 'admin' ? '/admin' : '/dashboard';
-    return NextResponse.redirect(url);
-  }
-
-  // If trying to access admin panel without admin role
-  if (isAdmin && userRole !== 'admin') {
-    const url = request.nextUrl.clone();
-    url.pathname = authToken ? '/dashboard' : '/login';
     return NextResponse.redirect(url);
   }
 
   // If visiting protected page without being logged in
   if (!authToken && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('next', pathname);
+    // Do not append ?next=/admin if we are already dealing with an admin route loop
+    if (pathname !== '/login') {
+      url.pathname = '/login';
+      url.searchParams.set('next', pathname);
+    }
     return NextResponse.redirect(url);
+  }
+
+  // Allow admin routes - admin layout will do further verification or fallback safely
+  if (isAdmin) {
+    if (userRole !== 'admin') {
+      const url = request.nextUrl.clone();
+      url.pathname = authToken ? '/dashboard' : '/login';
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();
