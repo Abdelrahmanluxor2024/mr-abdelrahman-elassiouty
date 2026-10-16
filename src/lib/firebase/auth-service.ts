@@ -31,8 +31,7 @@ export async function registerWithPhone(data: {
   gender: string;
   governorate: string;
   school?: string;
-  grade: string;
-}): Promise<{ ok: true; uid: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; uid: string; role: string } | { ok: false; error: string }> {
   const email = phoneToFirebaseEmail(data.phone);
 
   try {
