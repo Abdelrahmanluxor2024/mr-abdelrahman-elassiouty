@@ -1,9 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createBrowserClient } from '@supabase/ssr';
-import { adminReplyToPost, deleteForumPost } from '@/app/actions/admin';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,70 +8,100 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { MessageSquare, Send, Trash2, CheckCircle2, User, Sparkles, Loader2 } from 'lucide-react';
+import { collection, getDocs, addDoc, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 export default function AdminForumPage() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  const qc = useQueryClient();
   const [selectedPost, setSelectedPost] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [replies, setReplies] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: posts = [], isLoading } = useQuery({
-    queryKey: ['admin', 'forum', 'posts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('forum_posts')
-        .select('*, student:students(full_name, phone)')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const { data: replies = [], refetch: refetchReplies } = useQuery({
-    queryKey: ['admin', 'forum', 'replies', selectedPost],
-    enabled: !!selectedPost,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('forum_replies')
-        .select('*, student:students(full_name)')
-        .eq('post_id', selectedPost!)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  function handleSendReply() {
-    if (!selectedPost || !replyText.trim()) return;
-    startTransition(async () => {
-      const res = await adminReplyToPost({ postId: selectedPost, content: replyText.trim() });
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success('تم إرسال رد المستر بنجاح');
-      setReplyText('');
-      await refetchReplies();
-      qc.invalidateQueries({ queryKey: ['admin', 'forum', 'posts'] });
-    });
+  async function loadPosts() {
+    setIsLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'forum_posts'));
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        student: { full_name: d.data().studentName || 'طالب', phone: d.data().studentPhone || '' },
+        created_at: d.data().createdAt || d.data().created_at || new Date().toISOString()
+      }));
+      setPosts(list);
+    } catch (err) {
+      console.error('Error loading forum posts:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  function handleDelete(postId: string) {
+  async function loadReplies(postId: string) {
+    try {
+      const q = query(collection(db, 'forum_replies'), where('postId', '==', postId));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        student: { full_name: d.data().authorName || 'المستر' }
+      }));
+      setReplies(list);
+    } catch (err) {
+      console.error('Error loading replies:', err);
+    }
+  }
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  useEffect(() => {
+    if (selectedPost) {
+      loadReplies(selectedPost);
+    } else {
+      setReplies([]);
+    }
+  }, [selectedPost]);
+
+  async function handleSendReply() {
+    if (!selectedPost || !replyText.trim()) return;
+    setIsPending(true);
+    try {
+      await addDoc(collection(db, 'forum_replies'), {
+        postId: selectedPost,
+        content: replyText.trim(),
+        authorName: 'مستر عبدالرحمن الأسيوطي',
+        isAdminReply: true,
+        createdAt: new Date().toISOString()
+      });
+      await updateDoc(doc(db, 'forum_posts', selectedPost), {
+        isAnswered: true
+      });
+      toast.success('تم إرسال رد المستر بنجاح');
+      setReplyText('');
+      await loadReplies(selectedPost);
+      await loadPosts();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء الإرسال');
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  async function handleDelete(postId: string) {
     if (!confirm('هل أنت متأكد من حذف هذا السؤال؟')) return;
-    startTransition(async () => {
-      const res = await deleteForumPost(postId);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
+    setIsPending(true);
+    try {
+      await deleteDoc(doc(db, 'forum_posts', postId));
       toast.success('تم حذف السؤال');
       if (selectedPost === postId) setSelectedPost(null);
-      qc.invalidateQueries({ queryKey: ['admin', 'forum', 'posts'] });
-    });
+      await loadPosts();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء الحذف');
+    } finally {
+      setIsPending(false);
+    }
   }
 
   if (isLoading) return <Skeleton className="h-96 w-full rounded-3xl" />;

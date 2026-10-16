@@ -1,9 +1,17 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createBrowserClient } from '@supabase/ssr';
-import { createCourse, publishCourse, updateCourse, deleteCourse } from '@/app/actions/admin';
+import { useState, useEffect } from 'react';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  orderBy 
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,14 +19,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Upload, Sparkles, Edit3, Trash2, X, Check } from 'lucide-react';
+import { Upload, Sparkles, Edit3, Trash2, X, Check, Loader2 } from 'lucide-react';
 
 export default function AdminCoursesPage() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  const qc = useQueryClient();
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
   const [form, setForm] = useState({ 
     title: '', 
     description: '', 
@@ -28,28 +33,45 @@ export default function AdminCoursesPage() {
     thumbnail_url: '/images/course-foundation-languages.jpg'
   });
   const [editingCourse, setEditingCourse] = useState<any | null>(null);
-  const [pending, start] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  const { data: courses = [] } = useQuery({
-    queryKey: ['admin', 'courses'],
-    queryFn: async () => {
-      const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
-      return data ?? [];
-    },
-  });
+  async function loadCourses() {
+    setLoadingCourses(true);
+    try {
+      const q = query(collection(db, 'courses'));
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setCourses(list);
+    } catch (err) {
+      console.error('Error loading courses:', err);
+      toast.error('حدث خطأ أثناء تحميل الكورسات');
+    } finally {
+      setLoadingCourses(false);
+    }
+  }
 
-  function onCreate() {
-    if (!form.title) {
+  useEffect(() => {
+    loadCourses();
+  }, []);
+
+  async function onCreate() {
+    if (!form.title.trim()) {
       toast.error('يرجى كتابة عنوان الكورس');
       return;
     }
-    start(async () => {
-      const res = await createCourse(form);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success('تم إنشاء الكورس بنجاح');
+    setPending(true);
+    try {
+      await addDoc(collection(db, 'courses'), {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        price: Number(form.price) || 0,
+        is_free: Boolean(form.is_free),
+        duration_hours: Number(form.duration_hours) || 0,
+        thumbnail_url: form.thumbnail_url || '/images/course-foundation-languages.jpg',
+        is_published: true,
+        created_at: new Date().toISOString()
+      });
+      toast.success('تم إنشاء الكورس بنجاح في Firebase 🎉');
       setForm({ 
         title: '', 
         description: '', 
@@ -58,52 +80,65 @@ export default function AdminCoursesPage() {
         duration_hours: 0,
         thumbnail_url: '/images/course-foundation-languages.jpg'
       });
-      qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
-    });
+      await loadCourses();
+    } catch (err: any) {
+      console.error('Create course error:', err);
+      toast.error(err.message || 'حدث خطأ أثناء إنشاء الكورس');
+    } finally {
+      setPending(false);
+    }
   }
 
-  function onUpdate() {
-    if (!editingCourse || !editingCourse.title) {
+  async function onUpdate() {
+    if (!editingCourse || !editingCourse.title?.trim()) {
       toast.error('يرجى كتابة عنوان الكورس');
       return;
     }
-    start(async () => {
-      const res = await updateCourse({
-        id: editingCourse.id,
-        title: editingCourse.title,
+    setPending(true);
+    try {
+      const courseRef = doc(db, 'courses', editingCourse.id);
+      await updateDoc(courseRef, {
+        title: editingCourse.title.trim(),
         description: editingCourse.description || '',
-        price: Number(editingCourse.price || 0),
+        price: Number(editingCourse.price) || 0,
         is_free: Boolean(editingCourse.is_free),
-        duration_hours: Number(editingCourse.duration_hours || 0),
-        thumbnail_url: editingCourse.thumbnail_url,
+        duration_hours: Number(editingCourse.duration_hours) || 0,
+        thumbnail_url: editingCourse.thumbnail_url || '/images/course-foundation-languages.jpg'
       });
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success('تم تحديث بيانات الكورس والصورة بنجاح 🎉');
+      toast.success('تم تحديث بيانات الكورس بنجاح 🎉');
       setEditingCourse(null);
-      qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
-    });
+      await loadCourses();
+    } catch (err: any) {
+      console.error('Update course error:', err);
+      toast.error(err.message || 'حدث خطأ أثناء التحديث');
+    } finally {
+      setPending(false);
+    }
   }
 
   async function onDelete(id: string, title: string) {
     if (!confirm(`هل أنت متأكد من حذف كورس "${title}" نهائياً؟`)) return;
-    start(async () => {
-      const res = await deleteCourse(id);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
+    setPending(true);
+    try {
+      await deleteDoc(doc(db, 'courses', id));
       toast.success('تم حذف الكورس بنجاح');
-      qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
-    });
+      await loadCourses();
+    } catch (err: any) {
+      console.error('Delete course error:', err);
+      toast.error(err.message || 'حدث خطأ أثناء حذف الكورس');
+    } finally {
+      setPending(false);
+    }
   }
 
   async function toggle(id: string, is_published: boolean) {
-    const res = await publishCourse(id, is_published);
-    if (!res.ok) toast.error(res.error);
-    else qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
+    try {
+      await updateDoc(doc(db, 'courses', id), { is_published });
+      toast.success(is_published ? 'تم نشر الكورس' : 'تم إخفاء الكورس');
+      await loadCourses();
+    } catch (err: any) {
+      toast.error(err.message || 'فشل تغيير حالة النشر');
+    }
   }
 
   return (

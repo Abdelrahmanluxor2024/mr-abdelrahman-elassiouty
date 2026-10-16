@@ -1,7 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useState, useTransition } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,66 +8,66 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { MessageSquare, Upload, Send, Trash2, Heart, MessageCircle } from 'lucide-react';
-import { createTeacherCommunityPost, deleteForumPost } from '@/app/actions/admin';
-import { createBrowserClient } from '@supabase/ssr';
+import { collection, getDocs, addDoc, doc, deleteDoc, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 export default function AdminCommunityPage() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  const qc = useQueryClient();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
 
-  const { data: posts = [] } = useQuery({
-    queryKey: ['platform_group_posts'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('forum_posts')
-        .select('*, replies:forum_replies(*, student:students(*)), student:students(*)')
-        .ilike('title', '%[جروب المنصة]%')
-        .order('created_at', { ascending: false });
-      return data ?? [];
-    },
-  });
+  async function loadPosts() {
+    try {
+      const snap = await getDocs(collection(db, 'community_posts'));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setPosts(list);
+    } catch (err) {
+      console.error('Error loading community posts:', err);
+    }
+  }
 
-  function onPublish() {
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  async function onPublish() {
     if (!title.trim() || !content.trim()) {
       toast.error('يرجى كتابة عنوان وتفاصيل المنشور');
       return;
     }
 
-    startTransition(async () => {
-      const res = await createTeacherCommunityPost({
-        title,
-        content,
-        imageUrl: imageUrl.trim() || undefined,
+    setPending(true);
+    try {
+      await addDoc(collection(db, 'community_posts'), {
+        title: title.trim(),
+        content: content.trim(),
+        imageUrl: imageUrl.trim() || null,
+        created_at: new Date().toISOString(),
+        author: 'مستر عبدالرحمن الأسيوطي'
       });
-
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-
       toast.success('تم نشر البوست على جروب المنصة بنجاح 🎉');
       setTitle('');
       setContent('');
       setImageUrl('');
-      qc.invalidateQueries({ queryKey: ['platform_group_posts'] });
-    });
+      await loadPosts();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء النشر');
+    } finally {
+      setPending(false);
+    }
   }
 
   async function onDelete(postId: string) {
     if (!confirm('هل أنت متأكد من حذف هذا المنشور؟')) return;
-    const res = await deleteForumPost(postId);
-    if (res.ok) {
+    try {
+      await deleteDoc(doc(db, 'community_posts', postId));
       toast.success('تم حذف المنشور');
-      qc.invalidateQueries({ queryKey: ['platform_group_posts'] });
-    } else {
-      toast.error(res.error);
+      await loadPosts();
+    } catch (err: any) {
+      toast.error(err.message || 'فشل حذف المنشور');
     }
   }
 

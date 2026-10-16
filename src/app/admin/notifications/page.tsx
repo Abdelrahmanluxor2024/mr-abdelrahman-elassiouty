@@ -1,7 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useState, useTransition, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,14 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Bell, Upload, Send, Trash2, Pencil, X, Check, Users } from 'lucide-react';
-import {
-  sendBroadcastNotification,
-  getAdminNotifications,
-  updateBroadcastNotification,
-  deleteBroadcastNotification,
-} from '@/app/actions/admin';
+import { collection, getDocs, addDoc, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 type NotificationGroup = {
+  id?: string;
   title: string;
   message: string;
   link: string | null;
@@ -30,68 +26,117 @@ export default function AdminNotificationsPage() {
   const [message, setMessage] = useState('');
   const [targetGrade, setTargetGrade] = useState('all');
   const [imageUrl, setImageUrl] = useState('');
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [editingGroup, setEditingGroup] = useState<NotificationGroup | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editMessage, setEditMessage] = useState('');
   const [deletingGroup, setDeletingGroup] = useState<NotificationGroup | null>(null);
-  const qc = useQueryClient();
+  const [rawNotifications, setRawNotifications] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
 
-  const { data: rawNotifications = [], isLoading: loadingList } = useQuery({
-    queryKey: ['admin', 'notifications'],
-    queryFn: () => getAdminNotifications(),
-  });
+  async function loadNotifications() {
+    setLoadingList(true);
+    try {
+      const snap = await getDocs(collection(db, 'notifications'));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRawNotifications(list);
+    } catch (err) {
+      console.error('Error loading notifications:', err);
+    } finally {
+      setLoadingList(false);
+    }
+  }
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
 
   const notificationGroups = useMemo<NotificationGroup[]>(() => {
     const map = new Map<string, NotificationGroup>();
     for (const n of rawNotifications) {
       const key = `${n.title}|||${n.message}`;
       if (!map.has(key)) {
-        map.set(key, { title: n.title, message: n.message, link: n.link, count: 0, readCount: 0, createdAt: n.created_at });
+        map.set(key, { 
+          id: n.id,
+          title: n.title, 
+          message: n.message, 
+          link: n.link, 
+          count: 0, 
+          readCount: 0, 
+          createdAt: n.createdAt || n.created_at || new Date().toISOString() 
+        });
       }
       const g = map.get(key)!;
       g.count += 1;
-      if (n.is_read) g.readCount += 1;
-      if (n.created_at > g.createdAt) g.createdAt = n.created_at;
+      if (n.isRead || n.is_read) g.readCount += 1;
     }
     return Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [rawNotifications]);
 
-  function onSend() {
+  async function onSend() {
     if (!title.trim() || !message.trim()) { toast.error('يرجى ملء عنوان الإشعار والرسالة'); return; }
-    startTransition(async () => {
-      const res = await sendBroadcastNotification({ title, message, targetGrade, imageUrl: imageUrl.trim() || undefined });
-      if (!res.ok) { toast.error(res.error); return; }
+    setPending(true);
+    try {
+      // Create broadcast notification record
+      await addDoc(collection(db, 'notifications'), {
+        title: title.trim(),
+        message: message.trim(),
+        targetGrade,
+        link: imageUrl.trim() ? `image:${imageUrl.trim()}` : null,
+        type: 'broadcast',
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
       toast.success('تم إرسال الإشعار بنجاح إلى الطلاب 🎉');
       setTitle(''); setMessage(''); setImageUrl('');
-      qc.invalidateQueries({ queryKey: ['admin', 'notifications'] });
-    });
+      await loadNotifications();
+    } catch (err: any) {
+      console.error('Error sending notification:', err);
+      toast.error(err.message || 'حدث خطأ أثناء الإرسال');
+    } finally {
+      setPending(false);
+    }
   }
 
   function startEdit(group: NotificationGroup) {
     setEditingGroup(group); setEditTitle(group.title); setEditMessage(group.message);
   }
 
-  function onSaveEdit() {
+  async function onSaveEdit() {
     if (!editingGroup || !editTitle.trim() || !editMessage.trim()) return;
-    startTransition(async () => {
-      const res = await updateBroadcastNotification({ title: editingGroup.title, message: editingGroup.message, newTitle: editTitle, newMessage: editMessage });
-      if (!res.ok) { toast.error('حدث خطأ أثناء التعديل'); return; }
+    setPending(true);
+    try {
+      if (editingGroup.id) {
+        await updateDoc(doc(db, 'notifications', editingGroup.id), {
+          title: editTitle.trim(),
+          message: editMessage.trim()
+        });
+      }
       toast.success('تم تعديل الإشعار بنجاح ✅');
       setEditingGroup(null);
-      qc.invalidateQueries({ queryKey: ['admin', 'notifications'] });
-    });
+      await loadNotifications();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء التعديل');
+    } finally {
+      setPending(false);
+    }
   }
 
-  function onConfirmDelete() {
+  async function onConfirmDelete() {
     if (!deletingGroup) return;
-    startTransition(async () => {
-      const res = await deleteBroadcastNotification({ title: deletingGroup.title, message: deletingGroup.message });
-      if (!res.ok) { toast.error('حدث خطأ أثناء الحذف'); return; }
-      toast.success('تم حذف الإشعار من جميع الطلاب ✅');
+    setPending(true);
+    try {
+      if (deletingGroup.id) {
+        await deleteDoc(doc(db, 'notifications', deletingGroup.id));
+      }
+      toast.success('تم حذف الإشعار بنجاح ✅');
       setDeletingGroup(null);
-      qc.invalidateQueries({ queryKey: ['admin', 'notifications'] });
-    });
+      await loadNotifications();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء الحذف');
+    } finally {
+      setPending(false);
+    }
   }
 
   return (

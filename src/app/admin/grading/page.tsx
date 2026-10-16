@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createBrowserClient } from '@supabase/ssr';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { gradeEssay } from '@/app/actions/admin';
 import { toast } from 'sonner';
+import { collection, getDocs, updateDoc, doc, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 type PendingAnswer = {
   id: string;
@@ -27,72 +26,58 @@ type Attempt = { id: string; student_id: string; exam_id: string };
 type Student = { id: string; full_name: string; phone: string };
 
 export default function AdminGradingPage() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-  const qc = useQueryClient();
   const [marks, setMarks] = useState<Record<string, number>>({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
-  const [pending, start] = useTransition();
+  const [pending, setPending] = useState(false);
+  const [answers, setAnswers] = useState<PendingAnswer[]>([]);
+  const [questionsById, setQuestionsById] = useState<Map<string, Question>>(new Map());
+  const [studentsById, setStudentsById] = useState<Map<string, Student>>(new Map());
+  const [attemptsById, setAttemptsById] = useState<Map<string, Attempt>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: answers = [], isLoading } = useQuery({
-    queryKey: ['admin', 'pending-essays'],
-    queryFn: async (): Promise<PendingAnswer[]> => {
-      const { data, error } = await supabase
-        .from('student_answers')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return (data ?? []) as PendingAnswer[];
-    },
-  });
+  async function loadData() {
+    setIsLoading(true);
+    try {
+      // In Firebase mode, pending essays are loaded from firestore
+      const snap = await getDocs(collection(db, 'student_answers')).catch(() => null);
+      if (snap && !snap.empty) {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        setAnswers(list.filter(a => a.status === 'pending'));
+      } else {
+        setAnswers([]);
+      }
+    } catch (err) {
+      console.warn('Error loading pending essays:', err);
+      setAnswers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
-  const { data: questionsById = new Map<string, Question>() } = useQuery({
-    queryKey: ['admin', 'essay-questions', answers.map((a) => a.question_id).join(',')],
-    enabled: answers.length > 0,
-    queryFn: async () => {
-      const ids = Array.from(new Set(answers.map((a) => a.question_id)));
-      const { data } = await supabase.from('questions').select('id, question_text, marks, branch').in('id', ids);
-      return new Map((data ?? []).map((q) => [q.id, q as Question]));
-    },
-  });
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const { data: studentsById = new Map<string, Student>() } = useQuery({
-    queryKey: ['admin', 'students-map'],
-    queryFn: async () => {
-      const { data } = await supabase.from('students').select('id, full_name, phone');
-      return new Map((data ?? []).map((s) => [s.id, s as Student]));
-    },
-  });
-
-  const { data: attemptsById = new Map<string, Attempt>() } = useQuery({
-    queryKey: ['admin', 'attempts-map', answers.map((a) => a.attempt_id).join(',')],
-    enabled: answers.length > 0,
-    queryFn: async () => {
-      const ids = Array.from(new Set(answers.map((a) => a.attempt_id)));
-      const { data } = await supabase.from('exam_attempts').select('id, student_id, exam_id').in('id', ids);
-      return new Map((data ?? []).map((a) => [a.id, a as Attempt]));
-    },
-  });
-
-  function onGrade(answerId: string, maxMarks: number) {
+  async function onGrade(answerId: string, maxMarks: number) {
     const m = Number(marks[answerId] ?? 0);
     if (Number.isNaN(m) || m < 0 || m > maxMarks) {
       toast.error(`الدرجة يجب أن تكون بين 0 و ${maxMarks}`);
       return;
     }
-    start(async () => {
-      const res = await gradeEssay({ answerId, marksObtained: m, feedback: feedback[answerId] });
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success('تم التصحيح');
-      qc.invalidateQueries({ queryKey: ['admin', 'pending-essays'] });
-    });
+    setPending(true);
+    try {
+      await updateDoc(doc(db, 'student_answers', answerId), {
+        marks_obtained: m,
+        grader_feedback: feedback[answerId] || '',
+        status: 'graded'
+      });
+      toast.success('تم التصحيح وحفظ الدرجة بنجاح ✅');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء التصحيح');
+    } finally {
+      setPending(false);
+    }
   }
 
   return (

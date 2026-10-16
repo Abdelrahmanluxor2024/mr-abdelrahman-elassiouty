@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useQuery } from '@tanstack/react-query';
-import { createChargeCodes, getAdminChargeCodes } from '@/app/actions/admin';
+import { collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { toast } from 'sonner';
 import { Copy, Check, Search, Download } from 'lucide-react';
 
@@ -16,28 +16,55 @@ export default function AdminChargeCodesPage() {
   const [amount, setAmount] = useState(50);
   const [prefix, setPrefix] = useState('MR');
   const [searchQuery, setSearchQuery] = useState('');
-  const [pending, start] = useTransition();
+  const [pending, setPending] = useState(false);
   const [lastBatch, setLastBatch] = useState<string[]>([]);
+  const [codes, setCodes] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: codes = [], isLoading, refetch } = useQuery({
-    queryKey: ['admin', 'charge-codes'],
-    queryFn: async () => {
-      const data = await getAdminChargeCodes();
-      return data;
-    },
-  });
+  async function loadCodes() {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, 'charge_codes'));
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setCodes(list);
+    } catch (err) {
+      console.error('Error loading charge codes:', err);
+      toast.error('حدث خطأ أثناء تحميل أكواد الشحن');
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
-  function onCreate() {
-    start(async () => {
-      const res = await createChargeCodes({ count, amount, prefix });
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
+  useEffect(() => {
+    loadCodes();
+  }, []);
+
+  async function onCreate() {
+    setPending(true);
+    try {
+      const generatedCodes: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const codeStr = `${(prefix ?? 'MR').toUpperCase()}-${randomPart}`;
+        generatedCodes.push(codeStr);
+        await addDoc(collection(db, 'charge_codes'), {
+          code: codeStr,
+          amount: Number(amount) || 50,
+          is_used: false,
+          created_at: new Date().toISOString()
+        });
       }
-      setLastBatch(res.codes.map((c: { code: string }) => c.code));
-      toast.success(`تم إنشاء ${count} كود`);
-      refetch();
-    });
+      setLastBatch(generatedCodes);
+      toast.success(`تم إنشاء ${count} كود شحن بنجاح في Firebase 🎉`);
+      await loadCodes();
+    } catch (err: any) {
+      console.error('Error creating charge codes:', err);
+      toast.error(err.message || 'حدث خطأ أثناء إنشاء الأكواد');
+    } finally {
+      setPending(false);
+    }
   }
 
   function copy(text: string) {
