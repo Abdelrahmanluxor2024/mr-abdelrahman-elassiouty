@@ -42,7 +42,54 @@ export default function AdminGradingPage() {
       const snap = await getDocs(collection(db, 'student_answers')).catch(() => null);
       if (snap && !snap.empty) {
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        setAnswers(list.filter(a => a.status === 'pending'));
+        const pendingList = list.filter(a => a.status === 'pending');
+        setAnswers(pendingList);
+
+        // Fetch questions
+        const qSnap = await getDocs(collection(db, 'questions')).catch(() => null);
+        if (qSnap && !qSnap.empty) {
+          const qMap = new Map<string, Question>();
+          qSnap.docs.forEach(d => {
+            const data = d.data();
+            qMap.set(d.id, {
+              id: d.id,
+              question_text: data.questionText || data.question_text || '',
+              marks: Number(data.marks || 1),
+              branch: data.branch || 'عام'
+            });
+          });
+          setQuestionsById(qMap);
+        }
+
+        // Fetch students / users
+        const uSnap = await getDocs(collection(db, 'users')).catch(() => null);
+        if (uSnap && !uSnap.empty) {
+          const uMap = new Map<string, Student>();
+          uSnap.docs.forEach(d => {
+            const data = d.data();
+            uMap.set(d.id, {
+              id: d.id,
+              full_name: data.fullName || data.full_name || 'طالب',
+              phone: data.phone || data.phoneNumber || ''
+            });
+          });
+          setStudentsById(uMap);
+        }
+
+        // Fetch attempts
+        const attSnap = await getDocs(collection(db, 'exam_attempts')).catch(() => null);
+        if (attSnap && !attSnap.empty) {
+          const attMap = new Map<string, Attempt>();
+          attSnap.docs.forEach(d => {
+            const data = d.data();
+            attMap.set(d.id, {
+              id: d.id,
+              student_id: data.studentId || data.student_id || '',
+              exam_id: data.examId || data.exam_id || ''
+            });
+          });
+          setAttemptsById(attMap);
+        }
       } else {
         setAnswers([]);
       }
