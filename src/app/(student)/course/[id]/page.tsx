@@ -2,51 +2,58 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { getCourseById, getLessonsByCourse, getStudentPassedExams } from '@/lib/firebase/services';
+import {
+  getCourseById,
+  getLessonsByCourse,
+  getStudentPassedExams,
+  isEnrolledInCourse,
+  purchaseCourseFirebase,
+} from '@/lib/firebase/services';
 import type { FirebaseCourse, FirebaseLesson } from '@/lib/firebase/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import {
   CheckCircle2,
   Lock,
-  PlayCircle,
-  FileText,
-  Clock,
   Layers,
-  Award,
   ChevronLeft,
-  GraduationCap,
-  Sparkles,
-  ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function CoursePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const router = useRouter();
+  const { student } = useCurrentStudent();
 
   const [course, setCourse] = useState<FirebaseCourse | null>(null);
   const [lessons, setLessons] = useState<FirebaseLesson[]>([]);
   const [passedExams, setPassedExams] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
         const c = await getCourseById(id);
         setCourse(c);
+
         const l = await getLessonsByCourse(id);
         setLessons(l);
-        // Student passed exams (can be student uid or local test user)
-        const passed = await getStudentPassedExams('current-student');
-        setPassedExams(passed);
-        // Automatically enrolled if free or demo
-        if (c?.isFree) {
+
+        const studentId = student?.id || 'current-student';
+
+        // Check real enrollment
+        const enrolled = await isEnrolledInCourse(studentId, id);
+        if (enrolled || c?.isFree) {
           setIsSubscribed(true);
         }
+
+        // Get passed exams
+        const passed = await getStudentPassedExams(studentId);
+        setPassedExams(passed);
       } catch (err) {
         console.error('Failed to load course details', err);
       } finally {
@@ -54,7 +61,34 @@ export default function CoursePage() {
       }
     }
     load();
-  }, [id]);
+  }, [id, student?.id]);
+
+  const handleSubscribe = async () => {
+    const studentId = student?.id;
+    if (!studentId || studentId === 'current-student') {
+      toast.error('يجب تسجيل الدخول أولاً للشراء.');
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      const result = await purchaseCourseFirebase(studentId, id);
+      if (result.ok) {
+        setIsSubscribed(true);
+        if (result.alreadyEnrolled) {
+          toast.info('أنت مشترك في هذا الكورس بالفعل.');
+        } else {
+          toast.success('🎉 تم الاشتراك في الكورس بنجاح! يمكنك الآن متابعة المحاضرات.');
+        }
+      } else {
+        toast.error(result.error || 'فشل الاشتراك، يرجى المحاولة مرة أخرى.');
+      }
+    } catch (err) {
+      toast.error('حدث خطأ غير متوقع، حاول مجدداً.');
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -76,30 +110,24 @@ export default function CoursePage() {
     );
   }
 
-  const handleSubscribe = () => {
-    setIsSubscribed(true);
-    toast.success('🎉 تم الاشتراك في الكورس بنجاح! يمكنك الآن متابعة المحاضرات.');
-  };
-
   return (
     <div className="space-y-8" dir="rtl">
-      {/* ── 1. Wide Hero Header (Matching Screenshot 2) ────────────────────────── */}
+      {/* ── Hero Header ─────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-l from-[#0E172A] via-[#0B1324] to-[#070B14] p-6 sm:p-10 shadow-2xl">
         <div className="absolute top-0 right-0 h-48 w-48 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            {/* Enrollment Status Badge */}
-            <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-950/80 border border-blue-500/30 px-3.5 py-1.5 text-xs font-black text-cyan-300">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>أنت مشترك في هذا الكورس</span>
-            </div>
-
+            {isSubscribed && (
+              <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-950/80 border border-blue-500/30 px-3.5 py-1.5 text-xs font-black text-cyan-300">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <span>أنت مشترك في هذا الكورس</span>
+              </div>
+            )}
             <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">
               {course.title}
             </h1>
-
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
               {course.description}
             </p>
@@ -113,18 +141,19 @@ export default function CoursePage() {
                 <span className="text-emerald-400">مجاناً</span>
               ) : (
                 <>
-                  {course.price} <span className="text-base text-amber-400">L.E</span>
+                  {course.price} <span className="text-base text-amber-400">ج.م</span>
                 </>
               )}
             </div>
 
-            {!isSubscribed && !course.isFree ? (
+            {!isSubscribed ? (
               <button
                 type="button"
                 onClick={handleSubscribe}
-                className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition"
+                disabled={isPurchasing}
+                className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 py-2.5 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition"
               >
-                تفعيل الاشتراك ⚡
+                {isPurchasing ? 'جاري الاشتراك...' : 'تفعيل الاشتراك ⚡'}
               </button>
             ) : (
               <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-black text-emerald-400">
@@ -134,32 +163,30 @@ export default function CoursePage() {
           </div>
         </div>
 
-        {/* Course Stats Bar (Matching Screenshot 2: محاضرات، حصص، واجبات) */}
+        {/* Course Stats */}
         <div className="mt-8 grid grid-cols-3 gap-3 border-t border-slate-800/80 pt-6 text-center">
           <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
             <div className="text-lg sm:text-2xl font-black text-white">
-              {course.lessonsCount || lessons.length || 12}
+              {course.lessonsCount || lessons.length || 0}
             </div>
             <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">محاضرات الكورس</div>
           </div>
-
           <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
             <div className="text-lg sm:text-2xl font-black text-amber-400">
-              {course.partsCount || 24}
+              {course.partsCount || lessons.length * 3 || 0}
             </div>
             <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">أجزاء وتدريبات</div>
           </div>
-
           <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
             <div className="text-lg sm:text-2xl font-black text-cyan-400">
-              {course.homeworkCount || 16}
+              {course.homeworkCount || lessons.length || 0}
             </div>
             <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">واجبات وامتحانات</div>
           </div>
         </div>
       </div>
 
-      {/* ── 2. Lessons List Section (Matching Screenshot 3) ────────────────────── */}
+      {/* ── Lessons List ─────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
@@ -171,12 +198,18 @@ export default function CoursePage() {
           </span>
         </div>
 
+        {!isSubscribed && !course.isFree && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-center text-sm font-bold text-amber-300">
+            🔒 يجب الاشتراك في الكورس أولاً للوصول إلى المحاضرات
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {lessons.map((lesson, idx) => {
-            // Sequential lock rule: Lesson 1 is always unlocked. Next lessons require previous exam passed
             const isFirst = idx === 0;
             const prevLesson = idx > 0 ? lessons[idx - 1] : null;
-            const isLocked = !isFirst && !passedExams.has(`exam-${prevLesson?.id}`);
+            // Lock if: not subscribed, OR (not first lesson AND previous exam not passed)
+            const isLocked = !isSubscribed || (!isFirst && !passedExams.has(`exam-${prevLesson?.id}`));
 
             return (
               <div
@@ -189,7 +222,7 @@ export default function CoursePage() {
                 )}
               >
                 <div>
-                  {/* Thumbnail / Header */}
+                  {/* Thumbnail */}
                   <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -199,39 +232,26 @@ export default function CoursePage() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0B1324] via-transparent to-black/50" />
 
-                    {/* Part & Exercise Count Badges (Matching Screenshot 3) */}
-                    <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                      <span className="rounded-xl bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white shadow">
-                        3 أجزاء
-                      </span>
-                      <span className="rounded-xl bg-amber-500 text-black px-2.5 py-1 text-[11px] font-black shadow">
-                        تدريب واختبار
-                      </span>
-                    </div>
-
                     {isLocked && (
                       <div className="absolute inset-0 grid place-items-center bg-black/60 backdrop-blur-[2px]">
                         <div className="flex items-center gap-1.5 rounded-2xl bg-black/80 border border-slate-700 px-4 py-2 text-xs font-bold text-slate-300">
                           <Lock className="h-4 w-4 text-amber-400" />
-                          مقفول (اجتز امتحان الدرس السابق أولاً)
+                          {!isSubscribed ? 'اشترك في الكورس أولاً' : 'اجتز امتحان الدرس السابق أولاً'}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Body Content */}
+                  {/* Body */}
                   <div className="p-5 space-y-3">
                     <h3 className="text-base font-black text-white line-clamp-2">
                       {lesson.title}
                     </h3>
-
                     {lesson.description && (
                       <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
                         {lesson.description}
                       </p>
                     )}
-
-                    {/* Topics Bullets */}
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center gap-2 text-xs text-slate-300">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
@@ -249,7 +269,7 @@ export default function CoursePage() {
                   </div>
                 </div>
 
-                {/* Footer Action Button (Matching Screenshot 3 "الدخول للدرس") */}
+                {/* Footer */}
                 <div className="p-5 pt-0">
                   {isLocked ? (
                     <button

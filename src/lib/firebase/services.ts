@@ -278,9 +278,128 @@ export async function saveExamAttempt(attempt: Omit<FirebaseExamAttempt, 'id'>):
   return docRef.id;
 }
 
+
 // ======================== STORAGE (IMAGES) ========================
 export async function uploadQuestionImage(file: File, examId: string): Promise<string> {
   const storageRef = ref(storage, `questions/${examId}/${Date.now()}_${file.name}`);
   await uploadBytes(storageRef, file);
   return await getDownloadURL(storageRef);
+}
+
+// ======================== ENROLLMENTS ========================
+
+/** Check if a student is enrolled in a course */
+export async function isEnrolledInCourse(studentId: string, courseId: string): Promise<boolean> {
+  if (!studentId || !courseId) return false;
+  try {
+    const q = query(
+      collection(db, 'enrollments'),
+      where('studentId', '==', studentId),
+      where('courseId', '==', courseId)
+    );
+    const snap = await getDocs(q);
+    return !snap.empty;
+  } catch (err) {
+    console.warn('isEnrolledInCourse error', err);
+    return false;
+  }
+}
+
+/** Enroll a student in a course (free or after payment) */
+export async function enrollStudent(studentId: string, courseId: string): Promise<void> {
+  await addDoc(collection(db, 'enrollments'), {
+    studentId,
+    courseId,
+    enrolledAt: new Date().toISOString(),
+    progress: 0,
+  });
+}
+
+// ======================== WALLET ========================
+
+/** Get student wallet balance from Firestore */
+export async function getWalletBalance(studentId: string): Promise<number> {
+  try {
+    const snap = await getDoc(doc(db, 'users', studentId));
+    if (snap.exists()) {
+      return Number(snap.data().walletBalance || 0);
+    }
+  } catch (err) {
+    console.warn('getWalletBalance error', err);
+  }
+  return 0;
+}
+
+/** Deduct balance and log transaction */
+export async function deductWalletBalance(
+  studentId: string,
+  amount: number,
+  description: string
+): Promise<{ ok: boolean; newBalance: number; error?: string }> {
+  try {
+    const userRef = doc(db, 'users', studentId);
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) return { ok: false, newBalance: 0, error: 'المستخدم غير موجود.' };
+
+    const currentBalance = Number(snap.data().walletBalance || 0);
+    if (currentBalance < amount) {
+      return {
+        ok: false,
+        newBalance: currentBalance,
+        error: `رصيدك الحالي (${currentBalance} ج.م) غير كافٍ. يرجى شحن المحفظة أولاً.`,
+      };
+    }
+
+    const newBalance = currentBalance - amount;
+    await updateDoc(userRef, { walletBalance: newBalance });
+
+    // Log transaction
+    await addDoc(collection(db, 'wallet_transactions'), {
+      studentId,
+      amount,
+      type: 'debit',
+      description,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      createdAt: new Date().toISOString(),
+    });
+
+    return { ok: true, newBalance };
+  } catch (err: any) {
+    console.error('deductWalletBalance error', err);
+    return { ok: false, newBalance: 0, error: 'حدث خطأ أثناء خصم الرصيد.' };
+  }
+}
+
+/** Purchase a course: check enrollment, deduct balance, enroll */
+export async function purchaseCourseFirebase(
+  studentId: string,
+  courseId: string
+): Promise<{ ok: boolean; error?: string; alreadyEnrolled?: boolean }> {
+  // 1. Check already enrolled
+  const already = await isEnrolledInCourse(studentId, courseId);
+  if (already) return { ok: true, alreadyEnrolled: true };
+
+  // 2. Get course price
+  const courseSnap = await getDoc(doc(db, 'courses', courseId));
+  if (!courseSnap.exists()) return { ok: false, error: 'الكورس غير موجود.' };
+  const courseData = courseSnap.data();
+  const price = Number(courseData.price || 0);
+
+  // 3. Free course → enroll directly
+  if (courseData.isFree || price === 0) {
+    await enrollStudent(studentId, courseId);
+    return { ok: true };
+  }
+
+  // 4. Paid course → deduct from wallet then enroll
+  const result = await deductWalletBalance(
+    studentId,
+    price,
+    `شراء كورس: ${courseData.title}`
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+
+  await enrollStudent(studentId, courseId);
+  return { ok: true };
 }
