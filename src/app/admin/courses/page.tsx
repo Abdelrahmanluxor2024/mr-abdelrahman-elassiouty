@@ -19,7 +19,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Upload, Sparkles, Edit3, Trash2, X, Check, Loader2 } from 'lucide-react';
+import { Upload, Sparkles, Edit3, Trash2, X, Check, Loader2, BookOpen, Plus, Video, FileText } from 'lucide-react';
+import { where } from 'firebase/firestore';
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<any[]>([]);
@@ -34,6 +35,119 @@ export default function AdminCoursesPage() {
   });
   const [editingCourse, setEditingCourse] = useState<any | null>(null);
   const [pending, setPending] = useState(false);
+
+  // Lessons Management State
+  const [managingLessonsCourse, setManagingLessonsCourse] = useState<any | null>(null);
+  const [courseLessons, setCourseLessons] = useState<any[]>([]);
+  const [loadingLessons, setLoadingLessons] = useState(false);
+  const [lessonForm, setLessonForm] = useState({
+    title: '',
+    description: '',
+    videoUrl: '',
+    pdfUrl: '',
+    isPdfLocked: true,
+    orderIndex: 1
+  });
+  const [editingLesson, setEditingLesson] = useState<any | null>(null);
+
+  async function loadLessonsForCourse(courseId: string) {
+    setLoadingLessons(true);
+    try {
+      const q = query(collection(db, 'lessons'), where('courseId', '==', courseId));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
+      setCourseLessons(list);
+      setLessonForm(prev => ({ ...prev, orderIndex: list.length + 1 }));
+    } catch (err) {
+      console.error('Error loading course lessons:', err);
+      toast.error('حدث خطأ أثناء تحميل دروس الكورس');
+    } finally {
+      setLoadingLessons(false);
+    }
+  }
+
+  async function openLessonsManager(course: any) {
+    setManagingLessonsCourse(course);
+    setEditingLesson(null);
+    setLessonForm({
+      title: '',
+      description: '',
+      videoUrl: '',
+      pdfUrl: '',
+      isPdfLocked: true,
+      orderIndex: 1
+    });
+    await loadLessonsForCourse(course.id);
+  }
+
+  async function onSaveLesson() {
+    if (!managingLessonsCourse) return;
+    if (!lessonForm.title.trim()) {
+      toast.error('يرجى إدخال عنوان الدرس');
+      return;
+    }
+    setPending(true);
+    try {
+      if (editingLesson) {
+        // Update lesson
+        await updateDoc(doc(db, 'lessons', editingLesson.id), {
+          title: lessonForm.title.trim(),
+          description: lessonForm.description.trim(),
+          videoUrl: lessonForm.videoUrl.trim(),
+          pdfUrl: lessonForm.pdfUrl.trim(),
+          isPdfLocked: Boolean(lessonForm.isPdfLocked),
+          orderIndex: Number(lessonForm.orderIndex) || 1
+        });
+        toast.success('تم تحديث بيانات الدرس بنجاح 🎉');
+        setEditingLesson(null);
+      } else {
+        // Create new lesson
+        await addDoc(collection(db, 'lessons'), {
+          courseId: managingLessonsCourse.id,
+          title: lessonForm.title.trim(),
+          description: lessonForm.description.trim(),
+          videoUrl: lessonForm.videoUrl.trim(),
+          pdfUrl: lessonForm.pdfUrl.trim(),
+          isPdfLocked: Boolean(lessonForm.isPdfLocked),
+          orderIndex: Number(lessonForm.orderIndex) || (courseLessons.length + 1),
+          createdAt: new Date().toISOString()
+        });
+        toast.success('تمت إضافة الدرس بنجاح إلى الكورس 🎉');
+      }
+
+      setLessonForm({
+        title: '',
+        description: '',
+        videoUrl: '',
+        pdfUrl: '',
+        isPdfLocked: true,
+        orderIndex: courseLessons.length + 2
+      });
+      await loadLessonsForCourse(managingLessonsCourse.id);
+    } catch (err: any) {
+      console.error('Save lesson error:', err);
+      toast.error(err.message || 'حدث خطأ أثناء حفظ الدرس');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function onDeleteLesson(lessonId: string, title: string) {
+    if (!confirm(`هل أنت متأكد من حذف درس "${title}"؟`)) return;
+    setPending(true);
+    try {
+      await deleteDoc(doc(db, 'lessons', lessonId));
+      toast.success('تم حذف الدرس بنجاح');
+      if (managingLessonsCourse) {
+        await loadLessonsForCourse(managingLessonsCourse.id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'فشل حذف الدرس');
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function loadCourses() {
     setLoadingCourses(true);
@@ -394,10 +508,19 @@ export default function AdminCoursesPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={c.is_published ? 'success' : 'warning'}>
                   {c.is_published ? 'منشور علناً' : 'مسودة'}
                 </Badge>
+
+                <Button 
+                  size="sm" 
+                  onClick={() => openLessonsManager(c)}
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-md"
+                >
+                  <BookOpen className="h-4 w-4 ms-1" />
+                  إدارة دروس الكورس ({c.lessonsCount || 'عرض'})
+                </Button>
                 
                 <Button 
                   size="sm" 
@@ -426,6 +549,227 @@ export default function AdminCoursesPage() {
           ))}
         </CardContent>
       </Card>
+
+      {/* ── LESSONS MANAGEMENT MODAL / PANEL ── */}
+      {managingLessonsCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-700 bg-[#0B1324] p-6 text-white shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 text-white shadow">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">
+                    إدارة وإضافة دروس: {managingLessonsCourse.title}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    يمكنك إضافة فيديوهات (يوتيوب أو روابط مباشرة) ومذكرات PDF وترتيب المحاضرات
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setManagingLessonsCourse(null)}
+                className="rounded-full text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Form to Add / Edit Lesson */}
+            <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 p-5 space-y-4">
+              <h4 className="text-sm font-bold text-cyan-300 flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                {editingLesson ? 'تعديل بيانات المحاضرة' : 'إضافة محاضرة / درس جديد للكورس'}
+              </h4>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Label className="text-xs text-slate-300">عنوان الدرس *</Label>
+                  <Input
+                    placeholder="مثال: المحاضرة الرابعة: مراجعة عامة وشرح القواعد"
+                    value={lessonForm.title}
+                    onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+                    className="bg-[#070B14] border-slate-700 text-white"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-slate-300 flex items-center gap-1">
+                    <Video className="h-3.5 w-3.5 text-amber-400" />
+                    رابط الفيديو (YouTube أو رابط مباشر)
+                  </Label>
+                  <Input
+                    placeholder="https://youtu.be/..."
+                    dir="ltr"
+                    value={lessonForm.videoUrl}
+                    onChange={(e) => setLessonForm({ ...lessonForm, videoUrl: e.target.value })}
+                    className="bg-[#070B14] border-slate-700 text-white font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-slate-300 flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5 text-cyan-400" />
+                    رابط ملف الـ PDF (المذكرة والتدريبات)
+                  </Label>
+                  <Input
+                    placeholder="https://filebin.net/... أو رابط مباشر للـ PDF"
+                    dir="ltr"
+                    value={lessonForm.pdfUrl}
+                    onChange={(e) => setLessonForm({ ...lessonForm, pdfUrl: e.target.value })}
+                    className="bg-[#070B14] border-slate-700 text-white font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-slate-300">ترتيب الدرس (1, 2, 3...)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={lessonForm.orderIndex}
+                    onChange={(e) => setLessonForm({ ...lessonForm, orderIndex: Number(e.target.value) })}
+                    className="bg-[#070B14] border-slate-700 text-white"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-6">
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={lessonForm.isPdfLocked}
+                      onChange={(e) => setLessonForm({ ...lessonForm, isPdfLocked: e.target.checked })}
+                      className="rounded"
+                    />
+                    قفل ملف الـ PDF حتى يجتاز الطالب الامتحان
+                  </label>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Label className="text-xs text-slate-300">وصف موجز للمحاضرة</Label>
+                  <Textarea
+                    rows={2}
+                    placeholder="نبذة عن ما يتم شرحه في هذه المحاضرة..."
+                    value={lessonForm.description}
+                    onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                    className="bg-[#070B14] border-slate-700 text-white text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                {editingLesson && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingLesson(null);
+                      setLessonForm({
+                        title: '',
+                        description: '',
+                        videoUrl: '',
+                        pdfUrl: '',
+                        isPdfLocked: true,
+                        orderIndex: courseLessons.length + 1
+                      });
+                    }}
+                    className="rounded-xl border-slate-700 text-slate-300"
+                  >
+                    إلغاء التعديل
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={onSaveLesson}
+                  disabled={pending}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-500 font-black text-white px-6 shadow"
+                >
+                  {pending ? 'جاري الحفظ...' : (editingLesson ? 'حفظ تعديلات الدرس ✅' : 'إضافة الدرس للكورس 🚀')}
+                </Button>
+              </div>
+            </div>
+
+            {/* List of Lessons inside course */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-400">
+                قائمة دروس الكورس الحالية ({courseLessons.length} دروس):
+              </h4>
+
+              {loadingLessons ? (
+                <div className="text-center py-6 text-slate-500 text-xs">جاري تحميل الدروس...</div>
+              ) : courseLessons.length === 0 ? (
+                <div className="text-center py-8 border border-dashed border-slate-800 rounded-2xl text-slate-500 text-xs">
+                  لا توجد دروس مضافة لهذا الكورس حتى الآن. استخدم النموذج أعلاه لإضافة الدرس الأول!
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {courseLessons.map((l: any, idx: number) => (
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-[#070B14] p-3 hover:border-slate-700 transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-blue-600/30 text-cyan-300 text-xs font-black">
+                          {l.orderIndex || idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-white">{l.title}</p>
+                          <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-0.5">
+                            {l.videoUrl && <span className="flex items-center gap-1 text-amber-400">🎥 به فيديو</span>}
+                            {l.pdfUrl && <span className="flex items-center gap-1 text-cyan-400">📄 به PDF</span>}
+                            {l.isPdfLocked && <span className="text-slate-500">🔒 PDF مقفول بالامتحان</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingLesson(l);
+                            setLessonForm({
+                              title: l.title || '',
+                              description: l.description || '',
+                              videoUrl: l.videoUrl || '',
+                              pdfUrl: l.pdfUrl || '',
+                              isPdfLocked: l.isPdfLocked ?? true,
+                              orderIndex: l.orderIndex || (idx + 1)
+                            });
+                          }}
+                          className="h-8 w-8 p-0 rounded-lg text-blue-400 hover:bg-blue-950/40"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onDeleteLesson(l.id, l.title)}
+                          className="h-8 w-8 p-0 rounded-lg text-red-400 hover:bg-red-950/40"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <Button
+                onClick={() => setManagingLessonsCourse(null)}
+                className="rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-6"
+              >
+                إغلاق
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

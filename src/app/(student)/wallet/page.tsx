@@ -12,22 +12,35 @@ import { CreditCard, Hash, Wallet as WalletIcon, ArrowDownToLine, Sparkles } fro
 import { formatCurrencyEGP } from '@/lib/utils';
 import { toast } from 'sonner';
 
+import { redeemChargeCodeFirebase } from '@/lib/firebase/services';
+
 export default function WalletPage() {
-  const { student } = useCurrentStudent();
+  const { student, refreshStudent } = useCurrentStudent();
   const [code, setCode] = useState('');
   const [amount, setAmount] = useState(100);
   const [loading, setLoading] = useState(false);
 
-  function onRedeem() {
+  async function onRedeem() {
     if (!code.trim()) {
       toast.error('يرجى إدخال كود الشحن');
       return;
     }
+    const studentId = student?.id || 'current-student';
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await redeemChargeCodeFirebase(studentId, code);
+      if (res.ok) {
+        toast.success(`🎉 تم شحن ${res.amount} ج.م بنجاح إلى محفظتك!`);
+        setCode('');
+        if (refreshStudent) await refreshStudent();
+      } else {
+        toast.error(res.error || 'كود الشحن غير صالح أو تم استخدامه مسبقاً');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'حدث خطأ أثناء الشحن');
+    } finally {
       setLoading(false);
-      toast.error('كود الشحن غير صالح أو تم استخدامه مسبقاً');
-    }, 800);
+    }
   }
 
   function onFawry() {

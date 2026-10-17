@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 export default function CoursePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const { student } = useCurrentStudent();
+  const { student, refreshStudent } = useCurrentStudent();
 
   const [course, setCourse] = useState<FirebaseCourse | null>(null);
   const [lessons, setLessons] = useState<FirebaseLesson[]>([]);
@@ -75,6 +75,7 @@ export default function CoursePage() {
       const result = await purchaseCourseFirebase(studentId, id);
       if (result.ok) {
         setIsSubscribed(true);
+        if (refreshStudent) await refreshStudent();
         if (result.alreadyEnrolled) {
           toast.info('أنت مشترك في هذا الكورس بالفعل.');
         } else {

@@ -45,6 +45,10 @@ export default function AdminCreateExamPage() {
   const [lessonId, setLessonId] = useState('lesson-1');
   const [examDescription, setExamDescription] = useState('');
 
+  // Code Import State
+  const [showCodeImportModal, setShowCodeImportModal] = useState(false);
+  const [codeImportText, setCodeImportText] = useState('');
+
   // Questions State
   const [questions, setQuestions] = useState<QuestionFormItem[]>([
     {
@@ -63,6 +67,56 @@ export default function AdminCreateExamPage() {
       marks: 5
     }
   ]);
+
+  const handleImportJsonCode = () => {
+    if (!codeImportText.trim()) {
+      toast.error('يرجى لصق كود الأسئلة أولاً');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(codeImportText.trim());
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        toast.error('الكود يجب أن يكون قائمة أسئلة (JSON Array)');
+        return;
+      }
+
+      const importedQuestions: QuestionFormItem[] = parsed.map((item: any, idx: number) => {
+        const isEssay = item.type === 'essay';
+        let options = [
+          { key: 'a', text: '' },
+          { key: 'b', text: '' },
+          { key: 'c', text: '' },
+          { key: 'd', text: '' }
+        ];
+
+        if (Array.isArray(item.options)) {
+          options = item.options.map((opt: any, oIdx: number) => ({
+            key: opt.key || ['a', 'b', 'c', 'd'][oIdx] || `opt-${oIdx}`,
+            text: typeof opt === 'string' ? opt : (opt.text || '')
+          }));
+        }
+
+        return {
+          id: `q-imported-${Date.now()}-${idx}`,
+          text: item.text || item.questionText || '',
+          type: isEssay ? 'essay' : 'mcq',
+          imageFile: null,
+          imagePreview: item.imageUrl || null,
+          options,
+          correctAnswer: item.correctAnswer || item.correct_answer || (isEssay ? '' : 'a'),
+          marks: Number(item.marks) || (isEssay ? 5 : 2)
+        };
+      });
+
+      setQuestions(importedQuestions);
+      setShowCodeImportModal(false);
+      setCodeImportText('');
+      toast.success(`🎉 تم توليد وتضمين ${importedQuestions.length} سؤال في الامتحان بنجاح!`);
+    } catch (e: any) {
+      console.error('JSON parse error:', e);
+      toast.error('صيغة الكود غير صحيحة. يرجى التأكد من كتابة JSON صحيح.');
+    }
+  };
 
   const addQuestion = (type: 'mcq' | 'essay' = 'mcq') => {
     setQuestions((prev) => [
@@ -297,7 +351,14 @@ export default function AdminCreateExamPage() {
               أسئلة الامتحان ({questions.length})
             </h2>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCodeImportModal(true)}
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 px-3.5 py-2 text-xs font-black text-black shadow-md transition"
+              >
+                <Sparkles className="h-4 w-4" /> لصق كود الأسئلة الذكي (JSON) ⚡
+              </button>
               <button
                 type="button"
                 onClick={() => addQuestion('mcq')}
@@ -314,6 +375,68 @@ export default function AdminCreateExamPage() {
               </button>
             </div>
           </div>
+
+          {/* JSON Importer Modal */}
+          {showCodeImportModal && (
+            <div className="rounded-3xl border-2 border-amber-500/60 bg-amber-950/20 p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
+                <div className="flex items-center gap-2 text-amber-400 font-black text-sm">
+                  <Sparkles className="h-5 w-5" />
+                  <span>مولد الأسئلة التلقائي - الصق كود الأسئلة هنا</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCodeImportModal(false)}
+                  className="rounded-xl border border-slate-700 px-3 py-1 text-xs text-slate-400 hover:text-white"
+                >
+                  إلغاء ✕
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-300">
+                الصق كود الأسئلة الجاهز (JSON) الذي قمت بإنشائه، وسيتم تحويله فوراً لأسئلة تفاعلية مع الخيارات والإجابات النموذجية:
+              </p>
+
+              <textarea
+                rows={7}
+                dir="ltr"
+                value={codeImportText}
+                onChange={(e) => setCodeImportText(e.target.value)}
+                placeholder={`[
+  {
+    "text": "ما هو إعراب كلمة العلم؟",
+    "type": "mcq",
+    "marks": 2,
+    "options": [
+      { "key": "a", "text": "اسم إن منصوب" },
+      { "key": "b", "text": "خبر إن مرفوع" }
+    ],
+    "correctAnswer": "a"
+  },
+  {
+    "text": "اشرح الفارق بين لا النافية للجنس ولا النافية للفعل؟",
+    "type": "essay",
+    "marks": 5,
+    "correctAnswer": "إجابة نموذجية..."
+  }
+]`}
+                className="w-full rounded-2xl border border-slate-800 bg-black/90 p-4 font-mono text-xs text-emerald-400 placeholder:text-slate-600 focus:border-amber-400 focus:outline-none"
+              />
+
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">
+                  يدعم أسئلة الاختيار من متعدد والأسئلة المقالية تلقائياً.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleImportJsonCode}
+                  className="rounded-xl bg-amber-400 hover:bg-amber-300 px-6 py-2.5 text-xs font-black text-black shadow-lg shadow-amber-400/20 transition"
+                >
+                  توليد ووضع الأسئلة في الامتحان 🚀
+                </button>
+              </div>
+            </div>
+          )}
 
           {questions.map((q, qIndex) => (
             <div

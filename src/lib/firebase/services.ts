@@ -66,14 +66,31 @@ export async function getCourseById(courseId: string): Promise<FirebaseCourse | 
 // ======================== LESSONS ========================
 export async function getLessonsByCourse(courseId: string): Promise<FirebaseLesson[]> {
   try {
-    const q = query(
+    // 1. Try with orderBy
+    try {
+      const q = query(
+        collection(db, 'lessons'),
+        where('courseId', '==', courseId),
+        orderBy('orderIndex', 'asc')
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson));
+      }
+    } catch (orderErr) {
+      console.warn('Query with orderBy failed, querying without orderBy and sorting locally:', orderErr);
+    }
+
+    // 2. Fallback query without orderBy (in case Firestore requires composite index)
+    const qSimple = query(
       collection(db, 'lessons'),
-      where('courseId', '==', courseId),
-      orderBy('orderIndex', 'asc')
+      where('courseId', '==', courseId)
     );
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson));
+    const snapSimple = await getDocs(qSimple);
+    if (!snapSimple.empty) {
+      const list = snapSimple.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson));
+      list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
+      return list;
     }
   } catch (err) {
     console.warn('Firestore lessons fallback to defaults', err);
@@ -315,7 +332,71 @@ export async function enrollStudent(studentId: string, courseId: string): Promis
   });
 }
 
-// ======================== WALLET ========================
+// ======================== CHARGE CODES ========================
+
+export async function redeemChargeCodeFirebase(
+  studentId: string,
+  codeStr: string
+): Promise<{ ok: boolean; amount?: number; newBalance?: number; error?: string }> {
+  const cleanCode = codeStr.trim().toUpperCase();
+  if (!cleanCode) return { ok: false, error: 'يرجى إدخال كود الشحن' };
+
+  try {
+    const q = query(
+      collection(db, 'charge_codes'),
+      where('code', '==', cleanCode)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      return { ok: false, error: 'كود الشحن غير صحيح' };
+    }
+
+    const codeDoc = snap.docs[0];
+    const codeData = codeDoc.data();
+
+    if (codeData.is_used || codeData.isUsed) {
+      return { ok: false, error: 'تم استخدام كود الشحن هذا مسبقاً' };
+    }
+
+    const amount = Number(codeData.amount || 0);
+
+    // Mark code as used
+    await updateDoc(doc(db, 'charge_codes', codeDoc.id), {
+      is_used: true,
+      isUsed: true,
+      used_by: studentId,
+      usedAt: new Date().toISOString()
+    });
+
+    // Top up student balance
+    const userRef = doc(db, 'users', studentId);
+    const userSnap = await getDoc(userRef);
+    const currentBalance = userSnap.exists() ? Number(userSnap.data().walletBalance || 0) : 0;
+    const newBalance = currentBalance + amount;
+
+    if (userSnap.exists()) {
+      await updateDoc(userRef, { walletBalance: newBalance });
+    } else {
+      await setDoc(userRef, { id: studentId, walletBalance: newBalance }, { merge: true });
+    }
+
+    // Log transaction
+    await addDoc(collection(db, 'wallet_transactions'), {
+      studentId,
+      amount,
+      type: 'credit',
+      description: `شحن رصيد بكود: ${cleanCode}`,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      createdAt: new Date().toISOString()
+    });
+
+    return { ok: true, amount, newBalance };
+  } catch (err: any) {
+    console.error('Error redeeming code:', err);
+    return { ok: false, error: err.message || 'حدث خطأ أثناء شحن الكود' };
+  }
+}
 
 /** Get student wallet balance from Firestore */
 export async function getWalletBalance(studentId: string): Promise<number> {
