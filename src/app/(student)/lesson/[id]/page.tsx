@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { getLessonById, getExamByLesson, getStudentPassedExams } from '@/lib/firebase/services';
+import { getLessonById, getExamByLesson, getStudentPassedExams, isEnrolledInCourse } from '@/lib/firebase/services';
 import type { FirebaseLesson, FirebaseExam } from '@/lib/firebase/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SecureVideoPlayer } from '@/components/course/secure-video-player';
@@ -30,6 +30,8 @@ export default function LessonDetailsPage() {
   const router = useRouter();
   const {student} = useCurrentStudent();
 
+  const [access, setAccess] = useState(false);
+  const [courseId, setCourseId] = useState('');
   const [lesson, setLesson] = useState<FirebaseLesson | null>(null);
   const [exam, setExam] = useState<FirebaseExam | null>(null);
   const [passedExams, setPassedExams] = useState<Set<string>>(new Set());
@@ -37,10 +39,16 @@ export default function LessonDetailsPage() {
   const [activeVideoPart, setActiveVideoPart] = useState(1);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
+      setIsLoading(true); setAccess(false); setLesson(null);
       try {
         const l = await getLessonById(id);
-        setLesson(l);
+        if (cancelled || !l) return;
+        setCourseId(l.courseId);
+        if (!(await isEnrolledInCourse(student.id, l.courseId))) return;
+        if (cancelled) return;
+        setAccess(true); setLesson(l);
         const ex = await getExamByLesson(id);
         setExam(ex);
         const passed = await getStudentPassedExams(student.id);
@@ -48,10 +56,11 @@ export default function LessonDetailsPage() {
       } catch (err) {
         console.error('Failed to load lesson', err);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     load();
+    return () => {cancelled = true;};
   }, [id, student.id]);
 
   if (isLoading) {
@@ -63,6 +72,7 @@ export default function LessonDetailsPage() {
     );
   }
 
+  if (!access && courseId) return <div className="p-10 text-center space-y-4" dir="rtl"><Lock className="mx-auto h-12 w-12 text-amber-400"/><h1 className="text-xl font-black">اشترك في الكورس أولاً</h1><p>لا يُفتح الفيديو أو الملف إلا بعد تأكيد دفع الاشتراك.</p><Link className="inline-block rounded-xl bg-blue-600 text-white px-6 py-3" href={`/course/${courseId}`}>الرجوع للكورس والدفع</Link></div>;
   if (!lesson) {
     return (
       <div className="py-20 text-center text-slate-400" dir="rtl">

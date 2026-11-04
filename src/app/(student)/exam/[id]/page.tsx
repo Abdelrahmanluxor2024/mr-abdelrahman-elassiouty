@@ -203,7 +203,7 @@ export default function ExamRunnerPage() {
   const watermark = student ? `${student.fullName} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
 
   return (
-    <div className="relative select-none" dir="rtl" style={{ WebkitUserSelect: 'none', userSelect: 'none' }}>
+    <div className="relative" dir="rtl">
       {/* ── Background Security Dynamic Watermark (Anti-Screenshot) ──────────── */}
       <div
         aria-hidden
@@ -300,36 +300,9 @@ export default function ExamRunnerPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Professional Code Editor UI */}
-                <div className="rounded-2xl border border-slate-700/80 bg-[#0B0F19] overflow-hidden shadow-2xl">
-                  {/* Editor Header */}
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-[#131B2E] border-b border-slate-700/60 text-xs">
-                    <div className="flex items-center gap-2 text-slate-300 font-mono">
-                      <Code className="h-4 w-4 text-cyan-400" />
-                      <span className="font-bold text-cyan-300">محرر كتابة الأكواد (Code Editor)</span>
-                      <span className="text-slate-500">• index.html</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded-full bg-red-500/80 inline-block" />
-                      <span className="h-3 w-3 rounded-full bg-yellow-500/80 inline-block" />
-                      <span className="h-3 w-3 rounded-full bg-green-500/80 inline-block" />
-                    </div>
-                  </div>
-
-                  {/* Editor Textarea */}
-                  <div className="relative p-3">
-                    <Textarea
-                      value={answers[q.id] ?? ''}
-                      onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                      placeholder={`<!-- اكتب كود الـ HTML هنا -->\n<!DOCTYPE html>\n<html lang="ar">\n<head>\n  <title>صفحتي</title>\n</head>\n<body>\n  \n</body>\n</html>`}
-                      className="min-h-[260px] font-mono text-sm leading-relaxed border-0 bg-transparent text-emerald-400 placeholder:text-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0"
-                      dir="ltr"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  💡 نصيحة: اكتب الكود البرمجي بالكامل مع فتح وغلق الوسوم بدقة.
-                </p>
+                <label htmlFor={`essay-${q.id}`} className="block text-sm font-bold text-slate-700 dark:text-slate-200">إجابتك المقالية</label>
+                <Textarea id={`essay-${q.id}`} value={answers[q.id] ?? ''} onChange={e => handleAnswerChange(q.id, e.target.value)} placeholder="اكتب إجابتك هنا بأسلوبك، مع توضيح الأفكار والأمثلة…" dir="auto" className="min-h-[240px] text-base leading-8 text-right font-sans bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+                <p className="text-xs text-slate-500">سؤال مقالي عادي؛ لا يتطلب كتابة كود. تُراجع الإجابة بواسطة المعلم.</p>
               </div>
             )}
           </CardContent>

@@ -1,8 +1,9 @@
 'use client';
 
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getCourses, DEFAULT_COURSES } from '@/lib/firebase/services';
+import { getCourses, DEFAULT_COURSES, isEnrolledInCourse } from '@/lib/firebase/services';
 import type { FirebaseCourse } from '@/lib/firebase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,20 +13,23 @@ import { PlayCircle, BookOpen } from 'lucide-react';
 import { formatCurrencyEGP } from '@/lib/utils';
 
 export default function MyCoursesPage() {
+  const {student} = useCurrentStudent();
   const [courses, setCourses] = useState<FirebaseCourse[]>(DEFAULT_COURSES);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      setIsLoading(true);
       try {
         const c = await getCourses();
-        setCourses(c || []);
+        const allowed = await Promise.all(c.map(course => isEnrolledInCourse(student.id, course.id)));
+        setCourses(c.filter((_, index) => allowed[index]));
       } catch (err) {
         console.warn('MyCourses fallback:', err);
-      }
+      } finally {setIsLoading(false);}
     }
     load();
-  }, []);
+  }, [student.id]);
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -59,7 +63,7 @@ export default function MyCoursesPage() {
               <div className="relative h-44 w-full overflow-hidden bg-slate-950">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={c.thumbnailUrl || '/images/hero-study.jpg'}
+                  src={c.thumbnailUrl || '/images/course-foundation-languages.jpg'}
                   alt={c.title}
                   className="h-full w-full object-cover"
                 />
@@ -68,10 +72,10 @@ export default function MyCoursesPage() {
                 <CardTitle className="text-sm font-bold text-slate-900 dark:text-white line-clamp-2">{c.title}</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-2 space-y-3">
-                <Progress value={idx === 0 ? 30 : 0} className="h-2 bg-blue-100 dark:bg-slate-800" />
+
                 <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span>نسبة الإنجاز: {idx === 0 ? '30%' : '0%'}</span>
-                  <span>{c.lessonsCount || 12} محاضرة</span>
+                  <span>اشتراك مفعّل</span>
+                  <span>{c.lessonsCount || 0} محاضرة</span>
                 </div>
                 <Button asChild className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md">
                   <Link href={`/course/${c.id}`}>

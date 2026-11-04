@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Upload, Sparkles, Edit3, Trash2, X, Check, Loader2, BookOpen, Plus, Video, FileText } from 'lucide-react';
 import { normalizeCourse } from '@/lib/firebase/services';
-import { createDemoCourse } from '@/lib/firebase/demo-course';
+import { createDemoCourse, replaceCatalogWithPaidDemo } from '@/lib/firebase/demo-course';
 import Link from 'next/link';
 import { where } from 'firebase/firestore';
 
@@ -192,6 +192,7 @@ export default function AdminCoursesPage() {
         description: form.description.trim(),
         price: form.is_free ? 0 : Number(form.price) || 0,
         is_free: Boolean(form.is_free),
+        isFree: Boolean(form.is_free),
         duration_hours: Number(form.duration_hours) || 0,
         thumbnail_url: form.thumbnail_url || '/images/course-foundation-languages.jpg',
         is_published: true,
@@ -228,6 +229,7 @@ export default function AdminCoursesPage() {
         description: editingCourse.description || '',
         price: editingCourse.is_free ? 0 : Number(editingCourse.price) || 0,
         is_free: Boolean(editingCourse.is_free),
+        isFree: Boolean(editingCourse.is_free),
         duration_hours: Number(editingCourse.duration_hours) || 0,
         thumbnail_url: editingCourse.thumbnail_url || '/images/course-foundation-languages.jpg'
       });
@@ -264,7 +266,7 @@ export default function AdminCoursesPage() {
 
   async function toggle(id: string, is_published: boolean) {
     try {
-      await updateDoc(doc(db, 'courses', id), { is_published });
+      await updateDoc(doc(db, 'courses', id), { is_published, isPublished: is_published });
       toast.success(is_published ? 'تم نشر الكورس' : 'تم إخفاء الكورس');
       await loadCourses();
     } catch (err: any) {
@@ -278,8 +280,15 @@ export default function AdminCoursesPage() {
 
       <Card className="rounded-3xl border-blue-400/30 bg-blue-500/5">
         <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
-          <div><h2 className="font-black text-lg">من أول فيديو لأول امتحان ✨</h2><p className="mt-2 text-sm text-slate-500">١. أنشئ الكورس ← ٢. أضف الدرس والفيديو والملف ← ٣. اربط الامتحان من إدارة الامتحانات.</p><p className="mt-1 text-xs text-slate-500">جرّب كورساً مجانياً جاهزاً: فيديو واحد + PDF + ٥ أسئلة، دون تكرار عند الضغط مرة أخرى.</p></div>
-          <Button disabled={pending} onClick={async () => {setPending(true); try {const created = await createDemoCourse(); toast.success(created ? 'تم تجهيز ونشر الكورس التجريبي بالكامل' : 'الكورس التجريبي موجود بالفعل'); await loadCourses();} catch {toast.error('تعذر تجهيز الكورس. تأكد من الاتصال وصلاحيات الأدمن');} finally {setPending(false);}}}>{pending ? 'جاري الحفظ…' : 'تجهيز الكورس التجريبي'}</Button>
+          <div><h2 className="font-black text-lg">من أول فيديو لأول امتحان ✨</h2><p className="mt-2 text-sm text-slate-500">١. أنشئ الكورس ← ٢. أضف الدرس والفيديو والملف ← ٣. اربط الامتحان من إدارة الامتحانات.</p><p className="mt-1 text-xs text-slate-500">جرّب باقة بـ٢٠٠ جنيه: ٣ كورسات فرعية، كل منها درس + PDF + ٥ أسئلة، دون تكرار عند الضغط مرة أخرى.</p></div>
+          <Button disabled={pending} onClick={async () => {setPending(true); try {const created = await createDemoCourse(); toast.success(created ? 'تم تجهيز ونشر الكورس التجريبي بالكامل' : 'الكورس التجريبي موجود بالفعل'); await loadCourses();} catch {toast.error('تعذر تجهيز الكورس. تأكد من الاتصال وصلاحيات الأدمن');} finally {setPending(false);}}}>{pending ? 'جاري الحفظ…' : 'تجهيز باقة التجربة بـ٢٠٠ جنيه'}</Button>
+          <div className="w-full rounded-2xl border border-red-500/30 bg-red-500/5 p-4 space-y-3"><h3 className="font-black text-red-600">استبدال كل الكورسات الحالية</h3><p className="text-xs text-slate-500">يحذف الكورسات والدروس والامتحانات والأسئلة القديمة ويُنشئ باقة واحدة بـ٢٠٠ جنيه فيها ٣ كورسات فرعية. لا تُحذف حسابات الطلاب أو أرصدتهم أو إيصالات الدفع. تُنزّل نسخة احتياطية قبل التنفيذ.</p><Button disabled={pending} variant="destructive" onClick={async () => {
+            if (prompt('عملية حذف نهائي للكورسات الحالية. اكتب: حذف كل الكورسات') !== 'حذف كل الكورسات') return;
+            setPending(true);
+            try {const result = await replaceCatalogWithPaidDemo(); setManagingLessonsCourse(null); setEditingCourse(null); toast.success(`تم استبدال ${result.deletedCourses} كورس بباقة ٢٠٠ جنيه كاملة`); await loadCourses();}
+            catch (error) {toast.error(error instanceof Error ? error.message : 'فشل الاستبدال؛ راجع صلاحيات الأدمن');}
+            finally {setPending(false);}
+          }}>{pending ? 'جاري تنفيذ العملية…' : 'حذف الكورسات واستبدالها بالباقة الجديدة'}</Button></div>
           <Link href="/admin/exams" className="text-blue-500 font-bold text-sm underline">ربط وإدارة الامتحانات ←</Link>
         </CardContent>
       </Card>

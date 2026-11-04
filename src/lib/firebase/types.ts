@@ -20,6 +20,8 @@ export interface FirebaseCourse {
   durationHours: number;
   thumbnailUrl: string;
   isPublished: boolean;
+  sequentialLearning?: boolean;
+  modules?: {id: string; title: string}[];
   tag?: string;
   discountPrice?: number;
   features?: string[];
@@ -34,6 +36,8 @@ export interface FirebaseLesson {
   courseId: string;
   title: string;
   description?: string;
+  moduleId?: string;
+  moduleTitle?: string;
   videoUrl?: string;
   videoDuration?: number;
   pdfUrl?: string;
