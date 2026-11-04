@@ -1,5 +1,12 @@
 "use client";
 
+import { addFourthLesson } from "@/app/actions/add-fourth-lesson";
+import { auth } from "@/lib/firebase/config";
+import {
+  ARABIC_COURSE_ID,
+  ARABIC_PDF_SHA256,
+  ARABIC_PDF_SIZE,
+} from "@/lib/arabic-fourth-lesson";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, doc, getDocs } from "firebase/firestore";
@@ -47,6 +54,8 @@ function move<T>(items: T[], index: number, direction: number) {
   return next;
 }
 export default function CourseStudio() {
+  const [fourthPdf, setFourthPdf] = useState<File | null>(null);
+  const [fourthPdfUrl, setFourthPdfUrl] = useState("");
   const [courses, setCourses] = useState<FirebaseCourse[]>([]);
   const [exams, setExams] = useState<FirebaseExam[]>([]);
   const [draft, setDraft] = useState<CourseDraft | null>(null);
@@ -203,6 +212,86 @@ export default function CourseStudio() {
             كورس جديد من الصفر
           </Button>
         </header>
+        {courses.some((c) => c.id === ARABIC_COURSE_ID) && (
+          <Card>
+            <CardContent className="p-5 space-y-3">
+              <h2 className="font-black">
+                الدرس الرابع — المحاضرة التأسيسية عربي
+              </h2>
+              <p className="text-sm text-muted">
+                إضافة إلى الكورس الأساسي فقط: PDF من Drive + فيديو محمد صلاح +
+                اختبارين. لا يتم حذف أو استبدال الدروس القديمة، ولا تغيير السعر
+                أو الاشتراكات.
+              </p>
+              <label className="block text-sm font-bold space-y-2">
+                ملف المحاضرة من Drive (لن ينشر داخل GitHub)
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={busy}
+                  onChange={(e) => {
+                    setFourthPdf(e.target.files?.[0] || null);
+                    setFourthPdfUrl("");
+                  }}
+                  className="block w-full rounded-xl border border-slate-200 p-3"
+                />
+              </label>
+              <Button
+                disabled={busy}
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      "إضافة الدرس الرابع وامتحانين للكورس الأساسي؟ المحتوى الموجود والنتائج لن تُحذف.",
+                    )
+                  )
+                    return;
+                  setBusy(true);
+                  try {
+                    await auth.authStateReady();
+                    let url = fourthPdfUrl;
+                    if (fourthPdf && !url) {
+                      if (fourthPdf.size !== ARABIC_PDF_SIZE)
+                        throw Error(
+                          "اختر النسخة الأصلية من ملف المحاضرة التاسيسية عربي.pdf",
+                        );
+                      const hash = Array.from(
+                        new Uint8Array(
+                          await crypto.subtle.digest(
+                            "SHA-256",
+                            await fourthPdf.arrayBuffer(),
+                          ),
+                        ),
+                      )
+                        .map((b) => b.toString(16).padStart(2, "0"))
+                        .join("");
+                      if (hash !== ARABIC_PDF_SHA256)
+                        throw Error(
+                          "الملف المختار لا يطابق ملف المحاضرة المطلوب من Drive",
+                        );
+                      url = await uploadLessonPdf(ARABIC_COURSE_ID, fourthPdf);
+                      setFourthPdfUrl(url);
+                    }
+                    const result = await addFourthLesson(
+                      await auth.currentUser?.getIdToken(),
+                      url || undefined,
+                    );
+                    if (!result.ok) throw Error(result.message);
+                    toast.success(result.message);
+                    await refresh();
+                  } catch (e) {
+                    toast.error(
+                      e instanceof Error ? e.message : "تعذرت الإضافة",
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                إضافة الدرس الرابع وامتحانيه للكورس الأساسي
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           {[
             [BookOpen, "١. بيانات الكورس"],

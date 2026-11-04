@@ -18,7 +18,7 @@ async function studentDatabase(idToken?: string) {
   return { db: getFirestore(app), uid: auth.currentUser.uid };
 }
 
-type StartResult = { ok: true; attemptId: string; examId: string; durationMinutes: number; locked?: boolean } | {ok: false; error: string};
+type StartResult = { ok: true; attemptId: string; examId: string; durationMinutes: number; locked?: boolean; fresh?: boolean } | {ok: false; error: string};
 export async function startExam(examId: string, idToken?: string): Promise<StartResult> {
   try {
     const {db, uid} = await studentDatabase(idToken);
@@ -30,25 +30,37 @@ export async function startExam(examId: string, idToken?: string): Promise<Start
     }
     // The single-attempt policy applies to existing exams too, including legacy IDs.
     const history = await getDocs(query(collection(db, 'exam_attempts'), where('studentId', '==', uid), where('examId', '==', examId)));
-    if (history.docs.some(row => row.data().status !== 'in_progress')) return {ok: false, error: 'استهلكت محاولتك الوحيدة لهذا الامتحان'};
-    const legacy = history.docs[0];
-    const ref = doc(db, 'exam_attempts', legacy?.id || `${uid}_${examId}_1`);
+    const completed = history.docs.some(row => row.data().status !== 'in_progress');
+    const legacy = history.docs.find(row => row.data().status === 'in_progress');
     const result = await runTransaction(db, async transaction => {
+      let generation = 0;
+      const grantRef = doc(db, 'exam_attempt_grants', `${uid}_${examId}`);
+      let grant: Record<string, any> | undefined;
+      if (completed) {
+        const permit = await transaction.get(grantRef);
+        grant = permit.data();
+        if (!permit.exists() || grant?.studentId !== uid || grant?.examId !== examId || !Number.isSafeInteger(grant?.generation) || grant!.generation < 1) return null;
+        generation = grant!.generation;
+      }
+      const ref = doc(db, 'exam_attempts', generation ? `${uid}_${examId}_grant_${generation}` : legacy?.id || `${uid}_${examId}_1`);
       const existing = await transaction.get(ref);
       const duration = Math.max(1, Number(data.durationMinutes) || 20);
       if (existing.exists()) {
         const attempt = existing.data();
         if (attempt.studentId !== uid || attempt.examId !== examId || attempt.status !== 'in_progress') return null;
+        if (generation && grant?.usedGeneration !== generation) return null;
         if (attempt.lockedAt) return {ok: true as const, attemptId: ref.id, examId, durationMinutes: 0, locked: true};
         const deadline = Date.parse(attempt.expiresAt || '') || Date.parse(attempt.createdAt) + duration * 60000;
         return {ok: true as const, attemptId: ref.id, examId, durationMinutes: Math.max(0, (deadline - Date.now()) / 60000)};
       }
+      if (generation && Number(grant?.usedGeneration || 0) >= generation) return null;
       const now = Date.now();
-      transaction.set(ref, {examId, studentId: uid, status: 'in_progress', createdAt: new Date(now).toISOString(), expiresAt: new Date(now + duration * 60000).toISOString(), maxAttempts: 1, draftAnswers: {}});
-      return {ok: true as const, attemptId: ref.id, examId, durationMinutes: duration};
+      if (generation) transaction.update(grantRef, {usedGeneration: generation, consumedAt: new Date(now).toISOString()});
+      transaction.set(ref, {examId, studentId: uid, status: 'in_progress', createdAt: new Date(now).toISOString(), expiresAt: new Date(now + duration * 60000).toISOString(), maxAttempts: 1, draftAnswers: {}, ...(generation ? {grantGeneration: generation, grantedBy: grant?.grantedBy || ''} : {})});
+      return {ok: true as const, attemptId: ref.id, examId, durationMinutes: duration, fresh: true};
     });
     if (result) return result;
-    return {ok: false, error: 'استهلكت محاولتك الوحيدة لهذا الامتحان'};
+    return {ok: false, error: 'لا توجد محاولة متاحة حالياً؛ راجع المسؤول لمنح محاولة إضافية'};
   } catch { return {ok: false, error: 'تعذر بدء الامتحان. تحقق من تسجيل الدخول والاتصال وصلاحيات الوصول'}; }
 }
 

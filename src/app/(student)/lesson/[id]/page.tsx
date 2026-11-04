@@ -225,14 +225,11 @@ export default function LessonPage() {
                 </p>
                 <Link
                   className="inline-block rounded-xl theme-inverse bg-blue-600 text-ink px-4 py-2 text-sm font-bold"
-                  href={
-                    passed.has(exam.id)
-                      ? `/exam/${exam.id}/result`
-                      : `/exam/${exam.id}`
-                  }
+                  href={`/exam/${exam.id}`}
                 >
-                  {passed.has(exam.id) ? "عرض النتيجة" : "فتح الامتحان"}
+                  فتح الامتحان / المحاولة المتاحة
                 </Link>
+                <Link href={`/exam/${exam.id}/result`} className="mr-3 text-sm text-blue-600 dark:text-cyan-300 underline">عرض النتيجة السابقة</Link>
               </CardContent>
             </Card>
           ))}

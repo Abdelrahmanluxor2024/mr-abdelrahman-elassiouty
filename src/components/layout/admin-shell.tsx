@@ -9,6 +9,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ADMIN_NAV = [
+  { href: "/admin/attempts", label: "منح محاولة لطالب" },
   { href: "/admin", label: "الإحصائيات" },
   { href: "/admin/students", label: "الطلاب" },
   { href: "/admin/courses", label: "الكورسات" },

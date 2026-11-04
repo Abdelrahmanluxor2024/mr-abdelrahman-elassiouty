@@ -98,6 +98,7 @@ export default function ExamRunnerPage() {
         return;
       }
       if (res.locked) {setLocked(true); restorePendingRef.current = true;}
+      if(res.fresh){setAnswers({});try{sessionStorage.removeItem(`exam_answers_${student.id}_${examId}`);}catch{}}
       setAttemptId(res.attemptId);
       setSecondsLeft(Math.ceil(res.durationMinutes * 60));
     }).catch(() => {startRequested.current = false; setReady(false); toast.error('تعذر بدء الامتحان. تحقق من الاتصال وحاول مرة أخرى');});
@@ -224,10 +225,10 @@ export default function ExamRunnerPage() {
           </div>
           <div>
             <h2 className="font-display text-xl font-black text-ink dark:text-white">
-              انتهت محاولتك الوحيدة
+              انتهت المحاولة المتاحة
             </h2>
             <p className="mt-2 text-sm text-muted dark:text-slate-400 leading-relaxed">
-              لقد قمت بأداء هذا الامتحان بالحد الأقصى للمحاولات المسموح بها (محاولة واحدة فقط).
+              لا توجد محاولة متاحة حالياً. يمكنك مراجعة المسؤول لمنحك محاولة إضافية لهذا الدرس.
             </p>
           </div>
           <div className="flex flex-col gap-2.5 pt-2">
@@ -248,8 +249,8 @@ export default function ExamRunnerPage() {
   }
 
   if (!loadingExam && !loadingQuestions && (!exam || !questions.length)) return <div className="p-10 text-center space-y-4"><h1 className="font-black text-xl">الامتحان غير متاح أو لم تكتمل أسئلته بعد</h1><Link className="text-blue-500 underline" href="/courses">العودة للكورسات</Link></div>;
-  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><ShieldAlert className="h-10 w-10 text-amber-500"/><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-muted">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-8"><strong>محاولة واحدة فقط.</strong><ul className="list-disc pr-5"><li>مغادرة التبويب أو فقدان تركيز نافذة الامتحان يؤدي لتسليم المحاولة وقفل الإجابات.</li><li>لا تفتح تبويباً أو برنامجاً آخر أثناء الحل؛ افتح الامتحان في تبويب مستقل وأوقف الإشعارات قبل البداية.</li><li>اختصارات تصوير الشاشة المرصودة تقفل المحاولة. العلامة المائية تحمل اسمك ورقمك.</li><li>لا يمكن للمتصفح ضمان منع تصوير الشاشة من النظام أو بكاميرا خارجية.</li></ul></div><label className="flex items-start gap-3 text-sm leading-7"><input type="checkbox" checked={acceptedPolicy} onChange={e => setAcceptedPolicy(e.target.checked)} className="mt-2"/>قرأت التعليمات وفاهم أن مغادرة الامتحان تستهلك محاولتي الوحيدة.</label><Button disabled={!acceptedPolicy} onClick={() => setReady(true)}>موافق، ابدأ المحاولة الوحيدة</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
-  if (locked) return <div dir="rtl" role="status" className="mx-auto max-w-xl rounded-3xl border border-amber-500/30 p-8 text-center space-y-5"><ShieldAlert className="mx-auto h-12 w-12 text-amber-500"/><h1 className="font-black text-xl">{reasonRef.current === 'manual' ? 'جاري تسليم إجاباتك' : 'تم قفل المحاولة'}</h1><p className="text-sm leading-7 text-muted">{reasonRef.current === 'manual' ? 'تم تثبيت الإجابات ولا يمكن تعديلها بعد التسليم.' : 'انتهى وقت الامتحان أو تم رصد مغادرة النافذة أو اختصار تصوير. لن تُفتح محاولة جديدة.'}</p>{submitting ? <p className="flex justify-center items-center gap-2"><Loader2 className="h-5 w-5 animate-spin"/>جاري الحفظ والتصحيح…</p> : <><p className="text-sm text-amber-600">لو الاتصال انقطع، إعادة التسليم ترسل نفس الإجابات ولا تعيد فتح الامتحان.</p><Button onClick={() => void executeSubmission(reasonRef.current)}>إعادة التسليم</Button></>}</div>;
+  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><ShieldAlert className="h-10 w-10 text-amber-500"/><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-muted">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-8"><strong>محاولة واحدة افتراضياً؛ الإعادة بإذن المسؤول فقط.</strong><ul className="list-disc pr-5"><li>مغادرة التبويب أو فقدان تركيز نافذة الامتحان يؤدي لتسليم المحاولة وقفل الإجابات.</li><li>لا تفتح تبويباً أو برنامجاً آخر أثناء الحل؛ افتح الامتحان في تبويب مستقل وأوقف الإشعارات قبل البداية.</li><li>اختصارات تصوير الشاشة المرصودة تقفل المحاولة. العلامة المائية تحمل اسمك ورقمك.</li><li>لا يمكن للمتصفح ضمان منع تصوير الشاشة من النظام أو بكاميرا خارجية.</li></ul></div><label className="flex items-start gap-3 text-sm leading-7"><input type="checkbox" checked={acceptedPolicy} onChange={e => setAcceptedPolicy(e.target.checked)} className="mt-2"/>قرأت التعليمات وفاهم أن مغادرة الامتحان تستهلك المحاولة الحالية.</label><Button disabled={!acceptedPolicy} onClick={() => setReady(true)}>موافق، ابدأ المحاولة المتاحة</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
+  if (locked) return <div dir="rtl" role="status" className="mx-auto max-w-xl rounded-3xl border border-amber-500/30 p-8 text-center space-y-5"><ShieldAlert className="mx-auto h-12 w-12 text-amber-500"/><h1 className="font-black text-xl">{reasonRef.current === 'manual' ? 'جاري تسليم إجاباتك' : 'تم قفل المحاولة'}</h1><p className="text-sm leading-7 text-muted">{reasonRef.current === 'manual' ? 'تم تثبيت الإجابات ولا يمكن تعديلها بعد التسليم.' : 'انتهى وقت الامتحان أو تم رصد مغادرة النافذة أو اختصار تصوير. لن تُفتح محاولة جديدة تلقائياً؛ الإعادة بإذن المسؤول فقط.'}</p>{submitting ? <p className="flex justify-center items-center gap-2"><Loader2 className="h-5 w-5 animate-spin"/>جاري الحفظ والتصحيح…</p> : <><p className="text-sm text-amber-600">لو الاتصال انقطع، إعادة التسليم ترسل نفس الإجابات ولا تعيد فتح الامتحان.</p><Button onClick={() => void executeSubmission(reasonRef.current)}>إعادة التسليم</Button></>}</div>;
   if (!exam || questions.length === 0 || !q || secondsLeft === null) {
     return (
       <div className="grid place-items-center py-20">
@@ -265,7 +266,7 @@ export default function ExamRunnerPage() {
 
   return (
     <div className="relative" dir="rtl">
-      {confirmSubmit && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/70 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="confirm-submit-title" className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl dark:bg-slate-900"><h2 id="confirm-submit-title" className="text-xl font-black">لسه فيه أسئلة ناقصة</h2><p className="mt-3 text-sm text-muted">باقي {questions.length - answered} سؤال بدون إجابة. التسليم ينهي محاولتك الوحيدة.</p><div className="mt-6 flex gap-3"><Button onClick={() => {setConfirmSubmit(false); void executeSubmission();}}>سلّم الإجابات</Button><Button variant="outline" autoFocus onClick={() => setConfirmSubmit(false)}>أكمل الحل</Button></div></div></div>}
+      {confirmSubmit && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/70 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="confirm-submit-title" className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl dark:bg-slate-900"><h2 id="confirm-submit-title" className="text-xl font-black">لسه فيه أسئلة ناقصة</h2><p className="mt-3 text-sm text-muted">باقي {questions.length - answered} سؤال بدون إجابة. التسليم ينهي المحاولة الحالية.</p><div className="mt-6 flex gap-3"><Button onClick={() => {setConfirmSubmit(false); void executeSubmission();}}>سلّم الإجابات</Button><Button variant="outline" autoFocus onClick={() => setConfirmSubmit(false)}>أكمل الحل</Button></div></div></div>}
 
       {/* ── Background Security Dynamic Watermark (Anti-Screenshot) ──────────── */}
       <div
@@ -287,7 +288,7 @@ export default function ExamRunnerPage() {
       <div className="mx-auto max-w-4xl mb-3 flex items-center justify-between gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-300 font-bold">
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <span>محاولة واحدة • مغادرة النافذة أو التبويب تؤدي للتسليم التلقائي.</span>
+          <span>محاولة واحدة افتراضياً • مغادرة النافذة أو التبويب تؤدي للتسليم التلقائي.</span>
         </div>
         <span className="hidden sm:inline-block text-[11px] font-mono bg-amber-500/20 px-2 py-0.5 rounded-md">
           {watermark}

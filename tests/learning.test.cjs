@@ -171,3 +171,23 @@ test('an older in-flight autosave cannot overwrite a newer server draft', async 
   await s.actions.saveExamDraft({...input, revision: 100, answers: [{questionId: 'q1', answerText: 'b'}]});
   assert.equal(s.data.get('exam_attempts/' + s.attemptId).draftAnswers.q1, 'a');
 });
+test('admin credit creates a clean attempt without deleting the original result',async()=>{
+ const s=actionsDatabase();s.data.get('exam_attempts/'+s.attemptId).status='failed';
+ s.data.set('exam_attempt_grants/student-1_exam',{studentId:'student-1',examId:'exam',generation:1,usedGeneration:0,grantedBy:'admin'});
+ const result=await s.actions.startExam('exam','token');assert.equal(result.ok,true);assert.equal(result.fresh,true);assert.equal(result.attemptId,'student-1_exam_grant_1');
+ assert.equal(s.data.get('exam_attempts/'+s.attemptId).status,'failed');assert.equal(s.data.get('exam_attempt_grants/student-1_exam').usedGeneration,1);
+ assert.equal(Object.keys(s.data.get('exam_attempts/'+result.attemptId).draftAnswers).length,0);
+ const resume=await s.actions.startExam('exam','token');assert.equal(resume.attemptId,result.attemptId);assert.equal(resume.fresh,undefined);
+ s.data.get('exam_attempts/'+result.attemptId).status='passed';assert.equal((await s.actions.startExam('exam','token')).ok,false);
+});
+test('consumed, foreign and malformed grants cannot bypass the default single-attempt limit',async()=>{
+ for(const grant of [{studentId:'someone',examId:'exam',generation:1,usedGeneration:0},{studentId:'student-1',examId:'other',generation:1,usedGeneration:0},{studentId:'student-1',examId:'exam',generation:1,usedGeneration:1},{studentId:'student-1',examId:'exam',generation:0,usedGeneration:0}]){
+  const s=actionsDatabase();s.data.get('exam_attempts/'+s.attemptId).status='passed';s.data.set('exam_attempt_grants/student-1_exam',grant);assert.equal((await s.actions.startExam('exam','token')).ok,false);
+ }
+});
+test('an administrative retake keeps normal freeze, timeout and owner protections',async()=>{
+ const s=actionsDatabase();s.data.get('exam_attempts/'+s.attemptId).status='failed';s.data.set('exam_attempt_grants/student-1_exam',{studentId:'student-1',examId:'exam',generation:2,usedGeneration:1,grantedBy:'admin'});
+ const start=await s.actions.startExam('exam','token');const input={attemptId:start.attemptId,examId:'exam',idToken:'token',answers:[{questionId:'q1',answerText:'a'}],reason:'window_blur'};
+ assert.equal((await s.actions.saveExamDraft(input)).locked,true);assert.equal((await s.actions.startExam('exam','token')).locked,true);
+ await s.actions.submitExam({...input,answers:[{questionId:'q1',answerText:'b'}]});assert.equal(s.data.get('exam_attempts/'+start.attemptId).score,2);
+});
