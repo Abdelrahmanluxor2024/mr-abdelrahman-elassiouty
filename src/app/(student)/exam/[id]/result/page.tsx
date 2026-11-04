@@ -80,7 +80,7 @@ export default function ExamResultPage() {
           href={`/exam/${examId}`}
           className="text-blue-600 dark:text-cyan-300 underline"
         >
-          العودة لمحاولتك الوحيدة
+          العودة للمحاولة الحالية
         </Link>
       </div>
     );
@@ -99,7 +99,7 @@ export default function ExamResultPage() {
               : attempt.submission_reason === "capture_shortcut"
                 ? "تم إنهاء المحاولة بعد رصد اختصار تصوير شاشة."
                 : "تم إنهاء المحاولة بعد مغادرة تبويب أو نافذة الامتحان."}{" "}
-            تُحسب هذه محاولتك الوحيدة.
+            تُحتسب هذه المحاولة من المحاولات المتاحة لحسابك.
           </div>
         )}
       <section

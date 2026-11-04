@@ -26,3 +26,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private source PDF from connected Drive: never publish in this public repository
+content/arabic-foundation.pdf
