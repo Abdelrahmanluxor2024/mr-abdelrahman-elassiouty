@@ -30,7 +30,7 @@ export function useExam(examId: string) {
             duration_minutes: Number(d.durationMinutes || d.duration_minutes || 30),
             total_marks: Number(d.totalMarks || d.total_marks || 20),
             passing_marks: Number(d.passingMarks || d.passing_marks || 10),
-            max_attempts: Number(d.maxAttempts || d.max_attempts || 3),
+            max_attempts: 1,
             created_at: d.createdAt || d.created_at || new Date().toISOString()
           } as Exam;
         }
@@ -129,6 +129,7 @@ export function useAttempt(attemptId: string) {
             wrong_count: Number(d.wrong_count || d.wrongCount || 0),
             unanswered_count: Number(d.unanswered_count || d.unansweredCount || 0),
             status: d.status || 'passed',
+            submission_reason: d.submissionReason || '',
             created_at: d.createdAt || d.created_at || new Date().toISOString()
           } as any as ExamAttempt;
         }
@@ -177,6 +178,7 @@ export function useLatestAttemptForExam(examId: string, explicitAttemptId?: stri
               wrong_count: Number(d.wrong_count || d.wrongCount || 0),
               unanswered_count: Number(d.unanswered_count || d.unansweredCount || 0),
               status: d.status || 'passed',
+            submission_reason: d.submissionReason || '',
               created_at: d.createdAt || d.created_at || new Date().toISOString()
             } as any as ExamAttempt;
           }
@@ -213,6 +215,7 @@ export function useLatestAttemptForExam(examId: string, explicitAttemptId?: stri
             wrong_count: Number(d.wrong_count || d.wrongCount || 0),
             unanswered_count: Number(d.unanswered_count || d.unansweredCount || 0),
             status: d.status || 'passed',
+            submission_reason: d.submissionReason || '',
             created_at: d.createdAt || d.created_at || new Date().toISOString()
           } as any as ExamAttempt;
         }

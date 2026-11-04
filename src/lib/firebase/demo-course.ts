@@ -43,7 +43,7 @@ export function buildDemoDocuments(createdAt = new Date().toISOString()): DemoDo
     }});
     result.push({collection: 'exams', id: examId, data: {
       courseId: DEMO_COURSE_ID, lessonId, title: `اختبار ${module.title}`, description: '٤ أسئلة اختيار وسؤال مقالي نصي؛ النتيجة النهائية بعد مراجعة المعلم للمقالي.',
-      durationMinutes: 15, totalMarks: 6, passingMarks: 4, maxAttempts: 3, questionsCount: 5, isActive: true, createdAt
+      durationMinutes: 15, totalMarks: 6, passingMarks: 4, maxAttempts: 1, questionsCount: 5, isActive: true, createdAt
     }});
     module.questions.forEach(([questionText, options, correctAnswer], qIndex) => {
       result.push({collection: 'questions', id: `${examId}-${qIndex + 1}`, data: {

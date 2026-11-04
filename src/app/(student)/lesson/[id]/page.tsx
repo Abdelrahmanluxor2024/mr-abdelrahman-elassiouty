@@ -249,10 +249,10 @@ export default function LessonDetailsPage() {
                   <CheckCircle2 className="h-4 w-4" /> لقد اجتزت هذا الاختبار بنجاح
                 </div>
                 <Link
-                  href={`/exam/${examId}`}
+                  href={`/exam/${examId}/result`}
                   className="w-full md:w-auto rounded-2xl border border-emerald-500/40 bg-emerald-950/60 hover:bg-emerald-900/60 px-8 py-3 text-center text-xs font-black text-emerald-300 transition"
                 >
-                  إعادة الاختبار للتدريب
+                  عرض نتيجتي
                 </Link>
               </div>
             ) : (
