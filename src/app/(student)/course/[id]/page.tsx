@@ -39,7 +39,9 @@ export default function CoursePage() {
   const [isPurchasing, setIsPurchasing] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
+      setIsLoading(true); setIsSubscribed(false);
       try {
         const c = await getCourseById(id);
         setCourse(c);
@@ -54,7 +56,8 @@ export default function CoursePage() {
 
         // Check real enrollment
         const enrolled = await isEnrolledInCourse(studentId, id);
-        setIsSubscribed(enrolled || !!c?.isFree);
+        if (cancelled) return;
+        setIsSubscribed(enrolled);
 
         // Get passed exams
         const passed = await getStudentPassedExams(studentId);
@@ -62,10 +65,11 @@ export default function CoursePage() {
       } catch (err) {
         console.error('Failed to load course details', err);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     load();
+    return () => {cancelled = true;};
   }, [id, student?.id]);
 
   const handleSubscribe = async () => {
@@ -75,10 +79,13 @@ export default function CoursePage() {
       return;
     }
 
+    if (course && !course.isFree && !confirm(`سيتم خصم ${course.price} جنيه من رصيد محفظتك لتفعيل الكورس. تأكيد الشراء؟`)) return;
     setIsPurchasing(true);
     try {
       const result = await purchaseCourseFirebase(studentId, id);
       if (result.ok) {
+        const verified = await isEnrolledInCourse(studentId, id);
+        if (!verified) {toast.error('لم يتم تأكيد الاشتراك. أعد تحميل الصفحة أو راجع الإدارة قبل إعادة الدفع'); return;}
         setIsSubscribed(true);
         if (refreshStudent) await refreshStudent();
         if (result.alreadyEnrolled) {
@@ -159,7 +166,7 @@ export default function CoursePage() {
                 disabled={isPurchasing}
                 className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 py-2.5 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition"
               >
-                {isPurchasing ? 'جاري الاشتراك...' : 'تفعيل الاشتراك ⚡'}
+                {isPurchasing ? 'جاري تأكيد العملية…' : course.isFree ? 'اشترك مجاناً' : `ادفع ${course.price} ج.م من المحفظة`}
               </button>
             ) : (
               <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-black text-emerald-400">
@@ -192,6 +199,7 @@ export default function CoursePage() {
         </div>
       </div>
 
+      {course.modules?.length ? <section className="rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 space-y-3"><h2 className="font-black text-xl">٣ كورسات في اشتراك واحد</h2><p className="text-sm text-slate-400">السعر للباقة كاملة وليس لكل كورس فرعي. بعد تأكيد الدفع تقدر تدخل أي وحدة.</p><div className="grid gap-3 sm:grid-cols-3">{course.modules.map((module, index) => <div className="rounded-2xl border border-slate-700 p-4" key={module.id}><span className="text-cyan-400 font-black">٠{index + 1}</span><h3 className="font-bold mt-2">{module.title}</h3><p className="text-xs text-slate-400 mt-2">درس فيديو + PDF + امتحان</p></div>)}</div></section> : null}
       {/* ── Lessons List ─────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -217,7 +225,7 @@ export default function CoursePage() {
             const prevLesson = idx > 0 ? lessons[idx - 1] : null;
             // Lock if: not subscribed, OR (not first lesson AND previous exam not passed)
             const previousExamId = prevLesson ? lessonExams[prevLesson.id] : null;
-            const isLocked = !isSubscribed || (!isFirst && !!previousExamId && !passedExams.has(previousExamId));
+            const isLocked = !isSubscribed || (course.sequentialLearning === true && !isFirst && !!previousExamId && !passedExams.has(previousExamId));
 
             return (
               <div
@@ -252,6 +260,7 @@ export default function CoursePage() {
 
                   {/* Body */}
                   <div className="p-5 space-y-3">
+                    {lesson.moduleTitle && <p className="text-xs font-bold text-cyan-400">{lesson.moduleTitle}</p>}
                     <h3 className="text-base font-black text-white line-clamp-2">
                       {lesson.title}
                     </h3>

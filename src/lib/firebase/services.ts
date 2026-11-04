@@ -14,7 +14,8 @@ import {
   runTransaction
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './config';
+import { hasCourseAccess } from './course-payment';
+import { db, storage, auth } from './config';
 import type {
   FirebaseCourse,
   FirebaseLesson,
@@ -30,7 +31,7 @@ export const DEFAULT_COURSES: FirebaseCourse[] = [];
 export const DEFAULT_LESSONS: Record<string, FirebaseLesson[]> = {};
 
 export function normalizeCourse(id: string, data: Record<string, any>): FirebaseCourse {
-  return { ...data, id, isFree: data.is_free ?? data.isFree ?? false,
+  return { ...data, id, isFree: Number(data.price) === 0 && (data.is_free === true || data.isFree === true),
     isPublished: data.is_published ?? data.isPublished ?? false,
     durationHours: data.duration_hours ?? data.durationHours ?? 0,
     thumbnailUrl: data.thumbnail_url ?? data.thumbnailUrl ?? '',
@@ -205,29 +206,15 @@ export async function uploadQuestionImage(file: File, examId: string): Promise<s
 
 /** Check if a student is enrolled in a course */
 export async function isEnrolledInCourse(studentId: string, courseId: string): Promise<boolean> {
-  if (!studentId || !courseId) return false;
-  try {
-    const q = query(
-      collection(db, 'enrollments'),
-      where('studentId', '==', studentId),
-      where('courseId', '==', courseId)
-    );
-    const snap = await getDocs(q);
-    return !snap.empty;
-  } catch (err) {
-    console.warn('isEnrolledInCourse error', err);
-    return false;
-  }
+  if (!courseId) return false;
+  try { return await hasCourseAccess(db, studentId, courseId); }
+  catch { return false; }
 }
 
-/** Enroll a student in a course (free or after payment) */
+/** No direct enrollment path may bypass the purchase transaction. */
 export async function enrollStudent(studentId: string, courseId: string): Promise<void> {
-  await addDoc(collection(db, 'enrollments'), {
-    studentId,
-    courseId,
-    enrolledAt: new Date().toISOString(),
-    progress: 0,
-  });
+  const result = await purchaseCourseFirebase(studentId, courseId);
+  if (!result.ok) throw new Error(result.error || 'تعذر الاشتراك');
 }
 
 // ======================== CHARGE CODES ========================
@@ -309,78 +296,15 @@ export async function getWalletBalance(studentId: string): Promise<number> {
   return 0;
 }
 
-/** Deduct balance and log transaction */
-export async function deductWalletBalance(
-  studentId: string,
-  amount: number,
-  description: string
-): Promise<{ ok: boolean; newBalance: number; error?: string }> {
-  try {
-    const userRef = doc(db, 'users', studentId);
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) return { ok: false, newBalance: 0, error: 'المستخدم غير موجود.' };
-
-    const currentBalance = Number(snap.data().walletBalance || 0);
-    if (currentBalance < amount) {
-      return {
-        ok: false,
-        newBalance: currentBalance,
-        error: `رصيدك الحالي (${currentBalance} ج.م) غير كافٍ. يرجى شحن المحفظة أولاً.`,
-      };
-    }
-
-    const newBalance = currentBalance - amount;
-    await updateDoc(userRef, { walletBalance: newBalance });
-
-    // Log transaction
-    await addDoc(collection(db, 'wallet_transactions'), {
-      studentId,
-      amount,
-      type: 'debit',
-      description,
-      balanceBefore: currentBalance,
-      balanceAfter: newBalance,
-      createdAt: new Date().toISOString(),
-    });
-
-    return { ok: true, newBalance };
-  } catch (err: any) {
-    console.error('deductWalletBalance error', err);
-    return { ok: false, newBalance: 0, error: 'حدث خطأ أثناء خصم الرصيد.' };
-  }
-}
-
 /** Purchase a course: check enrollment, deduct balance, enroll */
 export async function purchaseCourseFirebase(
   studentId: string,
   courseId: string
 ): Promise<{ ok: boolean; error?: string; alreadyEnrolled?: boolean }> {
-  // 1. Check already enrolled
-  const already = await isEnrolledInCourse(studentId, courseId);
-  if (already) return { ok: true, alreadyEnrolled: true };
-
-  // 2. Get course price
-  const courseSnap = await getDoc(doc(db, 'courses', courseId));
-  if (!courseSnap.exists()) return { ok: false, error: 'الكورس غير موجود.' };
-  const courseData = courseSnap.data();
-  const price = Number(courseData.price || 0);
-
-  // 3. Free course → enroll directly
-  if ((courseData.is_free ?? courseData.isFree) || price === 0) {
-    await enrollStudent(studentId, courseId);
-    return { ok: true };
-  }
-
-  // 4. Paid course → deduct from wallet then enroll
-  const result = await deductWalletBalance(
-    studentId,
-    price,
-    `شراء كورس: ${courseData.title}`
-  );
-  if (!result.ok) return { ok: false, error: result.error };
-
-  await enrollStudent(studentId, courseId);
-  return { ok: true };
+  await auth.authStateReady();
+  if (!auth.currentUser || auth.currentUser.uid !== studentId) return {ok: false, error: 'سجّل الدخول بحسابك أولاً'};
+  const { buyCourse } = await import('@/app/actions/course-purchase');
+  return buyCourse(courseId, await auth.currentUser.getIdToken());
 }
 /** Recompute the whole attempt when grading, without provisional essay marks. */
 export async function gradeEssayAnswer(answerId: string, marks: number, feedback: string) {

@@ -4,6 +4,7 @@ import { initializeServerApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDoc, getDocs, collection, query, where, runTransaction } from 'firebase/firestore';
 import { headers } from 'next/headers';
+import { hasCourseAccess } from '@/lib/firebase/course-payment';
 import { firebaseConfig } from '@/lib/firebase/config';
 
 // Authenticate the Firestore request with the student's real Firebase ID token.
@@ -25,14 +26,7 @@ export async function startExam(examId: string, idToken?: string): Promise<Start
     if (!exam.exists() || !exam.data().isActive) return {ok: false, error: 'الامتحان غير متاح حالياً'};
     const data = exam.data();
     if (data.courseId) {
-      const course = await getDoc(doc(db, 'courses', data.courseId));
-      if (!course.exists()) return {ok: false, error: 'الكورس غير موجود'};
-      const c = course.data();
-      if (!(c.is_published ?? c.isPublished)) return {ok: false, error: 'الكورس غير متاح حالياً'};
-      if (!(c.is_free ?? c.isFree)) {
-        const enrollment = await getDocs(query(collection(db, 'enrollments'), where('studentId', '==', uid), where('courseId', '==', data.courseId)));
-        if (enrollment.empty) return {ok: false, error: 'اشترك في الكورس أولاً'};
-      }
+      if (!(await hasCourseAccess(db, uid, data.courseId))) return {ok: false, error: 'اشترك في الكورس وأكمل الدفع أولاً'};
     }
     // Stable slots and a transaction prevent double attempts on StrictMode or rapid clicks.
     const max = Math.max(1, Number(data.maxAttempts) || 2);
