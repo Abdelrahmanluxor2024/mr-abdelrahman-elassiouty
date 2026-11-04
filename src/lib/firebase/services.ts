@@ -9,7 +9,9 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy
+  orderBy,
+  writeBatch,
+  runTransaction
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './config';
@@ -27,35 +29,26 @@ export const DEFAULT_COURSES: FirebaseCourse[] = [];
 
 export const DEFAULT_LESSONS: Record<string, FirebaseLesson[]> = {};
 
+export function normalizeCourse(id: string, data: Record<string, any>): FirebaseCourse {
+  return { ...data, id, isFree: data.is_free ?? data.isFree ?? false,
+    isPublished: data.is_published ?? data.isPublished ?? false,
+    durationHours: data.duration_hours ?? data.durationHours ?? 0,
+    thumbnailUrl: data.thumbnail_url ?? data.thumbnailUrl ?? '',
+    createdAt: data.created_at ?? data.createdAt ?? '' } as FirebaseCourse;
+}
+
 // ======================== COURSES ========================
 export async function getCourses(): Promise<FirebaseCourse[]> {
-  const fetchCourses = async () => {
-    const q = query(collection(db, 'courses'));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseCourse));
-    }
-    return null;
-  };
-
-  const timeoutPromise = new Promise<null>((resolve) =>
-    setTimeout(() => resolve(null), 1200)
-  );
-
-  try {
-    const data = await Promise.race([fetchCourses(), timeoutPromise]);
-    if (data && data.length > 0) return data;
-  } catch (err) {
-    console.warn('Firestore courses fallback to defaults', err);
-  }
-  return DEFAULT_COURSES;
+  const snap = await getDocs(collection(db, 'courses'));
+  return snap.docs.map(d => normalizeCourse(d.id, d.data())).filter(c => c.isPublished);
 }
 
 export async function getCourseById(courseId: string): Promise<FirebaseCourse | null> {
   try {
     const snap = await getDoc(doc(db, 'courses', courseId));
     if (snap.exists()) {
-      return { id: snap.id, ...snap.data() } as FirebaseCourse;
+      const course = normalizeCourse(snap.id, snap.data());
+      return course.isPublished ? course : null;
     }
   } catch (err) {
     console.warn('Firestore getCourseById fallback', err);
@@ -123,25 +116,14 @@ export async function getExamByLesson(lessonId: string): Promise<FirebaseExam | 
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
-      const d = snap.docs[0];
+      const d = snap.docs.find(item => item.data().isActive !== false);
+      if (!d) return null;
       return { id: d.id, ...d.data() } as FirebaseExam;
     }
   } catch (err) {
     console.warn('Firestore getExamByLesson fallback', err);
   }
-  return {
-    id: `exam-${lessonId}`,
-    lessonId,
-    title: `اختبار تقييم الدرس - قياس الفهم والاستيعاب`,
-    description: 'يجب عليك اجتياز هذا الاختبار بنسبة 50% على الأقل لفتح المحاضرة والملفات التالية',
-    durationMinutes: 20,
-    totalMarks: 20,
-    passingMarks: 10,
-    maxAttempts: 2,
-    questionsCount: 4,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  };
+  return null;
 }
 
 export async function getExamById(examId: string): Promise<FirebaseExam | null> {
@@ -153,97 +135,13 @@ export async function getExamById(examId: string): Promise<FirebaseExam | null> 
   } catch (err) {
     console.warn('Firestore getExamById fallback', err);
   }
-  return {
-    id: examId,
-    lessonId: 'lesson-1',
-    title: 'اختبار تقييم الدرس',
-    description: 'اختبار إلكتروني لقياس المستوى وتأكيد الفهم',
-    durationMinutes: 20,
-    totalMarks: 20,
-    passingMarks: 10,
-    maxAttempts: 2,
-    questionsCount: 4,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  };
+  return null;
 }
 
 export async function getQuestionsByExam(examId: string): Promise<FirebaseQuestion[]> {
-  try {
-    const q = query(
-      collection(db, 'questions'),
-      where('examId', '==', examId),
-      orderBy('orderIndex', 'asc')
-    );
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseQuestion));
-    }
-  } catch (err) {
-    console.warn('Firestore getQuestionsByExam fallback', err);
-  }
-  return [
-    {
-      id: 'q1',
-      examId,
-      questionText: 'ما هو إعراب كلمة "العلم" في جملة: "إن العلمَ نورٌ يضيءُ الطريق"؟',
-      questionType: 'mcq',
-      marks: 5,
-      orderIndex: 1,
-      options: [
-        { key: 'a', text: 'اسم إن منصوب وعلامة نصبه الفتحة الظاهرة' },
-        { key: 'b', text: 'خبر إن مرفوع وعلامة رفعه الضمة الظاهرة' },
-        { key: 'c', text: 'مبتدأ مؤخر مرفوع وعلامة رفعه الضمة' },
-        { key: 'd', text: 'مفعول به مقدم منصوب بالفتحة' }
-      ],
-      correctAnswer: 'a'
-    },
-    {
-      id: 'q2',
-      examId,
-      questionText: 'في قول الشاعر: "والبدرُ في كبدِ السماءِ كدرهمٍ ملقىً على ديباجةٍ زرقاءِ"، نوع التشبيه هنا هو:',
-      questionType: 'mcq',
-      marks: 5,
-      orderIndex: 2,
-      options: [
-        { key: 'a', text: 'تشبيه بليغ' },
-        { key: 'b', text: 'تشبيه تمثيلي' },
-        { key: 'c', text: 'تشبيه ضمني' },
-        { key: 'd', text: 'تشبيه مجمل' }
-      ],
-      correctAnswer: 'b'
-    },
-    {
-      id: 'q3',
-      examId,
-      questionText: 'حدد المشتق وعمله في جملة: "المُخلِصُ عملَه محبوبٌ بين الناس":',
-      questionType: 'mcq',
-      marks: 5,
-      orderIndex: 3,
-      options: [
-        { key: 'a', text: 'المُخلِص اسم فاعل عامل رفع فاعلاً ونصب مفعولاً به (عمله)' },
-        { key: 'b', text: 'محبوب اسم فاعل عامل' },
-        { key: 'c', text: 'المُخلِص صيغة مبالغة غير عاملة' },
-        { key: 'd', text: 'عملَه فاعل مرفوع بالضمة' }
-      ],
-      correctAnswer: 'a'
-    },
-    {
-      id: 'q4',
-      examId,
-      questionText: 'من رائد مدرسة الإحياء والبعث في الشعر العربي الحديث؟',
-      questionType: 'mcq',
-      marks: 5,
-      orderIndex: 4,
-      options: [
-        { key: 'a', text: 'أحمد شوقي' },
-        { key: 'b', text: 'محمود سامي البارودي' },
-        { key: 'c', text: 'حافظ إبراهيم' },
-        { key: 'd', text: 'خليل مطران' }
-      ],
-      correctAnswer: 'b'
-    }
-  ];
+  const snap = await getDocs(query(collection(db, 'questions'), where('examId', '==', examId)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseQuestion))
+    .sort((a, b) => a.orderIndex - b.orderIndex);
 }
 
 // ======================== ADMIN CREATE EXAM ========================
@@ -251,21 +149,21 @@ export async function createExamWithQuestions(
   examData: Omit<FirebaseExam, 'id' | 'createdAt'>,
   questions: Omit<FirebaseQuestion, 'id' | 'examId'>[]
 ): Promise<string> {
-  const examRef = await addDoc(collection(db, 'exams'), {
-    ...examData,
-    createdAt: new Date().toISOString()
+  if (!questions.length || questions.length > 450) throw new Error('عدد الأسئلة يجب أن يكون بين 1 و450');
+  const batch = writeBatch(db);
+  const examRef = doc(collection(db, 'exams'));
+  batch.set(examRef, { ...examData, createdAt: new Date().toISOString() });
+  questions.forEach((question, index) => {
+    const clean = Object.fromEntries(Object.entries(question).filter(([, value]) => value !== undefined));
+    batch.set(doc(collection(db, 'questions')), { ...clean, examId: examRef.id, orderIndex: index + 1 });
   });
-
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    await addDoc(collection(db, 'questions'), {
-      ...q,
-      examId: examRef.id,
-      orderIndex: i + 1
-    });
-  }
-
+  await batch.commit();
   return examRef.id;
+}
+
+export async function getExamsByCourse(courseId: string): Promise<FirebaseExam[]> {
+  const snap = await getDocs(query(collection(db, 'exams'), where('courseId', '==', courseId)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseExam)).filter(e => e.isActive);
 }
 
 // ======================== EXAM ATTEMPTS & PROGRESS ========================
@@ -468,7 +366,7 @@ export async function purchaseCourseFirebase(
   const price = Number(courseData.price || 0);
 
   // 3. Free course → enroll directly
-  if (courseData.isFree || price === 0) {
+  if ((courseData.is_free ?? courseData.isFree) || price === 0) {
     await enrollStudent(studentId, courseId);
     return { ok: true };
   }
@@ -483,4 +381,33 @@ export async function purchaseCourseFirebase(
 
   await enrollStudent(studentId, courseId);
   return { ok: true };
+}
+/** Recompute the whole attempt when grading, without provisional essay marks. */
+export async function gradeEssayAnswer(answerId: string, marks: number, feedback: string) {
+  const answerRef = doc(db, 'student_answers', answerId);
+  const answer = await getDoc(answerRef);
+  if (!answer.exists()) throw new Error('الإجابة غير موجودة');
+  const attemptRef = doc(db, 'exam_attempts', answer.data().attempt_id);
+  const attempt = await getDoc(attemptRef);
+  if (!attempt.exists()) throw new Error('المحاولة غير موجودة');
+  const examRef = doc(db, 'exams', attempt.data().examId || attempt.data().exam_id);
+  const questionRef = doc(db, 'questions', answer.data().question_id);
+  const siblings = await getDocs(query(collection(db, 'student_answers'), where('attempt_id', '==', attemptRef.id)));
+  await runTransaction(db, async transaction => {
+    const [current, exam, question, ...all] = await Promise.all([
+      transaction.get(answerRef), transaction.get(examRef), transaction.get(questionRef),
+      ...siblings.docs.map(row => transaction.get(doc(db, 'student_answers', row.id)))
+    ]);
+    if (!current.exists() || !exam.exists() || !question.exists()) throw new Error('بيانات التصحيح غير مكتملة');
+    if (!Number.isFinite(marks) || marks < 0 || marks > Number(question.data().marks)) throw new Error('الدرجة خارج النطاق المسموح');
+    let score = 0, pending = false;
+    all.forEach(row => {
+      if (!row.exists()) return;
+      if (row.id === answerId) score += marks;
+      else {score += Number(row.data().marks_obtained) || 0; if (row.data().status === 'pending') pending = true;}
+    });
+    const total = Number(exam.data().totalMarks) || 1;
+    transaction.update(answerRef, {marks_obtained: marks, grader_feedback: feedback, status: 'graded'});
+    transaction.update(attemptRef, {score, percentage: Math.round(score / total * 100), status: pending ? 'pending' : score >= Number(exam.data().passingMarks) ? 'passed' : 'failed'});
+  });
 }

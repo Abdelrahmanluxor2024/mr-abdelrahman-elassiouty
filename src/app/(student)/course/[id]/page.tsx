@@ -6,12 +6,14 @@ import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   getCourseById,
+  getExamsByCourse,
+  getExamByLesson,
   getLessonsByCourse,
   getStudentPassedExams,
   isEnrolledInCourse,
   purchaseCourseFirebase,
 } from '@/lib/firebase/services';
-import type { FirebaseCourse, FirebaseLesson } from '@/lib/firebase/types';
+import type { FirebaseCourse, FirebaseLesson, FirebaseExam } from '@/lib/firebase/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import {
@@ -28,6 +30,8 @@ export default function CoursePage() {
   const { student, refreshStudent } = useCurrentStudent();
 
   const [course, setCourse] = useState<FirebaseCourse | null>(null);
+  const [exams, setExams] = useState<FirebaseExam[]>([]);
+  const [lessonExams, setLessonExams] = useState<Record<string, string>>({});
   const [lessons, setLessons] = useState<FirebaseLesson[]>([]);
   const [passedExams, setPassedExams] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -42,14 +46,15 @@ export default function CoursePage() {
 
         const l = await getLessonsByCourse(id);
         setLessons(l);
+        setExams(await getExamsByCourse(id));
+        const linked = await Promise.all(l.map(async lesson => [lesson.id, (await getExamByLesson(lesson.id))?.id || '']));
+        setLessonExams(Object.fromEntries(linked));
 
         const studentId = student?.id || 'current-student';
 
         // Check real enrollment
         const enrolled = await isEnrolledInCourse(studentId, id);
-        if (enrolled || c?.isFree) {
-          setIsSubscribed(true);
-        }
+        setIsSubscribed(enrolled || !!c?.isFree);
 
         // Get passed exams
         const passed = await getStudentPassedExams(studentId);
@@ -174,13 +179,13 @@ export default function CoursePage() {
           </div>
           <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
             <div className="text-lg sm:text-2xl font-black text-amber-400">
-              {course.partsCount || lessons.length * 3 || 0}
+              {lessons.filter(l => l.videoUrl).length + lessons.filter(l => l.pdfUrl).length}
             </div>
             <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">أجزاء وتدريبات</div>
           </div>
           <div className="rounded-2xl bg-[#070B14]/60 p-3 border border-slate-800/50">
             <div className="text-lg sm:text-2xl font-black text-cyan-400">
-              {course.homeworkCount || lessons.length || 0}
+              {exams.length}
             </div>
             <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">واجبات وامتحانات</div>
           </div>
@@ -205,12 +210,14 @@ export default function CoursePage() {
           </div>
         )}
 
+        {!lessons.length && <div className="rounded-2xl border border-dashed p-8 text-center text-slate-400">المعلم يجهز دروس الكورس. تابعنا قريباً.</div>}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {lessons.map((lesson, idx) => {
             const isFirst = idx === 0;
             const prevLesson = idx > 0 ? lessons[idx - 1] : null;
             // Lock if: not subscribed, OR (not first lesson AND previous exam not passed)
-            const isLocked = !isSubscribed || (!isFirst && !passedExams.has(`exam-${prevLesson?.id}`));
+            const previousExamId = prevLesson ? lessonExams[prevLesson.id] : null;
+            const isLocked = !isSubscribed || (!isFirst && !!previousExamId && !passedExams.has(previousExamId));
 
             return (
               <div
@@ -227,7 +234,7 @@ export default function CoursePage() {
                   <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src="/images/hero-study.jpg"
+                      src={course.thumbnailUrl || "/images/course-foundation-languages.jpg"}
                       alt={lesson.title}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
@@ -294,6 +301,7 @@ export default function CoursePage() {
           })}
         </div>
       </div>
+      {exams.length > 0 && <section className="space-y-4"><h2 className="text-xl font-black text-white">امتحانات الكورس</h2><div className="grid gap-4 sm:grid-cols-2">{exams.map(exam => <div key={exam.id} className="rounded-2xl border border-slate-800 bg-[#0B1324] p-5 space-y-3"><h3 className="font-bold text-white">{exam.title}</h3><p className="text-sm text-slate-400">{exam.questionsCount} سؤال · {exam.durationMinutes} دقيقة · النجاح من {exam.passingMarks} / {exam.totalMarks}</p>{isSubscribed ? <Link href={`/exam/${exam.id}`} className="inline-block rounded-xl bg-blue-600 px-5 py-2 text-white font-bold">ابدأ الامتحان</Link> : <p className="text-sm text-amber-300">اشترك في الكورس لبدء الامتحان</p>}</div>)}</div></section>}
     </div>
   );
 }

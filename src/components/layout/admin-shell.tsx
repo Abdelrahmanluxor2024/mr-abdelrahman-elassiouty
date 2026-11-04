@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ const ADMIN_NAV = [
 
 export function AdminShell({ children, name }: { children: React.ReactNode; name: string }) {
   const pathname = usePathname();
+  const {logout} = useCurrentStudent();
   return (
     <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
       <aside className="border-l border-slate-200 bg-brand-900 text-white">
@@ -33,7 +35,7 @@ export function AdminShell({ children, name }: { children: React.ReactNode; name
         </div>
         <nav className="space-y-1 p-3">
           {ADMIN_NAV.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href + '/'));
             return (
               <Link
                 key={item.href}
@@ -50,16 +52,7 @@ export function AdminShell({ children, name }: { children: React.ReactNode; name
           <div className="pt-4">
             <button
               type="button"
-              onClick={() => {
-                document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                if (typeof window !== 'undefined') {
-                  try {
-                    localStorage.removeItem('mr_ass_student_profile');
-                  } catch {}
-                  window.location.href = '/login';
-                }
-              }}
+              onClick={logout}
               className="flex w-full items-center gap-2 rounded-xl bg-white/5 px-3 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10"
             >
               <LogOut className="h-4 w-4" />
@@ -68,7 +61,7 @@ export function AdminShell({ children, name }: { children: React.ReactNode; name
           </div>
         </nav>
       </aside>
-      <main className="bg-soft p-6 lg:p-8">{children}</main>
+      <main className="min-w-0 bg-soft p-4 sm:p-6 lg:p-8">{children}</main>
     </div>
   );
 }

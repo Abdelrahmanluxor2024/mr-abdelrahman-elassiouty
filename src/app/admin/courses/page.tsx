@@ -20,6 +20,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Upload, Sparkles, Edit3, Trash2, X, Check, Loader2, BookOpen, Plus, Video, FileText } from 'lucide-react';
+import { normalizeCourse } from '@/lib/firebase/services';
+import { createDemoCourse } from '@/lib/firebase/demo-course';
+import Link from 'next/link';
 import { where } from 'firebase/firestore';
 
 export default function AdminCoursesPage() {
@@ -87,6 +90,9 @@ export default function AdminCoursesPage() {
       toast.error('يرجى إدخال عنوان الدرس');
       return;
     }
+    for (const url of [lessonForm.videoUrl, lessonForm.pdfUrl]) {
+      if (url.trim() && !/^https:\/\//i.test(url.trim()) && !url.trim().startsWith('/files/')) {toast.error('استخدم رابط HTTPS صحيح للفيديو أو الملف'); return;}
+    }
     setPending(true);
     try {
       if (editingLesson) {
@@ -137,6 +143,8 @@ export default function AdminCoursesPage() {
     if (!confirm(`هل أنت متأكد من حذف درس "${title}"؟`)) return;
     setPending(true);
     try {
+      const exams = await getDocs(query(collection(db, 'exams'), where('lessonId', '==', lessonId)));
+      if (!exams.empty) {toast.error('انقل امتحانات الدرس إلى درس آخر أولاً من إدارة الامتحانات'); return;}
       await deleteDoc(doc(db, 'lessons', lessonId));
       toast.success('تم حذف الدرس بنجاح');
       if (managingLessonsCourse) {
@@ -154,7 +162,10 @@ export default function AdminCoursesPage() {
     try {
       const q = query(collection(db, 'courses'));
       const snap = await getDocs(q);
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs.map((d) => {
+        const c = normalizeCourse(d.id, d.data());
+        return {...c, ...d.data(), id: d.id, is_free: c.isFree, is_published: c.isPublished, duration_hours: c.durationHours, thumbnail_url: c.thumbnailUrl};
+      });
       setCourses(list);
     } catch (err) {
       console.error('Error loading courses:', err);
@@ -173,12 +184,13 @@ export default function AdminCoursesPage() {
       toast.error('يرجى كتابة عنوان الكورس');
       return;
     }
+    if (form.price < 0 || form.duration_hours < 0) {toast.error('السعر والمدة لا يمكن أن يكونا أقل من صفر'); return;}
     setPending(true);
     try {
       await addDoc(collection(db, 'courses'), {
         title: form.title.trim(),
         description: form.description.trim(),
-        price: Number(form.price) || 0,
+        price: form.is_free ? 0 : Number(form.price) || 0,
         is_free: Boolean(form.is_free),
         duration_hours: Number(form.duration_hours) || 0,
         thumbnail_url: form.thumbnail_url || '/images/course-foundation-languages.jpg',
@@ -214,7 +226,7 @@ export default function AdminCoursesPage() {
       await updateDoc(courseRef, {
         title: editingCourse.title.trim(),
         description: editingCourse.description || '',
-        price: Number(editingCourse.price) || 0,
+        price: editingCourse.is_free ? 0 : Number(editingCourse.price) || 0,
         is_free: Boolean(editingCourse.is_free),
         duration_hours: Number(editingCourse.duration_hours) || 0,
         thumbnail_url: editingCourse.thumbnail_url || '/images/course-foundation-languages.jpg'
@@ -234,6 +246,11 @@ export default function AdminCoursesPage() {
     if (!confirm(`هل أنت متأكد من حذف كورس "${title}" نهائياً؟`)) return;
     setPending(true);
     try {
+      const [lessons, exams] = await Promise.all([
+        getDocs(query(collection(db, 'lessons'), where('courseId', '==', id))),
+        getDocs(query(collection(db, 'exams'), where('courseId', '==', id)))
+      ]);
+      if (!lessons.empty || !exams.empty) { toast.error('الكورس يحتوي على دروس أو امتحانات. أخفِه بدلاً من الحذف للحفاظ على بيانات الطلاب'); return; }
       await deleteDoc(doc(db, 'courses', id));
       toast.success('تم حذف الكورس بنجاح');
       await loadCourses();
@@ -259,6 +276,13 @@ export default function AdminCoursesPage() {
     <div className="space-y-6" dir="rtl">
       <h1 className="font-display text-2xl font-black text-brand-900 dark:text-white">إدارة وتعديل الكورسات</h1>
 
+      <Card className="rounded-3xl border-blue-400/30 bg-blue-500/5">
+        <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
+          <div><h2 className="font-black text-lg">من أول فيديو لأول امتحان ✨</h2><p className="mt-2 text-sm text-slate-500">١. أنشئ الكورس ← ٢. أضف الدرس والفيديو والملف ← ٣. اربط الامتحان من إدارة الامتحانات.</p><p className="mt-1 text-xs text-slate-500">جرّب كورساً مجانياً جاهزاً: فيديو واحد + PDF + ٥ أسئلة، دون تكرار عند الضغط مرة أخرى.</p></div>
+          <Button disabled={pending} onClick={async () => {setPending(true); try {const created = await createDemoCourse(); toast.success(created ? 'تم تجهيز ونشر الكورس التجريبي بالكامل' : 'الكورس التجريبي موجود بالفعل'); await loadCourses();} catch {toast.error('تعذر تجهيز الكورس. تأكد من الاتصال وصلاحيات الأدمن');} finally {setPending(false);}}}>{pending ? 'جاري الحفظ…' : 'تجهيز الكورس التجريبي'}</Button>
+          <Link href="/admin/exams" className="text-blue-500 font-bold text-sm underline">ربط وإدارة الامتحانات ←</Link>
+        </CardContent>
+      </Card>
       {/* Edit Course Modal / Panel */}
       {editingCourse && (
         <Card className="border-2 border-blue-500 bg-blue-50/20 dark:bg-blue-950/30 shadow-xl rounded-3xl">

@@ -13,6 +13,11 @@ import { addCommunityComment, likeCommunityPost } from '@/app/actions/community'
 import Image from 'next/image';
 
 export function PlatformGroupFeed() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-slate-500">جروب المنصة غير مفعّل حالياً. يمكنك متابعة الكورسات والدروس كالمعتاد.</div>;
+  return <ConfiguredGroupFeed />;
+}
+
+function ConfiguredGroupFeed() {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

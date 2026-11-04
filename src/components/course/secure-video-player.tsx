@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Maximize2, Pause, Play, Volume2, VolumeX } from 'lucide-react';
+import { getVideoSource } from '@/lib/video-url';
 import { Button } from '@/components/ui/button';
 
 type Props = {
@@ -20,6 +21,9 @@ type Props = {
  *  - Optional embed mode (iframe) for protected providers
  */
 export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) {
+  const source = getVideoSource(src);
+  src = source.src;
+  embed = source.embed;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -46,6 +50,7 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
     else v.pause();
   }
 
+  if (!src) return <div className="rounded-2xl border border-amber-500/30 p-6 text-center text-amber-300">رابط الفيديو غير صالح. تواصل مع المعلم لتحديثه.</div>;
   return (
     <div className="relative overflow-hidden rounded-2xl bg-black shadow-blue-soft">
       {embed ? (

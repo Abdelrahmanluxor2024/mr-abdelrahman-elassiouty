@@ -21,12 +21,14 @@ import {
   Download,
   AlertCircle
 } from 'lucide-react';
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import { cn } from '@/lib/utils';
 
 export default function LessonDetailsPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
+  const {student} = useCurrentStudent();
 
   const [lesson, setLesson] = useState<FirebaseLesson | null>(null);
   const [exam, setExam] = useState<FirebaseExam | null>(null);
@@ -41,7 +43,7 @@ export default function LessonDetailsPage() {
         setLesson(l);
         const ex = await getExamByLesson(id);
         setExam(ex);
-        const passed = await getStudentPassedExams('current-student');
+        const passed = await getStudentPassedExams(student.id);
         setPassedExams(passed);
       } catch (err) {
         console.error('Failed to load lesson', err);
@@ -50,7 +52,7 @@ export default function LessonDetailsPage() {
       }
     }
     load();
-  }, [id]);
+  }, [id, student.id]);
 
   if (isLoading) {
     return (
@@ -74,7 +76,7 @@ export default function LessonDetailsPage() {
 
   const examId = exam?.id || `exam-${lesson.id}`;
   const isExamPassed = passedExams.has(examId);
-  const isPdfLocked = lesson.isPdfLocked && !isExamPassed;
+  const isPdfLocked = lesson.isPdfLocked && !!exam && !isExamPassed;
 
   return (
     <div className="space-y-8" dir="rtl">
@@ -98,11 +100,11 @@ export default function LessonDetailsPage() {
             <span className="flex items-center gap-1.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 px-3.5 py-1.5 text-xs font-bold text-emerald-400">
               <CheckCircle2 className="h-4 w-4" /> اجتزت امتحان هذا الدرس
             </span>
-          ) : (
+          ) : exam ? (
             <span className="flex items-center gap-1.5 rounded-2xl bg-amber-950/80 border border-amber-500/30 px-3.5 py-1.5 text-xs font-bold text-amber-400">
               <AlertCircle className="h-4 w-4" /> مطلوب اجتياز الامتحان لفتح التالي
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -113,7 +115,7 @@ export default function LessonDetailsPage() {
             <PlayCircle className="h-5 w-5 text-amber-400" />
             أجزاء الدرس والشرح التفاعلي
           </h2>
-          <span className="text-xs text-slate-400">3 أجزاء متاحة</span>
+          <span className="text-xs text-slate-400">{lesson.videoUrl ? 'فيديو واحد متاح' : 'لم يُضف فيديو بعد'}</span>
         </div>
 
         {/* Video Player Box */}
@@ -127,61 +129,11 @@ export default function LessonDetailsPage() {
           </div>
         )}
 
-        {/* Parts Cards (Yellow action button & Progress indicator - Screenshot 4) */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            { num: 1, title: 'الجزء الأول: شرح المفاهيم التأسيسية', duration: '25 دقيقة', progress: 100 },
-            { num: 2, title: 'الجزء الثاني: التطبيقات ونماذج الأسئلة', duration: '30 دقيقة', progress: 65 },
-            { num: 3, title: 'الجزء الثالث: مراجعة وحل الواجب', duration: '20 دقيقة', progress: 0 }
-          ].map((part) => (
-            <div
-              key={part.num}
-              onClick={() => setActiveVideoPart(part.num)}
-              className={cn(
-                'cursor-pointer rounded-2xl border p-4 transition-all duration-300 flex flex-col justify-between space-y-3',
-                activeVideoPart === part.num
-                  ? 'border-amber-400 bg-[#0E172A] shadow-lg shadow-amber-500/10'
-                  : 'border-slate-800 bg-[#0B1324] hover:border-slate-700'
-              )}
-            >
-              <div>
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                  <span className="font-bold text-amber-400">الجزء {part.num}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {part.duration}
-                  </span>
-                </div>
-                <h4 className="text-sm font-bold text-white line-clamp-1">{part.title}</h4>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[11px] text-slate-400">
-                  <span>نسبة المشاهدة</span>
-                  <span className="font-bold text-white">{part.progress}%</span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full bg-amber-400 transition-all duration-500"
-                    style={{ width: `${part.progress}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Yellow Button (Matching Screenshot 4) */}
-              <button
-                type="button"
-                className="w-full rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black py-2 text-xs shadow-md shadow-amber-400/20 transition"
-              >
-                {activeVideoPart === part.num ? 'قيد المشاهدة الآن ▶' : 'مشاهدة هذا الجزء'}
-              </button>
-            </div>
-          ))}
-        </div>
+        {!lesson.videoUrl && <p className="rounded-2xl border border-dashed p-6 text-slate-400">سيضيف المعلم فيديو الشرح قريباً.</p>}
       </div>
 
       {/* ── SECTION 2: ملفات ومرفقات الدرس (PDF) (Matching Screenshot 4) ────────── */}
-      <div className="space-y-4 pt-4 border-t border-slate-800/80">
+      {lesson.pdfUrl && <div className="space-y-4 pt-4 border-t border-slate-800/80">
         <div className="flex items-center justify-between">
           <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
             <FileText className="h-5 w-5 text-cyan-400" />
@@ -222,7 +174,7 @@ export default function LessonDetailsPage() {
               </button>
             ) : (
               <a
-                href={lesson.pdfUrl || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'}
+                href={lesson.pdfUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 hover:bg-cyan-500 px-6 py-3 text-xs font-black text-white shadow-lg shadow-cyan-600/30 transition hover:scale-105"
@@ -233,10 +185,10 @@ export default function LessonDetailsPage() {
             )}
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* ── SECTION 3: اختبارات الدرس (Matching Screenshot 5) ────────────────── */}
-      <div className="space-y-4 pt-4 border-t border-slate-800/80 pb-10">
+      {exam && <div className="space-y-4 pt-4 border-t border-slate-800/80 pb-10">
         <div className="flex items-center justify-between">
           <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-red-500" />
@@ -274,7 +226,7 @@ export default function LessonDetailsPage() {
 
               <div className="flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5">
                 <Sparkles className="h-4 w-4 text-emerald-400" />
-                <span>درجة النجاح: 50%</span>
+                <span>درجة النجاح: {Math.round(exam.passingMarks / exam.totalMarks * 100)}%</span>
               </div>
             </div>
           </div>
@@ -303,7 +255,7 @@ export default function LessonDetailsPage() {
             )}
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

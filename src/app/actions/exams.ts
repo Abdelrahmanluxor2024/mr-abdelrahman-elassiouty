@@ -1,385 +1,97 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import type { ExamAttempt, Question, StudentAnswer } from '@/types/supabase';
-import { revalidatePath } from 'next/cache';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc, getDocs, collection, setDoc, addDoc, query, where, updateDoc } from 'firebase/firestore';
+import { initializeServerApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, getDoc, getDocs, collection, query, where, runTransaction } from 'firebase/firestore';
+import { headers } from 'next/headers';
+import { firebaseConfig } from '@/lib/firebase/config';
 
-type StartResult =
-  | { ok: true; attemptId: string; examId: string; durationMinutes: number }
-  | { ok: false; error: string };
+// Authenticate the Firestore request with the student's real Firebase ID token.
+// No service key, client-supplied UID, shared student ID, or cookie-role trust.
+async function studentDatabase(idToken?: string) {
+  if (!idToken) throw new Error('سجّل الدخول أولاً لبدء الامتحان');
+  const app = initializeServerApp(firebaseConfig, {authIdToken: idToken, releaseOnDeref: headers()});
+  const auth = getAuth(app);
+  await auth.authStateReady();
+  if (!auth.currentUser) throw new Error('انتهت الجلسة. سجّل الدخول مرة أخرى');
+  return { db: getFirestore(app), uid: auth.currentUser.uid };
+}
 
-export async function startExam(examId: string): Promise<StartResult> {
-  // 1. Try Firebase Firestore
+type StartResult = { ok: true; attemptId: string; examId: string; durationMinutes: number } | {ok: false; error: string};
+export async function startExam(examId: string, idToken?: string): Promise<StartResult> {
   try {
-    const examDoc = await getDoc(doc(db, 'exams', examId));
-    if (examDoc.exists()) {
-      const examData = examDoc.data();
-      const durationMinutes = Number(examData.durationMinutes || examData.duration_minutes || 30);
-      const attemptId = 'attempt-' + Date.now();
-      
-      await setDoc(doc(db, 'exam_attempts', attemptId), {
-        id: attemptId,
-        examId: examId,
-        studentId: 'current-student',
-        status: 'in_progress',
-        createdAt: new Date().toISOString()
+    const {db, uid} = await studentDatabase(idToken);
+    const exam = await getDoc(doc(db, 'exams', examId));
+    if (!exam.exists() || !exam.data().isActive) return {ok: false, error: 'الامتحان غير متاح حالياً'};
+    const data = exam.data();
+    if (data.courseId) {
+      const course = await getDoc(doc(db, 'courses', data.courseId));
+      if (!course.exists()) return {ok: false, error: 'الكورس غير موجود'};
+      const c = course.data();
+      if (!(c.is_published ?? c.isPublished)) return {ok: false, error: 'الكورس غير متاح حالياً'};
+      if (!(c.is_free ?? c.isFree)) {
+        const enrollment = await getDocs(query(collection(db, 'enrollments'), where('studentId', '==', uid), where('courseId', '==', data.courseId)));
+        if (enrollment.empty) return {ok: false, error: 'اشترك في الكورس أولاً'};
+      }
+    }
+    // Stable slots and a transaction prevent double attempts on StrictMode or rapid clicks.
+    const max = Math.max(1, Number(data.maxAttempts) || 2);
+    for (let slot = 1; slot <= max; slot++) {
+      const ref = doc(db, 'exam_attempts', `${uid}_${examId}_${slot}`);
+      const result = await runTransaction(db, async transaction => {
+        const existing = await transaction.get(ref);
+        if (existing.exists()) {
+          const attempt = existing.data();
+          if (attempt.status !== 'in_progress') return null;
+          const remaining = Math.max(0, (Number(data.durationMinutes) || 20) - (Date.now() - Date.parse(attempt.createdAt)) / 60000);
+          return {ok: true as const, attemptId: ref.id, examId, durationMinutes: remaining};
+        }
+        transaction.set(ref, {examId, studentId: uid, status: 'in_progress', createdAt: new Date().toISOString()});
+        return {ok: true as const, attemptId: ref.id, examId, durationMinutes: Number(data.durationMinutes) || 20};
       });
-
-      return {
-        ok: true,
-        attemptId,
-        examId,
-        durationMinutes
-      };
+      if (result) return result;
     }
-  } catch (err) {
-    console.warn('Firebase startExam error, trying supabase fallback:', err);
-  }
-
-  // 2. Supabase Fallback
-  try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      // If no supabase user, provide an instant attemptId for offline/firebase
-      return {
-        ok: true,
-        attemptId: 'attempt-' + Date.now(),
-        examId,
-        durationMinutes: 30
-      };
-    }
-
-    const studentId = (user.user_metadata?.student_id as string) ?? user.id;
-
-    // Check if exam exists
-    const { data: exam, error: examError } = await supabase
-      .from('exams')
-      .select('*')
-      .eq('id', examId)
-      .single();
-    if (examError || !exam) {
-      return {
-        ok: true,
-        attemptId: 'attempt-' + Date.now(),
-        examId,
-        durationMinutes: 30
-      };
-    }
-
-    // Check if there is already an in_progress attempt
-    const { data: ongoingAttempt } = await supabase
-      .from('exam_attempts')
-      .select('id, exam_id')
-      .eq('student_id', studentId)
-      .eq('exam_id', examId)
-      .eq('status', 'in_progress')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (ongoingAttempt) {
-      return {
-        ok: true,
-        attemptId: ongoingAttempt.id,
-        examId: ongoingAttempt.exam_id,
-        durationMinutes: exam.duration_minutes,
-      };
-    }
-
-    const { data: attempt, error } = await supabase
-      .from('exam_attempts')
-      .insert({
-        student_id: studentId,
-        exam_id: examId,
-        status: 'in_progress',
-      })
-      .select('id, exam_id')
-      .single();
-
-    if (error || !attempt) {
-      return {
-        ok: true,
-        attemptId: 'attempt-' + Date.now(),
-        examId,
-        durationMinutes: exam.duration_minutes || 30
-      };
-    }
-
-    return {
-      ok: true,
-      attemptId: attempt.id,
-      examId: attempt.exam_id,
-      durationMinutes: exam.duration_minutes,
-    };
-  } catch (err: any) {
-    return {
-      ok: true,
-      attemptId: 'attempt-' + Date.now(),
-      examId,
-      durationMinutes: 30
-    };
-  }
+    return {ok: false, error: 'استهلكت جميع محاولات هذا الامتحان'};
+  } catch { return {ok: false, error: 'تعذر بدء الامتحان. تحقق من تسجيل الدخول والاتصال وصلاحيات الوصول'}; }
 }
 
-type SubmitResult =
-  | { ok: true; attemptId: string; score: number; percentage: number; correct: number; wrong: number; unanswered: number; branchScores: Record<string, { correct: number; total: number }> }
-  | { ok: false; error: string };
-
-/**
- * Server-side grading supporting Firebase & Supabase.
- * For essay questions, we save them with status: 'pending' into `student_answers`
- * so the teacher grades them in /admin/grading.
- */
-export async function submitExam(input: {
-  attemptId: string;
-  examId: string;
-  answers: Array<{ questionId: string; answerText: string }>;
-}): Promise<SubmitResult> {
-  const answersByQ = new Map(input.answers.map((a) => [a.questionId, a.answerText]));
-
-  // 1. Try Firebase First
+type SubmitResult = {ok: true; attemptId: string; score: number; percentage: number; correct: number; wrong: number; unanswered: number; branchScores: Record<string, {correct: number; total: number}>} | {ok: false; error: string};
+export async function submitExam(input: {attemptId: string; examId: string; answers: Array<{questionId: string; answerText: string}>; idToken?: string}): Promise<SubmitResult> {
   try {
-    const qSnap = await getDocs(
-      query(collection(db, 'questions'), where('examId', '==', input.examId))
-    );
-
-    if (!qSnap.empty) {
-      let correct = 0;
-      let wrong = 0;
-      let unanswered = 0;
-      let score = 0;
-      const branchScores: Record<string, { correct: number; total: number }> = {};
-
-      const questionsList = qSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-      const totalMarks = questionsList.reduce((s, q) => s + Number(q.marks || 1), 0);
-
-      for (const q of questionsList) {
-        const studentAns = (answersByQ.get(q.id) ?? '').trim();
-        const branch = q.branch || 'عام';
-        if (!branchScores[branch]) branchScores[branch] = { correct: 0, total: 0 };
-        branchScores[branch].total += 1;
-
-        const isChoice = q.questionType === 'mcq' || q.question_type === 'mcq';
-        const marks = Number(q.marks || 1);
-
-        if (isChoice) {
-          if (!studentAns) {
-            unanswered += 1;
-            await addDoc(collection(db, 'student_answers'), {
-              attempt_id: input.attemptId,
-              question_id: q.id,
-              answer_text: null,
-              is_correct: false,
-              marks_obtained: 0,
-              status: 'auto_graded',
-              created_at: new Date().toISOString()
-            });
-          } else if (studentAns.toLowerCase() === (q.correctAnswer || q.correct_answer || '').trim().toLowerCase()) {
-            correct += 1;
-            score += marks;
-            branchScores[branch].correct += 1;
-            await addDoc(collection(db, 'student_answers'), {
-              attempt_id: input.attemptId,
-              question_id: q.id,
-              answer_text: studentAns,
-              is_correct: true,
-              marks_obtained: marks,
-              status: 'auto_graded',
-              created_at: new Date().toISOString()
-            });
-          } else {
-            wrong += 1;
-            await addDoc(collection(db, 'student_answers'), {
-              attempt_id: input.attemptId,
-              question_id: q.id,
-              answer_text: studentAns,
-              is_correct: false,
-              marks_obtained: 0,
-              status: 'auto_graded',
-              created_at: new Date().toISOString()
-            });
-          }
-        } else {
-          // Essay Question: Save as pending for teacher manual grading!
-          const hasAnswer = !!studentAns;
-          if (hasAnswer) {
-            // For immediate passing threshold evaluation, give provisional marks so student isn't blocked, or evaluate percentage
-            score += marks;
-            correct += 1;
-          } else {
-            unanswered += 1;
-          }
-
-          await addDoc(collection(db, 'student_answers'), {
-            attempt_id: input.attemptId,
-            question_id: q.id,
-            answer_text: studentAns || null,
-            is_correct: null,
-            marks_obtained: 0,
-            status: 'pending', // Teacher will grade in /admin/grading
-            created_at: new Date().toISOString()
-          });
-        }
-      }
-
-      const percentage = totalMarks === 0 ? 0 : Math.round((score / totalMarks) * 100);
-      const isPassed = percentage >= 50;
-
-      // Update attempt in Firestore
-      await setDoc(doc(db, 'exam_attempts', input.attemptId), {
-        id: input.attemptId,
-        examId: input.examId,
-        studentId: 'current-student',
-        score,
-        percentage,
-        correct_count: correct,
-        wrong_count: wrong,
-        unanswered_count: unanswered,
-        status: isPassed ? 'passed' : 'failed',
-        createdAt: new Date().toISOString()
-      }, { merge: true });
-
-      revalidatePath('/courses');
-      revalidatePath('/course/[id]', 'page');
-      revalidatePath('/exam/[id]', 'page');
-
-      return {
-        ok: true,
-        attemptId: input.attemptId,
-        score,
-        percentage,
-        correct,
-        wrong,
-        unanswered,
-        branchScores
-      };
-    }
-  } catch (err) {
-    console.warn('Firebase submitExam fallback to Supabase:', err);
-  }
-
-  // 2. Supabase Fallback
-  try {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const studentId = user ? ((user.user_metadata?.student_id as string) ?? user.id) : 'current-student';
-
-    const { data: questions } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('exam_id', input.examId)
-      .order('order_index', { ascending: true });
-
-    if (!questions || questions.length === 0) {
-      return {
-        ok: true,
-        attemptId: input.attemptId,
-        score: 10,
-        percentage: 100,
-        correct: 10,
-        wrong: 0,
-        unanswered: 0,
-        branchScores: {}
-      };
-    }
-
-    let correct = 0;
-    let wrong = 0;
-    let unanswered = 0;
-    let score = 0;
-    const branchScores: Record<string, { correct: number; total: number }> = {};
-    const toInsert: Partial<StudentAnswer>[] = [];
-
-    for (const q of questions as Question[]) {
-      const studentAns = answersByQ.get(q.id) ?? '';
-      const branch = q.branch ?? 'عام';
-      if (!branchScores[branch]) branchScores[branch] = { correct: 0, total: 0 };
-      branchScores[branch].total += 1;
-
-      const isChoiceQuestion = q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice';
-
-      if (isChoiceQuestion) {
-        if (!studentAns) {
-          unanswered += 1;
-          toInsert.push({ attempt_id: input.attemptId, question_id: q.id, answer_text: null, is_correct: null, marks_obtained: 0, status: 'auto_graded' });
-        } else if (studentAns.trim().toLowerCase() === (q.correct_answer ?? '').trim().toLowerCase()) {
-          correct += 1;
-          score += q.marks;
-          branchScores[branch].correct += 1;
-          toInsert.push({ attempt_id: input.attemptId, question_id: q.id, answer_text: studentAns, is_correct: true, marks_obtained: q.marks, status: 'auto_graded' });
-        } else {
-          wrong += 1;
-          toInsert.push({ attempt_id: input.attemptId, question_id: q.id, answer_text: studentAns, is_correct: false, marks_obtained: 0, status: 'auto_graded' });
-        }
-      } else {
-        toInsert.push({
-          attempt_id: input.attemptId,
-          question_id: q.id,
-          answer_text: studentAns || null,
-          is_correct: null,
-          marks_obtained: studentAns ? q.marks : 0,
-          status: 'pending',
-        });
-        if (studentAns && studentAns.trim().length > 5) {
-          score += q.marks;
-          correct += 1;
-        } else {
-          unanswered += 1;
-        }
-      }
-    }
-
-    const admin = createAdminClient();
-let percentage = 0;
-    try {
-      await admin.from('student_answers').delete().eq('attempt_id', input.attemptId);
-      await admin.from('student_answers').insert(toInsert);
-
-      const totalMarks = (questions as Question[]).reduce((s, q) => s + q.marks, 0);
-      percentage = totalMarks === 0 ? 0 : Math.round((score / totalMarks) * 100);
-
-      await admin
-        .from('exam_attempts')
-        .update({
-          submitted_at: new Date().toISOString(),
-          score,
-          percentage,
-          correct_count: correct,
-          wrong_count: wrong,
-          unanswered_count: unanswered,
-          status: percentage >= 50 ? 'passed' : 'failed',
-          performance_by_branch: branchScores,
-        })
-        .eq('id', input.attemptId);
-    } catch (e) {
-      console.warn('Supabase admin update error:', e);
-    }
-
-    return {
-      ok: true,
-      attemptId: input.attemptId,
-      score,
-      percentage,
-      correct,
-      wrong,
-      unanswered,
-      branchScores,
-    };
-  } catch (err: any) {
-    return {
-      ok: true,
-      attemptId: input.attemptId,
-      score: 10,
-      percentage: 100,
-      correct: 10,
-      wrong: 0,
-      unanswered: 0,
-      branchScores: {}
-    };
-  }
+    const {db, uid} = await studentDatabase(input.idToken);
+    const [exam, questionSnap] = await Promise.all([
+      getDoc(doc(db, 'exams', input.examId)),
+      getDocs(query(collection(db, 'questions'), where('examId', '==', input.examId)))
+    ]);
+    if (!exam.exists() || questionSnap.empty) return {ok: false, error: 'لا يمكن تصحيح امتحان بدون أسئلة'};
+    const answers = new Map(input.answers.map(a => [a.questionId, a.answerText.trim()]));
+    let score = 0, correct = 0, wrong = 0, unanswered = 0, totalMarks = 0;
+    const branchScores: Record<string, {correct: number; total: number}> = {};
+    const rows = questionSnap.docs.map(question => {
+      const q = question.data();
+      const text = answers.get(question.id) || '';
+      const choice = q.questionType === 'mcq';
+      const isCorrect = choice && !!text && text === q.correctAnswer;
+      const marks = isCorrect ? Number(q.marks) : 0;
+      totalMarks += Number(q.marks);
+      score += marks;
+      if (!text) unanswered++; else if (isCorrect) correct++; else if (choice) wrong++;
+      const branch = q.branch || 'عام';
+      branchScores[branch] ||= {correct: 0, total: 0};
+      branchScores[branch].total++;
+      if (isCorrect) branchScores[branch].correct++;
+      return {id: `${input.attemptId}_${question.id}`, data: {attempt_id: input.attemptId, studentId: uid, question_id: question.id, answer_text: text || null, is_correct: choice ? isCorrect : null, marks_obtained: marks, status: choice ? 'auto_graded' : 'pending', created_at: new Date().toISOString()}};
+    });
+    const percentage = totalMarks ? Math.round(score / totalMarks * 100) : 0;
+    const hasEssay = questionSnap.docs.some(q => q.data().questionType === 'essay');
+    const attemptRef = doc(db, 'exam_attempts', input.attemptId);
+    await runTransaction(db, async transaction => {
+      const attempt = await transaction.get(attemptRef);
+      if (!attempt.exists() || attempt.data().studentId !== uid || attempt.data().examId !== input.examId) throw new Error('invalid attempt');
+      if (attempt.data().status !== 'in_progress') return; // Idempotent submission.
+      rows.forEach(row => transaction.set(doc(db, 'student_answers', row.id), row.data));
+      transaction.update(attemptRef, {score, totalMarks, percentage, correct_count: correct, wrong_count: wrong, unanswered_count: unanswered, status: hasEssay ? 'pending' : score >= Number(exam.data().passingMarks) ? 'passed' : 'failed', submittedAt: new Date().toISOString()});
+    });
+    return {ok: true, attemptId: input.attemptId, score, percentage, correct, wrong, unanswered, branchScores};
+  } catch { return {ok: false, error: 'لم يتم حفظ الإجابات. تحقق من الاتصال ثم أعد التسليم؛ إجاباتك ما زالت محفوظة على جهازك'}; }
 }
-

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { collection, getDocs, updateDoc, doc, query, where } from 'firebase/firestore';
+import { gradeEssayAnswer } from '@/lib/firebase/services';
 import { db } from '@/lib/firebase/config';
 
 type PendingAnswer = {
@@ -113,11 +114,7 @@ export default function AdminGradingPage() {
     }
     setPending(true);
     try {
-      await updateDoc(doc(db, 'student_answers', answerId), {
-        marks_obtained: m,
-        grader_feedback: feedback[answerId] || '',
-        status: 'graded'
-      });
+      await gradeEssayAnswer(answerId, m, feedback[answerId] || '');
       toast.success('تم التصحيح وحفظ الدرجة بنجاح ✅');
       await loadData();
     } catch (err: any) {

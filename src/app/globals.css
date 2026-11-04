@@ -63,3 +63,6 @@ body {
   user-select: none;
 }
 
+
+/* Bundled fonts: no Google Fonts request required at build time. */
+:root { --font-cairo: "Cairo"; --font-tajawal: "Tajawal"; --font-inter: "Inter"; }

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { formatCurrencyEGP } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
+import { clearBrowserSession } from '@/lib/firebase/browser-session';
 import { signOut } from '@/lib/firebase/auth-service';
 
 export function Navbar({ 
@@ -26,11 +27,7 @@ export function Navbar({
       // ignore
     }
     if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('mr_ass_student_profile');
-      } catch {}
-      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      clearBrowserSession();
       window.location.href = '/login';
     }
   }
@@ -78,9 +75,6 @@ export function Navbar({
         {role === 'admin' && (
           <Link
             href="/admin"
-            onClick={() => {
-              document.cookie = 'user_role=admin; path=/; max-age=2592000';
-            }}
             className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 px-3.5 py-1.5 text-xs font-black text-black shadow-md shadow-amber-500/20 hover:scale-105 transition"
           >
             <span>لوحة التحكم 👑</span>

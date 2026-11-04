@@ -84,7 +84,7 @@ export async function registerWithPhone(data: {
 export async function loginWithPhone(
   phone: string,
   password: string
-): Promise<{ ok: true; uid: string; role: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; uid: string; role: string; profile: Record<string, any> | null } | { ok: false; error: string }> {
   const email = phoneToFirebaseEmail(phone);
 
   try {
@@ -98,7 +98,7 @@ export async function loginWithPhone(
       role = 'admin';
     }
 
-    return { ok: true, uid, role };
+    return { ok: true, uid, role, profile: userDoc.exists() ? userDoc.data() : null };
   } catch (err: any) {
     console.error('Login error:', err);
     if (
