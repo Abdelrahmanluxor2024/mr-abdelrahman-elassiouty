@@ -73,7 +73,13 @@ function actionsDatabase({essay = false, owner = 'student-1', active = true, fai
   state.data.set('exam_attempts/' + attemptId, {examId: 'exam', studentId: owner, status: 'in_progress', createdAt: new Date().toISOString()});
   const firestore = state.mocks['firebase/firestore'];
   firestore.getFirestore = () => ({});
-  firestore.getDocs = async () => ({empty: false, docs: [{id: 'q1', data: () => ({questionType: essay ? 'essay' : 'mcq', marks: 2, correctAnswer: 'a'})}]});
+  firestore.getDocs = async q => {
+    if (q?.[0]?.name === 'exam_attempts') {
+      const docs = [...state.data.entries()].filter(([key, data]) => key.startsWith('exam_attempts/') && data.examId === 'exam' && data.studentId === 'student-1').map(([key, data]) => ({id: key.split('/')[1], data: () => data}));
+      return {empty: !docs.length, docs};
+    }
+    return {empty: false, docs: [{id: 'q1', data: () => ({questionType: essay ? 'essay' : 'mcq', marks: 2, correctAnswer: 'a'})}]};
+  };
   firestore.runTransaction = async (_, cb) => {
     if (fail) throw new Error('offline');
     return cb({get: firestore.getDoc, set: (ref, row) => state.data.set(ref.key, row), update: (ref, row) => state.data.set(ref.key, {...state.data.get(ref.key), ...row})});
@@ -113,4 +119,55 @@ test('essay answers wait for grading rather than receiving free marks', async ()
 test('write failure returns an error, never a fabricated success', async () => {
   const state = actionsDatabase({fail: true});
   assert.equal((await state.actions.submitExam({examId: 'exam', attemptId: state.attemptId, idToken: 'token', answers: []})).ok, false);
+});
+test('single-attempt rule ignores a legacy exam maxAttempts value of 99', async () => {
+  const s = actionsDatabase();
+  s.data.get('exams/exam').maxAttempts = 99;
+  s.data.get('exam_attempts/' + s.attemptId).status = 'passed';
+  assert.equal((await s.actions.startExam('exam', 'token')).ok, false);
+  assert.equal(s.data.has('exam_attempts/student-1_exam_2'), false);
+});
+test('completed historical auto-ID attempt consumes the only chance', async () => {
+  const s = actionsDatabase();
+  s.data.delete('exam_attempts/' + s.attemptId);
+  s.data.set('exam_attempts/legacy-attempt', {studentId: 'student-1', examId: 'exam', status: 'failed'});
+  assert.equal((await s.actions.startExam('exam', 'token')).ok, false);
+});
+test('tab violation freezes answers; retries cannot replace the submission snapshot', async () => {
+  const s = actionsDatabase();
+  const input = {attemptId: s.attemptId, examId: 'exam', idToken: 'token', answers: [{questionId: 'q1', answerText: 'a'}]};
+  assert.equal((await s.actions.saveExamDraft({...input, reason: 'tab_hidden'})).locked, true);
+  const resumed = await s.actions.startExam('exam', 'token');
+  assert.equal(resumed.locked, true); assert.equal(resumed.durationMinutes, 0);
+  const result = await s.actions.submitExam({...input, answers: [{questionId: 'q1', answerText: 'b'}]});
+  assert.equal(result.ok, true); assert.equal(result.score, 2);
+  assert.equal(s.data.get('exam_attempts/' + s.attemptId).submissionReason, 'tab_hidden');
+  assert.equal((await s.actions.startExam('exam', 'token')).ok, false);
+});
+test('late answers use the last saved server draft, not a changed browser timer', async () => {
+  const s = actionsDatabase();
+  const attempt = s.data.get('exam_attempts/' + s.attemptId);
+  attempt.draftAnswers = {q1: 'b'}; attempt.expiresAt = new Date(Date.now() - 60000).toISOString();
+  const result = await s.actions.submitExam({attemptId: s.attemptId, examId: 'exam', idToken: 'token', answers: [{questionId: 'q1', answerText: 'a'}]});
+  assert.equal(result.ok, true); assert.equal(result.score, 0);
+  assert.equal(attempt.submissionReason || s.data.get('exam_attempts/' + s.attemptId).submissionReason, 'timeout');
+});
+test('another student cannot save or lock a foreign attempt', async () => {
+  const s = actionsDatabase({owner: 'other'});
+  assert.equal((await s.actions.saveExamDraft({attemptId: s.attemptId, examId: 'exam', idToken: 'token', reason: 'window_blur', answers: []})).ok, false);
+  assert.equal(s.data.get('exam_attempts/' + s.attemptId).lockedAt, undefined);
+});
+test('autosave cannot change an already frozen answer', async () => {
+  const s = actionsDatabase();
+  const input = {attemptId: s.attemptId, examId: 'exam', idToken: 'token', answers: [{questionId: 'q1', answerText: 'a'}]};
+  await s.actions.saveExamDraft({...input, reason: 'capture_shortcut'});
+  await s.actions.saveExamDraft({...input, answers: [{questionId: 'q1', answerText: 'b'}]});
+  assert.equal(s.data.get('exam_attempts/' + s.attemptId).lockedAnswers.q1, 'a');
+});
+test('an older in-flight autosave cannot overwrite a newer server draft', async () => {
+  const s = actionsDatabase();
+  const input = {attemptId: s.attemptId, examId: 'exam', idToken: 'token'};
+  await s.actions.saveExamDraft({...input, revision: 200, answers: [{questionId: 'q1', answerText: 'a'}]});
+  await s.actions.saveExamDraft({...input, revision: 100, answers: [{questionId: 'q1', answerText: 'b'}]});
+  assert.equal(s.data.get('exam_attempts/' + s.attemptId).draftAnswers.q1, 'a');
 });

@@ -81,6 +81,7 @@ export default function ExamResultPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6" dir="rtl">
+      {attempt.submission_reason && ['tab_hidden', 'window_blur', 'capture_shortcut', 'timeout'].includes(attempt.submission_reason) && <div className="rounded-2xl border border-amber-400/40 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">{attempt.submission_reason === 'timeout' ? 'تم إنهاء المحاولة لانتهاء الوقت.' : attempt.submission_reason === 'capture_shortcut' ? 'تم إنهاء المحاولة بعد رصد اختصار تصوير شاشة.' : 'تم إنهاء المحاولة بعد مغادرة تبويب أو نافذة الامتحان.'} تُحسب هذه محاولتك الوحيدة.</div>}
       {/* Hero Result Banner */}
       <div className={`rounded-3xl p-8 text-white shadow-xl ${
         passed

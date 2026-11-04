@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { startExam, submitExam } from '@/app/actions/exams';
+import { startExam, submitExam, saveExamDraft } from '@/app/actions/exams';
 import { useExam, useExamQuestions } from '@/lib/queries/useExams';
 import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
 import { auth } from '@/lib/firebase/config';
@@ -30,6 +30,14 @@ export default function ExamRunnerPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [current, setCurrent] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
+  const reasonRef = useRef<'manual' | 'tab_hidden' | 'window_blur' | 'capture_shortcut' | 'timeout'>('manual');
+  const frozenAnswersRef = useRef<Record<string, string> | null>(null);
+  const startRequested = useRef(false);
+  const restorePendingRef = useRef(false);
   const [exhausted, setExhausted] = useState(false);
   const submittedRef = useRef(false);
   const answersRef = useRef(answers);
@@ -69,10 +77,19 @@ export default function ExamRunnerPage() {
 
   // Start or resume attempt on mount
   useEffect(() => {
-    if (attemptId || !examId || !ready || !exam || !questions.length) return;
+    if (attemptId || !examId || !ready || !exam || !questions.length || startRequested.current) return;
+    startRequested.current = true;
+    try {
+      const pending = JSON.parse(sessionStorage.getItem(`exam_pending_${student.id}_${examId}`) || 'null');
+      if (pending?.attemptId && pending?.answers) {
+        restorePendingRef.current = true;
+        reasonRef.current = pending.reason || 'manual'; frozenAnswersRef.current = pending.answers;
+        setAnswers(pending.answers); setAttemptId(pending.attemptId); setLocked(true); setSecondsLeft(0); return;
+      }
+    } catch { /* The server still enforces the one-attempt limit. */ }
     auth.authStateReady().then(async () => startExam(examId, await auth.currentUser?.getIdToken())).then((res) => {
       if (!res.ok) {
-        if (res.error?.includes('محاولات') || res.error?.includes('attempt')) {
+        if (res.error?.includes('محاول') || res.error?.includes('attempt')) {
           setExhausted(true);
         } else {
           toast.error(res.error);
@@ -80,29 +97,36 @@ export default function ExamRunnerPage() {
         }
         return;
       }
+      if (res.locked) {setLocked(true); restorePendingRef.current = true;}
       setAttemptId(res.attemptId);
       setSecondsLeft(Math.ceil(res.durationMinutes * 60));
-    });
-  }, [examId, attemptId, router, ready, exam, questions.length]);
+    }).catch(() => {startRequested.current = false; setReady(false); toast.error('تعذر بدء الامتحان. تحقق من الاتصال وحاول مرة أخرى');});
+  }, [examId, attemptId, router, ready, exam, questions.length, student.id]);
 
   // Submit Handler
-  const executeSubmission = useCallback(async () => {
+  const executeSubmission = useCallback(async (reason: 'manual' | 'tab_hidden' | 'window_blur' | 'capture_shortcut' | 'timeout' = 'manual') => {
     const curAttemptId = attemptIdRef.current;
     const curExamId = examIdRef.current;
     if (submitting || !curAttemptId || !curExamId || submittedRef.current) return;
     submittedRef.current = true;
-    setSubmitting(true);
+    reasonRef.current = frozenAnswersRef.current ? reasonRef.current : reason;
+    frozenAnswersRef.current ||= {...answersRef.current};
+    setLocked(true); setSubmitting(true);
+    try {sessionStorage.setItem(`exam_pending_${student.id}_${curExamId}`, JSON.stringify({attemptId: curAttemptId, reason: reasonRef.current, answers: frozenAnswersRef.current}));} catch {}
 
 
-    const formattedAnswers = Object.entries(answersRef.current).map(([questionId, answerText]) => ({
+
+    const formattedAnswers = Object.entries(frozenAnswersRef.current).map(([questionId, answerText]) => ({
       questionId,
       answerText,
     }));
 
+    try {
     const res = await submitExam({
       attemptId: curAttemptId,
       examId: curExamId,
       answers: formattedAnswers,
+      reason: reasonRef.current,
       idToken: await auth.currentUser?.getIdToken(),
     });
 
@@ -114,6 +138,7 @@ export default function ExamRunnerPage() {
     }
 
     try {
+      sessionStorage.removeItem(`exam_pending_${student.id}_${curExamId}`);
       sessionStorage.removeItem(`exam_answers_${student.id}_${curExamId}`);
     } catch {
       // ignore
@@ -121,28 +146,63 @@ export default function ExamRunnerPage() {
 
     toast.success('تم حفظ وتسليم إجاباتك بنجاح 🎉');
     router.push(`/exam/${curExamId}/result?attempt=${res.attemptId}`);
+    } catch {toast.error('تعذر الاتصال. المحاولة مقفولة وإجاباتك محفوظة؛ اضغط إعادة التسليم عند عودة الاتصال'); setSubmitting(false); submittedRef.current = false;}
   }, [router, submitting, student.id]);
 
-  // Warn on leaving without punishing mobile interruptions or accessibility tools.
+  // Save drafts during the attempt; server time, not the browser timer, sets the deadline.
   useEffect(() => {
-    if (!attemptId) return;
-    const visibility = () => {if (document.hidden) toast.warning('إجاباتك محفوظة، لكن وقت الامتحان مستمر.');};
-    const beforeUnload = (event: BeforeUnloadEvent) => {if (!submittedRef.current) {event.preventDefault(); event.returnValue = '';}};
+    if (!attemptId || locked) return;
+    const timer = setTimeout(async () => {
+      try {
+        const result = await saveExamDraft({attemptId, examId, revision: Date.now(), answers: Object.entries(answers).map(([questionId, answerText]) => ({questionId, answerText})), idToken: await auth.currentUser?.getIdToken()});
+        setSaveStatus(result.ok ? 'تم حفظ إجاباتك' : 'تعذر الحفظ على الخادم — تحقق من الاتصال');
+        if (result.locked) void executeSubmission('timeout');
+      } catch {setSaveStatus('انقطع الاتصال — إجاباتك محفوظة على الجهاز');}
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [attemptId, examId, answers, locked, executeSubmission]);
+
+  // Best-effort browser deterrents, never a guarantee against OS/camera capture.
+  useEffect(() => {
+    if (!attemptId || locked) return;
+    const violation = (reason: 'tab_hidden' | 'window_blur' | 'capture_shortcut') => {void executeSubmission(reason);};
+    const visibility = () => {if (document.hidden) violation('tab_hidden');};
+    const blur = () => violation('window_blur');
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'PrintScreen' || ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 's')) {event.preventDefault(); violation('capture_shortcut');}
+      if ((event.metaKey || event.ctrlKey) && ['p', 's', 'c'].includes(event.key.toLowerCase())) event.preventDefault();
+    };
+    const block = (event: Event) => event.preventDefault();
+    const unload = () => violation('tab_hidden');
+    if (document.hidden) violation('tab_hidden');
     document.addEventListener('visibilitychange', visibility);
-    window.addEventListener('beforeunload', beforeUnload);
-    return () => {document.removeEventListener('visibilitychange', visibility); window.removeEventListener('beforeunload', beforeUnload);};
-  }, [attemptId]);
+    window.addEventListener('blur', blur);
+    window.addEventListener('pagehide', unload);
+    window.addEventListener('keydown', key);
+    window.addEventListener('keyup', key);
+    document.addEventListener('contextmenu', block);
+    document.addEventListener('copy', block);
+    return () => {
+      document.removeEventListener('visibilitychange', visibility); window.removeEventListener('blur', blur);
+      window.removeEventListener('pagehide', unload); window.removeEventListener('keydown', key); window.removeEventListener('keyup', key);
+      document.removeEventListener('contextmenu', block); document.removeEventListener('copy', block);
+    };
+  }, [attemptId, locked, executeSubmission]);
+
+  useEffect(() => {
+    if (attemptId && restorePendingRef.current) {restorePendingRef.current = false; void executeSubmission(reasonRef.current);}
+  }, [attemptId, executeSubmission]);
 
   // Timer
   useEffect(() => {
-    if (secondsLeft === null) return;
+    if (secondsLeft === null || locked) return;
     if (secondsLeft <= 0) {
-      void executeSubmission();
+      void executeSubmission(reasonRef.current === 'manual' ? 'timeout' : reasonRef.current);
       return;
     }
     const t = setTimeout(() => setSecondsLeft((s) => (s === null ? s : s - 1)), 1000);
     return () => clearTimeout(t);
-  }, [secondsLeft, executeSubmission]);
+  }, [secondsLeft, executeSubmission, locked]);
 
   const q = questions[current];
   const answered = useMemo(
@@ -151,7 +211,7 @@ export default function ExamRunnerPage() {
   );
 
   async function onSubmit() {
-    if (answered < questions.length && !confirm(`باقي ${questions.length - answered} سؤال بدون إجابة. هل تريد التسليم الآن؟`)) return;
+    if (answered < questions.length) {setConfirmSubmit(true); return;}
     await executeSubmission();
   }
 
@@ -164,10 +224,10 @@ export default function ExamRunnerPage() {
           </div>
           <div>
             <h2 className="font-display text-xl font-black text-slate-900 dark:text-white">
-              استنفدت كل المحاولات المتاحة
+              انتهت محاولتك الوحيدة
             </h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              لقد قمت بأداء هذا الامتحان بالحد الأقصى للمحاولات المسموح بها ({exam?.max_attempts ?? 1} محاولة).
+              لقد قمت بأداء هذا الامتحان بالحد الأقصى للمحاولات المسموح بها (محاولة واحدة فقط).
             </p>
           </div>
           <div className="flex flex-col gap-2.5 pt-2">
@@ -188,7 +248,8 @@ export default function ExamRunnerPage() {
   }
 
   if (!loadingExam && !loadingQuestions && (!exam || !questions.length)) return <div className="p-10 text-center space-y-4"><h1 className="font-black text-xl">الامتحان غير متاح أو لم تكتمل أسئلته بعد</h1><Link className="text-blue-500 underline" href="/courses">العودة للكورسات</Link></div>;
-  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-slate-500">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><p className="text-sm">الوقت يبدأ عند الضغط على الزر. إجاباتك تُحفظ على هذا الجهاز أثناء الحل. لو حدث انقطاع يمكنك العودة لنفس المحاولة والوقت المتبقي.</p><Button onClick={() => setReady(true)}>أنا جاهز، ابدأ الامتحان</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
+  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><ShieldAlert className="h-10 w-10 text-amber-500"/><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-slate-500">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-8"><strong>محاولة واحدة فقط.</strong><ul className="list-disc pr-5"><li>مغادرة التبويب أو فقدان تركيز نافذة الامتحان يؤدي لتسليم المحاولة وقفل الإجابات.</li><li>لا تفتح تبويباً أو برنامجاً آخر أثناء الحل؛ افتح الامتحان في تبويب مستقل وأوقف الإشعارات قبل البداية.</li><li>اختصارات تصوير الشاشة المرصودة تقفل المحاولة. العلامة المائية تحمل اسمك ورقمك.</li><li>لا يمكن للمتصفح ضمان منع تصوير الشاشة من النظام أو بكاميرا خارجية.</li></ul></div><label className="flex items-start gap-3 text-sm leading-7"><input type="checkbox" checked={acceptedPolicy} onChange={e => setAcceptedPolicy(e.target.checked)} className="mt-2"/>قرأت التعليمات وفاهم أن مغادرة الامتحان تستهلك محاولتي الوحيدة.</label><Button disabled={!acceptedPolicy} onClick={() => setReady(true)}>موافق، ابدأ المحاولة الوحيدة</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
+  if (locked) return <div dir="rtl" role="status" className="mx-auto max-w-xl rounded-3xl border border-amber-500/30 p-8 text-center space-y-5"><ShieldAlert className="mx-auto h-12 w-12 text-amber-500"/><h1 className="font-black text-xl">{reasonRef.current === 'manual' ? 'جاري تسليم إجاباتك' : 'تم قفل المحاولة'}</h1><p className="text-sm leading-7 text-slate-500">{reasonRef.current === 'manual' ? 'تم تثبيت الإجابات ولا يمكن تعديلها بعد التسليم.' : 'انتهى وقت الامتحان أو تم رصد مغادرة النافذة أو اختصار تصوير. لن تُفتح محاولة جديدة.'}</p>{submitting ? <p className="flex justify-center items-center gap-2"><Loader2 className="h-5 w-5 animate-spin"/>جاري الحفظ والتصحيح…</p> : <><p className="text-sm text-amber-600">لو الاتصال انقطع، إعادة التسليم ترسل نفس الإجابات ولا تعيد فتح الامتحان.</p><Button onClick={() => void executeSubmission(reasonRef.current)}>إعادة التسليم</Button></>}</div>;
   if (!exam || questions.length === 0 || !q || secondsLeft === null) {
     return (
       <div className="grid place-items-center py-20">
@@ -204,6 +265,8 @@ export default function ExamRunnerPage() {
 
   return (
     <div className="relative" dir="rtl">
+      {confirmSubmit && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/70 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="confirm-submit-title" className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl dark:bg-slate-900"><h2 id="confirm-submit-title" className="text-xl font-black">لسه فيه أسئلة ناقصة</h2><p className="mt-3 text-sm text-slate-500">باقي {questions.length - answered} سؤال بدون إجابة. التسليم ينهي محاولتك الوحيدة.</p><div className="mt-6 flex gap-3"><Button onClick={() => {setConfirmSubmit(false); void executeSubmission();}}>سلّم الإجابات</Button><Button variant="outline" autoFocus onClick={() => setConfirmSubmit(false)}>أكمل الحل</Button></div></div></div>}
+
       {/* ── Background Security Dynamic Watermark (Anti-Screenshot) ──────────── */}
       <div
         aria-hidden
@@ -224,7 +287,7 @@ export default function ExamRunnerPage() {
       <div className="mx-auto max-w-4xl mb-3 flex items-center justify-between gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-300 font-bold">
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <span>إجاباتك محفوظة أثناء الحل. حافظ على اتصالك وتابع الوقت؛ التسليم التلقائي عند انتهاء المدة فقط.</span>
+          <span>محاولة واحدة • مغادرة النافذة أو التبويب تؤدي للتسليم التلقائي.</span>
         </div>
         <span className="hidden sm:inline-block text-[11px] font-mono bg-amber-500/20 px-2 py-0.5 rounded-md">
           {watermark}
@@ -249,6 +312,7 @@ export default function ExamRunnerPage() {
           </div>
         </header>
 
+        <p className="text-xs text-slate-500" aria-live="polite">{saveStatus || 'يجري حفظ إجاباتك أثناء الحل'}</p>
         <Progress value={((current + 1) / questions.length) * 100} className="h-2 bg-blue-100 dark:bg-slate-800" />
 
         {/* Question Card */}
@@ -256,7 +320,7 @@ export default function ExamRunnerPage() {
           <CardHeader className="bg-slate-50/50 dark:bg-slate-900/40 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 mb-2">
               <span className="rounded-lg bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
-                {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? 'اختيار من متعدد' : '💻 سؤال كتابة كود برمجية'}
+                {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? 'اختيار من متعدد' : 'سؤال مقالي'}
               </span>
               <span className="text-xs text-slate-400 font-medium">الدرجة: {q.marks}</span>
             </div>

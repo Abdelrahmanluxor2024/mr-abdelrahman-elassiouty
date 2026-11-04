@@ -153,7 +153,7 @@ export async function createExamWithQuestions(
   if (!questions.length || questions.length > 450) throw new Error('عدد الأسئلة يجب أن يكون بين 1 و450');
   const batch = writeBatch(db);
   const examRef = doc(collection(db, 'exams'));
-  batch.set(examRef, { ...examData, createdAt: new Date().toISOString() });
+  batch.set(examRef, { ...examData, maxAttempts: 1, createdAt: new Date().toISOString() });
   questions.forEach((question, index) => {
     const clean = Object.fromEntries(Object.entries(question).filter(([, value]) => value !== undefined));
     batch.set(doc(collection(db, 'questions')), { ...clean, examId: examRef.id, orderIndex: index + 1 });

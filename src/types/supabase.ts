@@ -179,6 +179,7 @@ export interface ExamAttempt {
   wrong_count: number;
   unanswered_count: number;
   status: ExamStatus;
+  submission_reason?: string;
   performance_by_branch: Record<string, { correct: number; total: number }> | null;
   created_at: string;
 }

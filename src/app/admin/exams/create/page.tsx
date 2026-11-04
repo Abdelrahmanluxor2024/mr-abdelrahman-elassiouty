@@ -248,7 +248,7 @@ export default function AdminCreateExamPage() {
             durationMinutes,
             totalMarks: totalExamMarks,
             passingMarks: Math.ceil((totalExamMarks * passingPercentage) / 100),
-            maxAttempts: 2,
+            maxAttempts: 1,
             questionsCount: questions.length,
             isActive: true
           },
