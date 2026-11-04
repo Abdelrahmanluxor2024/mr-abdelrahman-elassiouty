@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -21,6 +21,8 @@ import {
   HelpCircle,
   FileSpreadsheet
 } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { cn } from '@/lib/utils';
 
 interface QuestionFormItem {
@@ -36,13 +38,21 @@ interface QuestionFormItem {
 
 export default function AdminCreateExamPage() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
+  const [courses, setCourses] = useState<{id: string; title: string}[]>([]);
+  const [lessons, setLessons] = useState<{id: string; title: string; courseId: string}[]>([]);
+  const [courseId, setCourseId] = useState('');
+  useEffect(() => {
+    Promise.all([getDocs(collection(db, 'courses')), getDocs(collection(db, 'lessons'))])
+      .then(([c, l]) => { setCourses(c.docs.map(d => ({id: d.id, title: d.data().title}))); setLessons(l.docs.map(d => ({id: d.id, title: d.data().title, courseId: d.data().courseId}))); })
+      .catch(() => toast.error('تعذر تحميل الكورسات. أعد تحميل الصفحة'));
+  }, []);
 
   // Exam Meta
   const [examTitle, setExamTitle] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(25);
   const [passingPercentage, setPassingPercentage] = useState(50);
-  const [lessonId, setLessonId] = useState('lesson-1');
+  const [lessonId, setLessonId] = useState('');
   const [examDescription, setExamDescription] = useState('');
 
   // Code Import State
@@ -172,7 +182,7 @@ export default function AdminCreateExamPage() {
 
   const totalExamMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!examTitle.trim()) {
@@ -180,6 +190,8 @@ export default function AdminCreateExamPage() {
       return;
     }
 
+    if (!courseId || !lessonId) { toast.error('اختر الكورس والدرس الذي يتبعه الامتحان'); return; }
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1 || passingPercentage < 1 || passingPercentage > 100 || questions.some(q => !Number.isFinite(q.marks) || q.marks < 1 || (q.type === 'mcq' && !q.options.some(o => o.key === q.correctAnswer)))) { toast.error('راجع المدة ودرجات الأسئلة والإجابة الصحيحة ونسبة النجاح'); return; }
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.text.trim()) {
@@ -195,8 +207,9 @@ export default function AdminCreateExamPage() {
       }
     }
 
-    startTransition(async () => {
-      try {
+    setIsPending(true);
+    try {
+
         toast.loading('جاري رفع الصور ونشر الامتحان في قاعدة بيانات Firebase...');
 
         // 1. Prepare questions data & upload images if any
@@ -204,13 +217,13 @@ export default function AdminCreateExamPage() {
 
         for (let i = 0; i < questions.length; i++) {
           const q = questions[i];
-          let imageUrl: string | undefined = undefined;
+          let imageUrl: string | undefined = q.imagePreview?.startsWith('https://') ? q.imagePreview : undefined;
 
           if (q.imageFile) {
             try {
               imageUrl = await uploadQuestionImage(q.imageFile, 'temp-exam');
             } catch (err) {
-              console.warn('Image upload skipped or failed', err);
+              throw new Error('تعذر رفع صورة السؤال. حاول مرة أخرى قبل النشر');
             }
           }
 
@@ -229,6 +242,7 @@ export default function AdminCreateExamPage() {
         await createExamWithQuestions(
           {
             lessonId,
+            courseId,
             title: examTitle,
             description: examDescription,
             durationMinutes,
@@ -248,11 +262,11 @@ export default function AdminCreateExamPage() {
         toast.dismiss();
         toast.error(err.message || 'حدث خطأ أثناء نشر الامتحان');
       }
-    });
+    finally { setIsPending(false); }
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto py-6" dir="rtl">
+    <div className="space-y-8 max-w-4xl mx-auto rounded-3xl bg-[#070B14] p-4 sm:p-6 text-white" dir="rtl">
       {/* ── Top Header ────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
@@ -277,6 +291,15 @@ export default function AdminCreateExamPage() {
         </div>
       </div>
 
+      <section className="rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 space-y-4">
+        <h2 className="font-bold">أين يظهر الامتحان؟</h2>
+        <p className="text-sm text-slate-400">اختر الكورس ثم الدرس. سيظهر الامتحان في صفحة الكورس وتحت فيديو الدرس تلقائياً.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2">الكورس<select aria-label="الكورس" className="w-full rounded-xl border p-3 bg-slate-900 text-white" value={courseId} onChange={e => {setCourseId(e.target.value); setLessonId('');}}><option value="">اختر الكورس</option>{courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
+          <label className="space-y-2">الدرس<select aria-label="الدرس" disabled={!courseId} className="w-full rounded-xl border p-3 bg-slate-900 text-white" value={lessonId} onChange={e => setLessonId(e.target.value)}><option value="">اختر الدرس</option>{lessons.filter(l => l.courseId === courseId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}</select></label>
+        </div>
+        {courseId && !lessons.some(l => l.courseId === courseId) && <Link href="/admin/courses" className="text-blue-400 underline">أضف درساً لهذا الكورس أولاً من إدارة الكورسات</Link>}
+      </section>
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* ── Exam Metadata Card ────────────────────────────── */}
         <div className="rounded-3xl border border-slate-800 bg-[#0B1324] p-6 shadow-xl space-y-5">

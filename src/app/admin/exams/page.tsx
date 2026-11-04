@@ -1,174 +1,68 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
+import type { FirebaseExam } from '@/lib/firebase/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { RotateCcw, Key, Sparkles, CheckCircle2, UserCheck, Loader2, Plus } from 'lucide-react';
-import Link from 'next/link';
-import { formatArabicNumber } from '@/lib/utils';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { Plus, ClipboardList, Search, BookOpen } from 'lucide-react';
 
+type Item = { id: string; title: string; courseId?: string };
 export default function AdminExamsPage() {
-  const [studentPhone, setStudentPhone] = useState('');
-  const [selectedExamId, setSelectedExamId] = useState('all');
-  const [isPending, setIsPending] = useState(false);
-  const [exams, setExams] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  async function loadExams() {
-    setIsLoading(true);
+  const [exams, setExams] = useState<FirebaseExam[]>([]);
+  const [courses, setCourses] = useState<Item[]>([]);
+  const [lessons, setLessons] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [editing, setEditing] = useState<FirebaseExam | null>(null);
+  const [pending, setPending] = useState(false);
+  async function load() {
+    setLoading(true); setError(false);
     try {
-      const q = query(collection(db, 'exams'));
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        title: d.data().title || 'امتحان بدون عنوان',
-        created_at: d.data().createdAt || d.data().created_at || new Date().toISOString()
-      }));
-      setExams(list);
-    } catch (err) {
-      console.error('Error loading exams:', err);
-    } finally {
-      setIsLoading(false);
-    }
+      const [e, c, l] = await Promise.all(['exams', 'courses', 'lessons'].map(name => getDocs(collection(db, name))));
+      setExams(e.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseExam)));
+      setCourses(c.docs.map(d => ({ id: d.id, title: d.data().title })));
+      setLessons(l.docs.map(d => ({ id: d.id, title: d.data().title, courseId: d.data().courseId })));
+    } catch { setError(true); toast.error('تعذر تحميل الامتحانات. حاول مرة أخرى'); }
+    finally { setLoading(false); }
   }
-
-  useEffect(() => {
-    loadExams();
-  }, []);
-
-  function handleGrantAttempt(e: React.FormEvent) {
-    e.preventDefault();
-    if (!studentPhone.trim()) {
-      toast.error('يرجى كتابة رقم هاتف الطالب');
-      return;
-    }
-    toast.success(`تم فتح محاولة جديدة بنجاح للطالب برقم ${studentPhone}`);
-    setStudentPhone('');
+  useEffect(() => { load(); }, []);
+  async function save() {
+    if (!editing) return;
+    if (!editing.courseId || !lessons.some(l => l.id === editing.lessonId && l.courseId === editing.courseId)) {toast.error('اختر الكورس والدرس الصحيحين'); return;}
+    setPending(true);
+    try {
+      await updateDoc(doc(db, 'exams', editing.id), {courseId: editing.courseId, lessonId: editing.lessonId, isActive: editing.isActive});
+      toast.success('تم حفظ الربط وحالة الظهور'); setEditing(null); await load();
+    } catch { toast.error('لم يتم الحفظ. تحقق من الاتصال والصلاحيات'); }
+    finally {setPending(false);}
   }
-
-  if (isLoading) return <Skeleton className="h-96 w-full rounded-3xl" />;
-
-  return (
-    <div className="space-y-6" dir="rtl">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">
-            إدارة الامتحانات والمحاولات 📝
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            يمكنك هنا إنشاء امتحانات تفاعلية جديدة ومنح محاولات إضافية للطلاب.
-          </p>
-        </div>
-
-        <Link
-          href="/admin/exams/create"
-          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 px-6 py-3 text-xs font-black text-white shadow-xl shadow-blue-600/30 transition hover:scale-105"
-        >
-          <Plus className="h-4 w-4" />
-          إنشاء امتحان جديد وبنك أسئلة 🚀
-        </Link>
+  const visible = exams.filter(e => e.title?.includes(search) && (filter === 'all' || (filter === 'active' ? e.isActive : !e.courseId)));
+  return <div className="space-y-6" dir="rtl">
+    <header className="flex flex-wrap items-center justify-between gap-4">
+      <div><p className="text-sm font-bold text-blue-500 mb-2">مساحة المعلم / التقييمات</p><h1 className="text-2xl font-black">امتحاناتك، في مكانها الصحيح</h1><p className="mt-2 text-sm text-slate-500">أنشئ الامتحان، اختر الكورس والدرس، وتحكم في ظهوره للطلاب.</p></div>
+      <Link href="/admin/exams/create" className="flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white"><Plus className="h-4 w-4"/>إنشاء امتحان</Link>
+    </header>
+    <div className="grid gap-3 sm:grid-cols-3">{[['كل الامتحانات', exams.length], ['ظاهرة للطلاب', exams.filter(e => e.isActive).length], ['تحتاج ربط بكورس', exams.filter(e => !e.courseId).length]].map(([label, count]) => <Card key={label}><CardContent className="p-5"><p className="text-sm text-slate-500">{label}</p><p className="text-3xl font-black mt-2">{count}</p></CardContent></Card>)}</div>
+    {editing && <Card className="border-blue-500"><CardContent className="p-6 space-y-4">
+      <h2 className="font-black">ربط وظهور: {editing.title}</h2>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label>الكورس<select className="mt-2 w-full rounded-xl border p-3 bg-white dark:bg-slate-900" value={editing.courseId || ''} onChange={e => setEditing({...editing, courseId: e.target.value, lessonId: ''})}><option value="">اختر الكورس</option>{courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
+        <label>الدرس<select disabled={!editing.courseId} className="mt-2 w-full rounded-xl border p-3 bg-white dark:bg-slate-900" value={editing.lessonId} onChange={e => setEditing({...editing, lessonId: e.target.value})}><option value="">اختر الدرس</option>{lessons.filter(l => l.courseId === editing.courseId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}</select></label>
       </div>
-
-      {/* Grant Attempt Card */}
-      <Card className="rounded-3xl border border-blue-500/30 bg-gradient-to-tr from-blue-950/20 via-slate-900/40 to-cyan-950/20 bg-white dark:bg-[#0E172A] shadow-lg">
-        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-          <CardTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <RotateCcw className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
-            منح محاولة إضافية لطالب (إعادة فتح الامتحان)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-5">
-          <form onSubmit={handleGrantAttempt} className="grid gap-4 sm:grid-cols-3 items-end">
-            <div>
-              <Label className="font-bold text-xs">رقم هاتف الطالب المسجل به</Label>
-              <Input
-                placeholder="مثال: 01012345678"
-                value={studentPhone}
-                onChange={(e) => setStudentPhone(e.target.value)}
-                className="mt-1 rounded-2xl border-slate-200 dark:border-slate-800 text-sm font-mono text-left"
-                dir="ltr"
-              />
-            </div>
-
-            <div>
-              <Label className="font-bold text-xs">اختر الامتحان</Label>
-              <select
-                value={selectedExamId}
-                onChange={(e) => setSelectedExamId(e.target.value)}
-                className="mt-1 w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white"
-              >
-                <option value="all">جميع الامتحانات (إعادة ضبط شاملة)</option>
-                {exams.map((ex: any) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.title} ({ex.lesson?.course?.title ?? 'كورس'})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Button
-                type="submit"
-                disabled={isPending || !studentPhone.trim()}
-                className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2.5 shadow-md shadow-blue-500/20"
-              >
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin ms-2" />
-                ) : (
-                  <UserCheck className="h-4 w-4 ms-2" />
-                )}
-                منح المحاولة فوراً
-              </Button>
-            </div>
-          </form>
-          <p className="mt-3 text-[11px] text-slate-500">
-            💡 ملاحظة: عند منح المحاولة، سيتمكن الطالب من الدخول للامتحان والبدء من جديد فوراً دون الحاجة لأي خطوات أخرى.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Exams List */}
-      <Card className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A]">
-        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-          <CardTitle className="text-base font-bold text-slate-900 dark:text-white">
-            قائمة الامتحانات النشطة ({formatArabicNumber(exams.length)})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="divide-y divide-slate-100 dark:divide-slate-800">
-          {exams.map((e: any) => (
-            <div key={e.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold text-slate-900 dark:text-white">{e.title}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {e.lesson?.course?.title} • {e.lesson?.title}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs font-mono">{e.duration_minutes} دقيقة</Badge>
-                <Badge variant="secondary" className="text-xs">{e.total_marks} درجة</Badge>
-                <Badge variant={e.is_active ? 'success' : 'warning'} className="text-xs font-bold">
-                  {e.is_active ? 'نشط ✅' : 'متوقف'}
-                </Badge>
-              </div>
-            </div>
-          ))}
-
-          {exams.length === 0 && (
-            <div className="text-center py-12 text-xs text-slate-400">
-              لا توجد امتحانات مضافة حالياً.
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
+      <label className="flex items-center gap-2"><input type="checkbox" checked={editing.isActive} onChange={e => setEditing({...editing, isActive: e.target.checked})}/>إظهار الامتحان في الكورس وصفحة الدرس</label>
+      <p className="text-xs text-slate-500">الإخفاء يحافظ على الأسئلة ونتائج الطلاب. يمكن إظهار الامتحان مجدداً في أي وقت.</p>
+      <div className="flex gap-2"><Button disabled={pending} onClick={save}>{pending ? 'جاري الحفظ…' : 'حفظ التغييرات'}</Button><Button variant="outline" disabled={pending} onClick={() => setEditing(null)}>إلغاء</Button></div>
+    </CardContent></Card>}
+    <div className="flex flex-wrap gap-3"><div className="relative flex-1 min-w-48"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400"/><Input aria-label="البحث عن امتحان" className="pr-10" placeholder="ابحث باسم الامتحان…" value={search} onChange={e => setSearch(e.target.value)}/></div><select aria-label="تصفية الامتحانات" className="rounded-xl border px-3 bg-white dark:bg-slate-900" value={filter} onChange={e => setFilter(e.target.value)}><option value="all">كل الامتحانات</option><option value="active">ظاهرة للطلاب</option><option value="unlinked">تحتاج ربط</option></select></div>
+    {loading ? <Skeleton className="h-64 rounded-3xl"/> : error ? <Card><CardContent className="p-8 text-center"><p>تعذر تحميل البيانات، لا يعني هذا أن الامتحانات غير موجودة.</p><Button className="mt-4" onClick={load}>إعادة المحاولة</Button></CardContent></Card> : <div className="space-y-3">{visible.map(exam => <Card key={exam.id}><CardContent className="flex flex-wrap items-center justify-between gap-4 p-5"><div className="space-y-2"><h2 className="font-bold flex gap-2"><ClipboardList className="h-5 w-5 text-blue-500"/>{exam.title}</h2><p className="text-sm text-slate-500 flex items-center gap-2"><BookOpen className="h-4 w-4"/>{courses.find(c => c.id === exam.courseId)?.title || 'لم يتم اختيار كورس'} / {lessons.find(l => l.id === exam.lessonId)?.title || 'لم يتم اختيار درس'}</p><div className="flex flex-wrap gap-2"><Badge variant="outline">{exam.durationMinutes} دقيقة</Badge><Badge variant="outline">{exam.questionsCount || '—'} سؤال</Badge><Badge variant="outline">{exam.totalMarks} درجة</Badge><Badge variant={exam.isActive ? 'success' : 'warning'}>{exam.isActive ? 'ظاهر للطلاب' : 'مخفي'}</Badge></div></div><Button variant="outline" onClick={() => setEditing({...exam})}>ربط وظهور الامتحان</Button></CardContent></Card>)}{!visible.length && <div className="rounded-3xl border border-dashed p-12 text-center"><ClipboardList className="mx-auto h-10 w-10 text-blue-400"/><h2 className="mt-4 font-bold">{exams.length ? 'لا توجد نتائج مطابقة' : 'أول امتحان يبدأ من هنا'}</h2><p className="mt-2 text-sm text-slate-500">أنشئ امتحاناً جديداً أو جهز الكورس التجريبي من إدارة الكورسات.</p><Link href="/admin/courses" className="inline-block mt-4 text-blue-500 underline">الانتقال لإدارة الكورسات</Link></div>}</div>}
+  </div>;
 }
-

@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { createBrowserClient } from '@supabase/ssr';
 import type { Exam, ExamAttempt, Question, StudentAnswer } from '@/types/supabase';
-import { db } from '@/lib/firebase/config';
+import { db, auth } from '@/lib/firebase/config';
 import { doc, getDoc, getDocs, collection, query, where, orderBy, limit } from 'firebase/firestore';
 
 function browserClient() {
@@ -155,14 +155,18 @@ export function useAttempt(attemptId: string) {
 
 export function useLatestAttemptForExam(examId: string, explicitAttemptId?: string) {
   return useQuery({
-    queryKey: ['attempts', 'latest', examId, explicitAttemptId],
+    queryKey: ['attempts', 'latest', examId, explicitAttemptId, auth.currentUser?.uid],
     enabled: !!examId || !!explicitAttemptId,
     queryFn: async (): Promise<ExamAttempt | null> => {
+      await auth.authStateReady();
+      const uid = auth.currentUser?.uid;
+      if (!uid) return null;
       if (explicitAttemptId) {
         try {
           const snap = await getDoc(doc(db, 'exam_attempts', explicitAttemptId));
           if (snap.exists()) {
             const d = snap.data();
+            if (d.studentId !== uid || d.examId !== examId) return null;
             return {
               id: snap.id,
               exam_id: d.examId || d.exam_id,
@@ -187,11 +191,12 @@ export function useLatestAttemptForExam(examId: string, explicitAttemptId?: stri
           query(
             collection(db, 'exam_attempts'),
             where('examId', '==', examId),
+            where('studentId', '==', uid),
             orderBy('createdAt', 'desc'),
             limit(1)
           )
         ).catch(async () => {
-          return await getDocs(query(collection(db, 'exam_attempts'), where('examId', '==', examId)));
+          return await getDocs(query(collection(db, 'exam_attempts'), where('examId', '==', examId), where('studentId', '==', uid)));
         });
 
         if (!snap.empty) {
@@ -258,7 +263,9 @@ export function useMyAttempts() {
     queryKey: ['attempts', 'me'],
     queryFn: async (): Promise<(ExamAttempt & { exam: Exam })[]> => {
       try {
-        const snap = await getDocs(collection(db, 'exam_attempts'));
+        await auth.authStateReady();
+        if (!auth.currentUser) return [];
+        const snap = await getDocs(query(collection(db, 'exam_attempts'), where('studentId', '==', auth.currentUser.uid)));
         if (!snap.empty) {
           return snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
         }

@@ -1,29 +1,19 @@
 import type { Metadata, Viewport } from 'next';
-import { Cairo, Tajawal, Inter } from 'next/font/google';
+import '@fontsource/cairo/400.css';
+import '@fontsource/cairo/600.css';
+import '@fontsource/cairo/700.css';
+import '@fontsource/cairo/900.css';
+import '@fontsource/tajawal/400.css';
+import '@fontsource/tajawal/500.css';
+import '@fontsource/tajawal/700.css';
+import '@fontsource/tajawal/900.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { Providers } from './providers';
-
-const cairo = Cairo({
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '600', '700', '900'],
-  display: 'swap',
-  variable: '--font-cairo',
-});
-
-const tajawal = Tajawal({
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '500', '700', '900'],
-  display: 'swap',
-  variable: '--font-tajawal',
-});
-
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
-  variable: '--font-inter',
-});
 
 export const metadata: Metadata = {
   title: {
@@ -56,7 +46,7 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
-      className={`${cairo.variable} ${tajawal.variable} ${inter.variable}`}
+
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-soft font-sans text-slate-900">

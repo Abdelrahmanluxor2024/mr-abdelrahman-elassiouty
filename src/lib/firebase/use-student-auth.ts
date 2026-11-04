@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './config';
+import { writeBrowserSession, clearBrowserSession } from './browser-session';
 import type { FirebaseUser } from './types';
 
 export interface StudentProfileData {
@@ -42,7 +43,7 @@ export function getCachedStudentProfile(): StudentProfileData {
         const phone = parsed.phone || '';
         const role = (phone.trim() === '01064106070' || parsed.role === 'admin') ? 'admin' : (parsed.role || 'student');
         if (role === 'admin') {
-          document.cookie = 'user_role=admin; path=/; max-age=2592000';
+          // Cookies are synchronized after a live authenticated profile is loaded.
         }
         return {
           id: parsed.id || parsed.uid || 'current-student',
@@ -70,8 +71,7 @@ export function saveCachedStudentProfile(data: Partial<StudentProfileData> & { i
     const updated = { ...current, ...data };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     // Also sync cookies
-    document.cookie = `token=${updated.id}; path=/; max-age=2592000`;
-    document.cookie = `user_role=${updated.role || 'student'}; path=/; max-age=2592000`;
+    writeBrowserSession(updated.id, updated.role || 'student');
   } catch (err) {
     console.warn('Error saving cached student profile', err);
   }
@@ -89,7 +89,7 @@ export function useCurrentStudent() {
         const phone = d.phone || '';
         const role = (phone.trim() === '01064106070' || d.role === 'admin') ? 'admin' : (d.role || 'student');
         if (role === 'admin') {
-          document.cookie = 'user_role=admin; path=/; max-age=2592000';
+          // Cookies are synchronized after a live authenticated profile is loaded.
         }
         const prof: StudentProfileData = {
           id: uid,
@@ -143,9 +143,7 @@ export function useCurrentStudent() {
       // ignore
     }
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      clearBrowserSession();
       window.location.href = '/login';
     }
   }, []);

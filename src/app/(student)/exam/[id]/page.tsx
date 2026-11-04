@@ -12,25 +12,25 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { startExam, submitExam } from '@/app/actions/exams';
 import { useExam, useExamQuestions } from '@/lib/queries/useExams';
-import { useStudent } from '@/lib/queries/useStudent';
+import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
+import { auth } from '@/lib/firebase/config';
 
 export default function ExamRunnerPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const examId = params.id;
 
-  const { data: exam } = useExam(examId);
-  const { data: questions = [] } = useExamQuestions(examId);
-  const { data: student } = useStudent();
+  const { data: exam, isLoading: loadingExam } = useExam(examId);
+  const { data: questions = [], isLoading: loadingQuestions } = useExamQuestions(examId);
+  const { student } = useCurrentStudent();
 
+  const [ready, setReady] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [current, setCurrent] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [exhausted, setExhausted] = useState(false);
-  const [isScreenBlurred, setIsScreenBlurred] = useState(false);
-  const [isCheatingDetected, setIsCheatingDetected] = useState(false);
   const submittedRef = useRef(false);
   const answersRef = useRef(answers);
   answersRef.current = answers;
@@ -43,14 +43,14 @@ export default function ExamRunnerPage() {
   useEffect(() => {
     if (!examId) return;
     try {
-      const saved = sessionStorage.getItem(`exam_answers_${examId}`);
+      const saved = sessionStorage.getItem(`exam_answers_${student.id}_${examId}`);
       if (saved) {
         setAnswers(JSON.parse(saved));
       }
     } catch {
       // ignore
     }
-  }, [examId]);
+  }, [examId, student.id]);
 
   // Save answers to sessionStorage whenever they change
   function handleAnswerChange(questionId: string, value: string) {
@@ -58,7 +58,7 @@ export default function ExamRunnerPage() {
       const next = { ...prev, [questionId]: value };
       if (examId) {
         try {
-          sessionStorage.setItem(`exam_answers_${examId}`, JSON.stringify(next));
+          sessionStorage.setItem(`exam_answers_${student.id}_${examId}`, JSON.stringify(next));
         } catch {
           // ignore
         }
@@ -69,8 +69,8 @@ export default function ExamRunnerPage() {
 
   // Start or resume attempt on mount
   useEffect(() => {
-    if (attemptId || !examId) return;
-    startExam(examId).then((res) => {
+    if (attemptId || !examId || !ready || !exam || !questions.length) return;
+    auth.authStateReady().then(async () => startExam(examId, await auth.currentUser?.getIdToken())).then((res) => {
       if (!res.ok) {
         if (res.error?.includes('محاولات') || res.error?.includes('attempt')) {
           setExhausted(true);
@@ -81,22 +81,18 @@ export default function ExamRunnerPage() {
         return;
       }
       setAttemptId(res.attemptId);
-      setSecondsLeft((res.durationMinutes || 30) * 60);
+      setSecondsLeft(Math.ceil(res.durationMinutes * 60));
     });
-  }, [examId, attemptId, router]);
+  }, [examId, attemptId, router, ready, exam, questions.length]);
 
   // Submit Handler
-  const executeSubmission = useCallback(async (isForcedByViolation = false) => {
+  const executeSubmission = useCallback(async () => {
     const curAttemptId = attemptIdRef.current;
     const curExamId = examIdRef.current;
     if (submitting || !curAttemptId || !curExamId || submittedRef.current) return;
     submittedRef.current = true;
     setSubmitting(true);
 
-    if (isForcedByViolation) {
-      setIsCheatingDetected(true);
-      toast.error('⚠️ تم رصد مغادرة نافذة الامتحان أو محاولة غش! تم تسليم الامتحان تلقائياً فوراً.');
-    }
 
     const formattedAnswers = Object.entries(answersRef.current).map(([questionId, answerText]) => ({
       questionId,
@@ -107,13 +103,8 @@ export default function ExamRunnerPage() {
       attemptId: curAttemptId,
       examId: curExamId,
       answers: formattedAnswers,
+      idToken: await auth.currentUser?.getIdToken(),
     });
-
-    try {
-      sessionStorage.removeItem(`exam_answers_${curExamId}`);
-    } catch {
-      // ignore
-    }
 
     if (!res.ok) {
       toast.error(res.error);
@@ -122,113 +113,31 @@ export default function ExamRunnerPage() {
       return;
     }
 
-    if (!isForcedByViolation) {
-      toast.success('تم تسليم الامتحان وحساب النتيجة بنجاح 🎉');
+    try {
+      sessionStorage.removeItem(`exam_answers_${student.id}_${curExamId}`);
+    } catch {
+      // ignore
     }
-    router.push(`/exam/${curExamId}/result?attempt=${res.attemptId}`);
-  }, [router, submitting]);
 
-  // Anti-Cheat: Tab switch, window blur, leaving page auto-submits immediately
+    toast.success('تم حفظ وتسليم إجاباتك بنجاح 🎉');
+    router.push(`/exam/${curExamId}/result?attempt=${res.attemptId}`);
+  }, [router, submitting, student.id]);
+
+  // Warn on leaving without punishing mobile interruptions or accessibility tools.
   useEffect(() => {
     if (!attemptId) return;
-
-    let violationTriggered = false;
-
-    const handleViolation = () => {
-      if (violationTriggered || submittedRef.current) return;
-      violationTriggered = true;
-      setIsScreenBlurred(true);
-      void executeSubmission(true);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden || document.visibilityState === 'hidden') {
-        handleViolation();
-      }
-    };
-
-    const handleWindowBlur = () => {
-      setIsScreenBlurred(true);
-      handleViolation();
-    };
-
-    const handleWindowFocus = () => {
-      setIsScreenBlurred(false);
-    };
-
-    // Block keyboard shortcuts (Screenshot, PrintScreen, Snipping tool, Copy, Devtools)
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // PrintScreen / Snip
-      if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
-        e.preventDefault();
-        setIsScreenBlurred(true);
-        navigator.clipboard?.writeText?.('');
-        toast.error('🚫 ممنوع التقاط سكرين شوت أثناء الامتحان!');
-        handleViolation();
-        return false;
-      }
-
-      // Ctrl+P (Print), Ctrl+S (Save), Ctrl+U (Source), Ctrl+C (Copy), Ctrl+Shift+I/J/C (Devtools), F12
-      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-      if (
-        (isCtrlOrCmd && ['p', 's', 'u', 'c', 'v', 'a'].includes(e.key.toLowerCase())) ||
-        (isCtrlOrCmd && e.shiftKey && ['i', 'j', 'c', 's'].includes(e.key.toLowerCase())) ||
-        e.key === 'F12'
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        toast.error('🚫 تم حظر هذا الاختصار لحماية الامتحان.');
-        return false;
-      }
-    };
-
-    // Block Right click (context menu)
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      toast.error('🚫 النقر بزر الفأرة الأيمن معطل لحماية الامتحان.');
-      return false;
-    };
-
-    // Block copy / selectstart
-    const handleCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      toast.error('🚫 النسخ معطل أثناء الامتحان.');
-      return false;
-    };
-
-    // Before unload warning
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!submittedRef.current) {
-        handleViolation();
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('contextmenu', handleContextMenu, true);
-    window.addEventListener('copy', handleCopy, true);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('contextmenu', handleContextMenu, true);
-      window.removeEventListener('copy', handleCopy, true);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [attemptId, executeSubmission]);
+    const visibility = () => {if (document.hidden) toast.warning('إجاباتك محفوظة، لكن وقت الامتحان مستمر.');};
+    const beforeUnload = (event: BeforeUnloadEvent) => {if (!submittedRef.current) {event.preventDefault(); event.returnValue = '';}};
+    document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => {document.removeEventListener('visibilitychange', visibility); window.removeEventListener('beforeunload', beforeUnload);};
+  }, [attemptId]);
 
   // Timer
   useEffect(() => {
     if (secondsLeft === null) return;
     if (secondsLeft <= 0) {
-      void executeSubmission(false);
+      void executeSubmission();
       return;
     }
     const t = setTimeout(() => setSecondsLeft((s) => (s === null ? s : s - 1)), 1000);
@@ -242,7 +151,8 @@ export default function ExamRunnerPage() {
   );
 
   async function onSubmit() {
-    await executeSubmission(false);
+    if (answered < questions.length && !confirm(`باقي ${questions.length - answered} سؤال بدون إجابة. هل تريد التسليم الآن؟`)) return;
+    await executeSubmission();
   }
 
   if (exhausted) {
@@ -277,6 +187,8 @@ export default function ExamRunnerPage() {
     );
   }
 
+  if (!loadingExam && !loadingQuestions && (!exam || !questions.length)) return <div className="p-10 text-center space-y-4"><h1 className="font-black text-xl">الامتحان غير متاح أو لم تكتمل أسئلته بعد</h1><Link className="text-blue-500 underline" href="/courses">العودة للكورسات</Link></div>;
+  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-slate-500">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><p className="text-sm">الوقت يبدأ عند الضغط على الزر. إجاباتك تُحفظ على هذا الجهاز أثناء الحل. لو حدث انقطاع يمكنك العودة لنفس المحاولة والوقت المتبقي.</p><Button onClick={() => setReady(true)}>أنا جاهز، ابدأ الامتحان</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
   if (!exam || questions.length === 0 || !q || secondsLeft === null) {
     return (
       <div className="grid place-items-center py-20">
@@ -288,7 +200,7 @@ export default function ExamRunnerPage() {
   const minutes = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
   const seconds = (secondsLeft % 60).toString().padStart(2, '0');
 
-  const watermark = student ? `${student.full_name} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
+  const watermark = student ? `${student.fullName} • ${student.phone}` : 'منصة مستر عبدالرحمن الأسيوطي';
 
   return (
     <div className="relative select-none" dir="rtl" style={{ WebkitUserSelect: 'none', userSelect: 'none' }}>
@@ -308,37 +220,18 @@ export default function ExamRunnerPage() {
         </div>
       </div>
 
-      {/* ── Anti-Cheat Blur Overlay on Window Blur / Attempted Capture ──────────── */}
-      {isScreenBlurred && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-2xl p-6 text-center text-white">
-          <div className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-3xl bg-red-600/20 text-red-500 border border-red-500/30 animate-pulse">
-            <ShieldAlert className="h-10 w-10" />
-          </div>
-          <h2 className="font-display text-2xl font-black text-white">
-            ⚠️ تم رصد مغادرة نافذة الامتحان / محاولة تصوير الشاشة
-          </h2>
-          <p className="mt-2 text-sm text-slate-300 max-w-md">
-            نظام الحماية والأمان قام بتسليم الامتحان تلقائياً لحفظ نزاهة التقييم.
-          </p>
-          <div className="mt-6 flex items-center gap-2 text-xs font-bold text-red-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            جاري حفظ الإجابات والانتقال للنتيجة...
-          </div>
-        </div>
-      )}
-
       {/* ── Security Alert Banner ──────────── */}
       <div className="mx-auto max-w-4xl mb-3 flex items-center justify-between gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-300 font-bold">
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <span>الامتحان مراقب ومؤمّن: مغادرة الصفحة أو التقاط سكرين شوت يؤدي لتسليم الامتحان فوراً!</span>
+          <span>إجاباتك محفوظة أثناء الحل. حافظ على اتصالك وتابع الوقت؛ التسليم التلقائي عند انتهاء المدة فقط.</span>
         </div>
         <span className="hidden sm:inline-block text-[11px] font-mono bg-amber-500/20 px-2 py-0.5 rounded-md">
           {watermark}
         </span>
       </div>
 
-      <div className={`mx-auto max-w-4xl space-y-4 transition-all duration-300 ${isScreenBlurred ? 'blur-xl pointer-events-none' : ''}`}>
+      <div className="mx-auto max-w-4xl space-y-4">
         {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-5 shadow-sm">
           <div>

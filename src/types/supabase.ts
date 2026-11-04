@@ -14,7 +14,7 @@ export type Json =
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export type GradeLevel = '1st_secondary' | '2nd_secondary' | '3rd_secondary';
-export type ExamStatus = 'in_progress' | 'submitted' | 'graded';
+export type ExamStatus = 'in_progress' | 'submitted' | 'graded' | 'pending' | 'passed' | 'failed';
 export type AnswerStatus = 'pending' | 'auto_graded' | 'manually_graded';
 export type QuestionType = 'mcq' | 'essay';
 export type TxnType = 'topup' | 'purchase' | 'refund' | 'reward';

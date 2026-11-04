@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { toast } from 'sonner';
 import { Phone, Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { writeBrowserSession, getLoginDestination, PROFILE_STORAGE_KEY } from '@/lib/firebase/browser-session';
 import { loginWithPhone } from '@/lib/firebase/auth-service';
 
 export default function LoginPage() {
@@ -21,7 +22,6 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const search = useSearchParams();
   const nextPath = search.get('next') ?? '/dashboard';
 
@@ -29,49 +29,40 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isPending) return;
     setError(null);
-    startTransition(async () => {
+    setIsPending(true);
+    try {
       const result = await loginWithPhone(phone.trim(), password);
-      if (!result.ok) {
-        setError(result.error);
-        toast.error(result.error);
-        return;
-      }
+      if (!result.ok) throw new Error(result.error);
 
-      // Cache student profile in localStorage for 0ms paint
-      if (typeof window !== 'undefined') {
-        try {
-          const { getUserProfile } = await import('@/lib/firebase/auth-service');
-          const prof = await getUserProfile(result.uid);
-          if (prof) {
-            localStorage.setItem('mr_ass_student_profile', JSON.stringify({
-              id: result.uid,
-              fullName: prof.fullName || prof.full_name || 'طالب المنصة',
-              phone: prof.phone || phone.trim(),
-              grade: prof.grade || '2nd_bac',
-              governorate: prof.governorate || 'القاهرة',
-              school: prof.school || '',
-              walletBalance: prof.walletBalance || prof.wallet_balance || 0,
-              avatarUrl: prof.avatarUrl || prof.avatar_url || '',
-              role: prof.role || result.role,
-            }));
-          }
-        } catch (e) {
-          console.warn('Error pre-caching login profile', e);
-        }
-      }
+      // Do not fetch the same profile a second time before navigating.
+      const prof = result.profile;
+      try {
+        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
+          id: result.uid, fullName: prof?.fullName || prof?.full_name || 'طالب المنصة',
+          phone: prof?.phone || phone.trim(), grade: prof?.grade || '2nd_bac',
+          governorate: prof?.governorate || 'القاهرة', school: prof?.school || '',
+          walletBalance: prof?.walletBalance ?? prof?.wallet_balance ?? 0,
+          avatarUrl: prof?.avatarUrl || prof?.avatar_url || '', role: result.role,
+        }));
+      } catch { /* Profile caching is optional; it must not block login. */ }
 
-      // Set cookie so middleware knows the user is logged in
-      document.cookie = `token=${result.uid}; path=/; max-age=2592000`;
-      document.cookie = `user_role=${result.role}; path=/; max-age=2592000`;
-
-      toast.success('تم تسجيل الدخول بنجاح 🎉');
-      window.location.href = result.role === 'admin' ? '/admin' : nextPath;
-    });
+      writeBrowserSession(result.uid, result.role);
+      toast.success('تم تسجيل الدخول بنجاح، جاري فتح حسابك…');
+      // Full navigation sends the newly-written cookies and avoids a cached
+      // unauthenticated App Router response for the dashboard.
+      window.location.replace(getLoginDestination(result.role, nextPath));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'تعذر إكمال الدخول. حاول مرة أخرى.';
+      setError(message);
+      toast.error(message);
+      setIsPending(false);
+    }
   }
 
   return (
@@ -110,6 +101,7 @@ function LoginForm() {
               <Input
                 id="phone"
                 inputMode="tel"
+                autoComplete="username"
                 placeholder="01xxxxxxxxx"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -125,6 +117,7 @@ function LoginForm() {
               <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="password"
+                autoComplete="current-password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}

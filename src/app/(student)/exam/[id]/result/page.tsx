@@ -71,6 +71,8 @@ export default function ExamResultPage() {
     );
   }
 
+  if (attempt.status === 'pending' || attempt.status === 'in_progress') return <div className="mx-auto max-w-xl rounded-3xl border p-8 text-center space-y-4" dir="rtl"><h1 className="text-xl font-black">{attempt.status === 'pending' ? 'تم تسليم إجاباتك، في انتظار تصحيح المعلم' : 'لم يتم تسليم الامتحان بعد'}</h1><p className="text-slate-500">لا تُحتسب الأسئلة المقالية كإجابات صحيحة قبل مراجعتها.</p><Link href="/courses" className="text-blue-500 underline">العودة للكورسات</Link></div>;
+
   const total = exam.total_marks;
   const percentage = Math.round(Number(attempt.percentage));
   const passed = percentage >= (exam.passing_marks / total) * 100;

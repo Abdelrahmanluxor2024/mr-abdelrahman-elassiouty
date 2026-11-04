@@ -85,7 +85,7 @@ export interface FirebaseExamAttempt {
   score: number;
   totalMarks: number;
   percentage: number;
-  status: 'passed' | 'failed';
+  status: 'in_progress' | 'pending' | 'passed' | 'failed';
   answers: Record<string, string>;
   createdAt: string;
 }

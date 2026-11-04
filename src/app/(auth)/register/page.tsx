@@ -8,6 +8,7 @@ import { Phone, Lock, User, Loader2, UserPlus, MapPin, School, Eye, EyeOff } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { writeBrowserSession, getLoginDestination } from '@/lib/firebase/browser-session';
 import { registerWithPhone } from '@/lib/firebase/auth-service';
 import { cn } from '@/lib/utils';
 
@@ -90,11 +91,13 @@ export default function RegisterPage() {
       }
 
       // Set cookie for middleware auth check
-      document.cookie = `token=${result.uid}; path=/; max-age=2592000`;
-      document.cookie = `user_role=${assignedRole}; path=/; max-age=2592000`;
+      try { writeBrowserSession(result.uid, assignedRole); } catch (err) {
+        const message = err instanceof Error ? err.message : 'تعذر حفظ الجلسة';
+        setError(message); toast.error(message); return;
+      }
 
       toast.success('🎉 تم إنشاء الحساب وتسجيل الدخول بنجاح! مرحباً بك في المنصة.');
-      window.location.href = assignedRole === 'admin' ? '/admin' : '/dashboard';
+      window.location.replace(getLoginDestination(assignedRole));
     });
   }
 

@@ -10,23 +10,18 @@ import { CheckCircle2, BookOpen, Clock, Sparkles, ArrowLeft, ShieldCheck } from 
 import { cn } from '@/lib/utils';
 
 export default function CoursesPage() {
+  const [error, setError] = useState(false);
   const [courses, setCourses] = useState<FirebaseCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'paid' | 'free'>('all');
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getCourses();
-        setCourses(data);
-      } catch (err) {
-        console.error('Failed to load courses', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, []);
+  async function load() {
+    setIsLoading(true); setError(false);
+    try {setCourses(await getCourses());}
+    catch {setError(true);}
+    finally {setIsLoading(false);}
+  }
+  useEffect(() => { load(); }, []);
 
   const filteredCourses = courses.filter((c) => {
     if (activeTab === 'free') return c.isFree;
@@ -89,7 +84,7 @@ export default function CoursesPage() {
       </div>
 
       {/* ── Courses Grid (Screenshot 1 Exact Layout) ────────────────────── */}
-      {isLoading ? (
+      {error ? <div role="alert" className="rounded-3xl border border-amber-500/30 p-8 text-center space-y-4"><p className="text-amber-300">تعذر تحميل الكورسات. تحقق من الاتصال ثم حاول مرة أخرى.</p><button className="rounded-xl bg-blue-600 px-5 py-3 text-white font-bold" onClick={load}>إعادة المحاولة</button></div> : isLoading ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-[460px] w-full rounded-3xl bg-slate-800/40" />
