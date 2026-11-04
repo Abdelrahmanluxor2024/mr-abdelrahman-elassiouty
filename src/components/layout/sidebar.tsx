@@ -53,14 +53,14 @@ export function Sidebar({
       {/* Mobile Overlay Backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 theme-panel bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-100 bg-white dark:border-slate-800/80 dark:bg-[#0A101D] shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shadow-none',
+          'fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-100 theme-panel bg-white dark:bg-slate-900 dark:border-slate-800/80 dark:bg-[#0A101D] shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shadow-none',
           collapsed ? 'w-20' : 'w-72 sm:w-64',
           mobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         )}
@@ -82,18 +82,18 @@ export function Sidebar({
           {/* Mobile Header Inside Sidebar */}
           <div className="flex items-center justify-between w-full lg:hidden">
             <div className="flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white font-black text-xs">
+              <div className="grid h-8 w-8 place-items-center rounded-lg theme-inverse bg-blue-600 text-ink font-black text-xs">
                 {studentName?.[0] ?? 'ط'}
               </div>
               <div>
-                <p className="text-xs font-black text-slate-900 dark:text-white leading-none">{studentName}</p>
+                <p className="text-xs font-black text-ink dark:text-white leading-none">{studentName}</p>
                 <span className="text-[10px] text-cyan-500 font-bold">القائمة الرئيسية</span>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setMobileOpen(false)}
-              className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-50 hover:text-red-600 transition"
+              className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-muted dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 transition"
               aria-label="إغلاق القائمة"
             >
               <X className="h-5 w-5" />
@@ -125,8 +125,8 @@ export function Sidebar({
             className={cn(
               'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
               isHome
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20'
+                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
             )}
           >
             <LayoutGrid className="h-5 w-5 shrink-0" />
@@ -141,8 +141,8 @@ export function Sidebar({
               className={cn(
                 'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
                 isCourses
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                  ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20'
+                  : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
               )}
             >
               <BookOpen className="h-5 w-5 shrink-0" />
@@ -159,7 +159,7 @@ export function Sidebar({
                     'block rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors',
                     pathname === '/courses'
                       ? 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-bold'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300'
+                      : 'text-muted dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300'
                   )}
                 >
                   جميع الكورسات
@@ -167,7 +167,7 @@ export function Sidebar({
                 <Link
                   href="/dashboard"
                   onClick={() => setMobileOpen(false)}
-                  className="block rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+                  className="block rounded-xl px-3 py-1.5 text-xs font-semibold text-muted dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
                 >
                   كورساتنا المُقترحة
                 </Link>
@@ -182,8 +182,8 @@ export function Sidebar({
             className={cn(
               'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
               isForum
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30'
+                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
             )}
           >
             <MessageSquare className="h-5 w-5 shrink-0" />
@@ -197,8 +197,8 @@ export function Sidebar({
             className={cn(
               'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
               pathname === '/community'
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? 'theme-inverse bg-gradient-to-r from-blue-600 to-indigo-600 text-ink shadow-lg shadow-blue-600/30'
+                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
             )}
           >
             <Sparkles className="h-5 w-5 shrink-0 text-cyan-500" />
@@ -217,8 +217,8 @@ export function Sidebar({
             className={cn(
               'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
               isWallet
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30'
+                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
             )}
           >
             <Wallet className="h-5 w-5 shrink-0" />
@@ -232,8 +232,8 @@ export function Sidebar({
             className={cn(
               'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
               isProfile
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30'
+                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
             )}
           >
             <User className="h-5 w-5 shrink-0" />
@@ -265,11 +265,11 @@ export function Sidebar({
               href="/profile"
               className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-900/80 p-3 transition hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 font-bold text-white shadow-md shadow-blue-500/20">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl theme-inverse bg-gradient-to-tr from-blue-600 to-cyan-500 font-bold text-ink shadow-md shadow-blue-500/20">
                 {studentName?.[0] ?? 'ط'}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-slate-900 dark:text-white">{studentName}</p>
+                <p className="truncate text-xs font-bold text-ink dark:text-white">{studentName}</p>
                 <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-cyan-400 font-semibold">
                   <Sparkles className="h-3 w-3" />
                   <span>طالب متميز</span>

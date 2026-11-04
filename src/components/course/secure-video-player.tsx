@@ -52,7 +52,7 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
 
   if (!src) return <div className="rounded-2xl border border-amber-500/30 p-6 text-center text-amber-300">رابط الفيديو غير صالح. تواصل مع المعلم لتحديثه.</div>;
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-black shadow-blue-soft">
+    <div className="relative overflow-hidden rounded-2xl theme-inverse bg-black shadow-blue-soft">
       {embed ? (
         <iframe
           src={src}
@@ -74,7 +74,7 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
             const v = e.currentTarget;
             setProgress((v.currentTime / Math.max(v.duration, 1)) * 100);
           }}
-          className="aspect-video w-full bg-black"
+          className="aspect-video w-full theme-inverse bg-black"
         />
       )}
 
@@ -86,7 +86,7 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
         <div className="grid h-full w-full grid-cols-3 grid-rows-3">
           {Array.from({ length: 9 }).map((_, i) => (
             <div key={i} className="flex items-center justify-center">
-              <span className="-rotate-12 text-xs font-semibold text-white/30">
+              <span className="-rotate-12 text-xs font-semibold text-white/25">
                 {watermarkText}
               </span>
             </div>
@@ -95,8 +95,8 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
       </div>
 
       {!embed && (
-        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 bg-gradient-to-t from-black/80 to-transparent p-3">
-          <Button size="icon" variant="ghost" onClick={toggle} className="text-white hover:bg-white/10">
+        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 theme-inverse bg-gradient-to-t from-black/80 to-transparent p-3">
+          <Button size="icon" variant="ghost" onClick={toggle} className="text-ink hover:bg-white/10">
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
           <Button
@@ -108,18 +108,18 @@ export function SecureVideoPlayer({ src, poster, watermarkText, embed }: Props) 
               v.muted = !v.muted;
               setMuted(v.muted);
             }}
-            className="text-white hover:bg-white/10"
+            className="text-ink hover:bg-white/10"
           >
             {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </Button>
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/20">
-            <div className="h-full bg-brand-500" style={{ width: `${progress}%` }} />
+            <div className="h-full theme-inverse bg-brand-500" style={{ width: `${progress}%` }} />
           </div>
           <Button
             size="icon"
             variant="ghost"
             onClick={() => videoRef.current?.requestFullscreen()}
-            className="text-white hover:bg-white/10"
+            className="text-ink hover:bg-white/10"
           >
             <Maximize2 className="h-4 w-4" />
           </Button>

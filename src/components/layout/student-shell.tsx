@@ -8,7 +8,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   const { student } = useCurrentStudent();
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-[#070B14] text-slate-900 dark:text-slate-100 transition-colors duration-200" dir="rtl">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-[#070B14] text-ink dark:text-slate-100 transition-colors duration-200" dir="rtl">
       <Sidebar studentName={student.fullName} avatarUrl={student.avatarUrl} role={student.role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar studentName={student.fullName} balance={student.walletBalance} role={student.role} />

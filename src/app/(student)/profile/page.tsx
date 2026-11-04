@@ -47,10 +47,10 @@ export default function ProfilePage() {
     <div className="space-y-6 max-w-4xl mx-auto" dir="rtl">
       {/* Student Profile Card */}
       <Card className="overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-md">
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 p-6 text-white relative overflow-hidden">
+        <div className="theme-inverse bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 p-6 text-ink relative overflow-hidden">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 relative z-10 text-center sm:text-right">
             <StudentAvatarUploader currentAvatar={student.avatarUrl} studentName={student.fullName} />
-            <div className="text-white space-y-1.5 flex-1">
+            <div className="text-ink space-y-1.5 flex-1">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                 <h1 className="font-display text-2xl font-black">{student.fullName}</h1>
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold backdrop-blur-md">
@@ -60,16 +60,16 @@ export default function ProfilePage() {
               </div>
               <p className="text-xs sm:text-sm text-cyan-200 font-mono" dir="ltr">{student.phone}</p>
               <div className="mt-3 flex flex-wrap justify-center sm:justify-start gap-2 pt-1">
-                <Badge variant="secondary" className="bg-white/15 text-white border-0">
+                <Badge variant="secondary" className="bg-white/15 text-ink border-0">
                   {student.grade === '1st_bac' ? 'الصف الأول الثانوي' : 'الصف الثاني الثانوي'}
                 </Badge>
                 {student.governorate && (
-                  <Badge variant="secondary" className="bg-white/15 text-white border-0 flex items-center gap-1">
+                  <Badge variant="secondary" className="bg-white/15 text-ink border-0 flex items-center gap-1">
                     <MapPin className="h-3 w-3" /> {student.governorate}
                   </Badge>
                 )}
                 {student.school && (
-                  <Badge variant="secondary" className="bg-white/15 text-white border-0 flex items-center gap-1">
+                  <Badge variant="secondary" className="bg-white/15 text-ink border-0 flex items-center gap-1">
                     <School className="h-3 w-3" /> {student.school}
                   </Badge>
                 )}
@@ -92,11 +92,11 @@ export default function ProfilePage() {
       {/* Exam Results List */}
       <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E172A]">
         <CardHeader>
-          <CardTitle className="text-slate-900 dark:text-white">نتائج الامتحانات</CardTitle>
+          <CardTitle className="text-ink dark:text-white">نتائج الامتحانات</CardTitle>
         </CardHeader>
         <CardContent className="divide-y divide-slate-100 dark:divide-slate-800">
           {attempts.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">لا توجد نتائج اختبارات حتى الآن.</p>
+            <p className="py-6 text-center text-sm text-muted">لا توجد نتائج اختبارات حتى الآن.</p>
           ) : (
             attempts.map((a) => (
               <div key={a.id} className="flex items-center gap-3 py-3">
@@ -104,8 +104,8 @@ export default function ProfilePage() {
                   <Trophy className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-slate-900 dark:text-white">{a.examTitle || 'اختبار تقييم الدرس'}</p>
-                  <p className="text-xs text-slate-500">{new Date(a.createdAt || Date.now()).toLocaleDateString('ar-EG')}</p>
+                  <p className="truncate font-bold text-ink dark:text-white">{a.examTitle || 'اختبار تقييم الدرس'}</p>
+                  <p className="text-xs text-muted">{new Date(a.createdAt || Date.now()).toLocaleDateString('ar-EG')}</p>
                 </div>
                 <Badge variant={Number(a.percentage || 0) >= 50 ? 'success' : 'error'}>
                   %{formatArabicNumber(Math.round(Number(a.percentage || 0)))}
@@ -150,11 +150,11 @@ export default function ProfilePage() {
 function Stat({ label, value, icon: Icon }: { label: string; value: string; icon: React.ComponentType<{ className?: string }> }) {
   return (
     <div className="rounded-2xl border border-slate-100 dark:border-slate-800 p-3 bg-slate-50/50 dark:bg-slate-900/50">
-      <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+      <div className="flex items-center gap-2 text-muted dark:text-slate-400">
         <Icon className="h-4 w-4" />
         <p className="text-xs">{label}</p>
       </div>
-      <p className="mt-1 font-display text-xl font-black text-slate-900 dark:text-white">{value}</p>
+      <p className="mt-1 font-display text-xl font-black text-ink dark:text-white">{value}</p>
     </div>
   );
 }

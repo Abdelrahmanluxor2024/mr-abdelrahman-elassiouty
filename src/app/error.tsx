@@ -14,7 +14,7 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
       <div>
         <p className="text-sm uppercase tracking-widest text-error">حصل خطأ</p>
         <h1 className="mt-2 font-display text-3xl font-black text-brand-900">استنى لحظة</h1>
-        <p className="mt-2 max-w-md text-slate-600">{error.message || 'حصل خطأ غير متوقع.'}</p>
+        <p className="mt-2 max-w-md text-muted">{error.message || 'حصل خطأ غير متوقع.'}</p>
         <div className="mt-6 flex justify-center gap-3">
           <Button onClick={reset}>حاول تاني</Button>
           <Button asChild variant="outline">

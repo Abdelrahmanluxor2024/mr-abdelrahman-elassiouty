@@ -46,7 +46,7 @@ export function TabsList({ className, children }: { className?: string; children
   return (
     <div
       className={cn(
-        'inline-flex h-11 items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1',
+        'inline-flex h-11 items-center gap-1 rounded-2xl border border-slate-200 theme-panel bg-white dark:bg-slate-900 p-1',
         className
       )}
     >
@@ -64,7 +64,7 @@ export function TabsTrigger({ value, className, children }: { value: string; cla
       onClick={() => setValue(value)}
       className={cn(
         'rounded-xl px-4 py-1.5 text-sm font-semibold transition-colors',
-        isActive ? 'bg-brand-600 text-white shadow-blue-soft' : 'text-slate-600 hover:bg-slate-100',
+        isActive ? 'theme-inverse bg-brand-600 text-ink shadow-blue-soft' : 'text-muted hover:bg-slate-100',
         className
       )}
     >

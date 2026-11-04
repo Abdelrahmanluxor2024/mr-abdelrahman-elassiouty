@@ -69,7 +69,7 @@ export async function getLessonsByCourse(courseId: string): Promise<FirebaseLess
       );
       const snap = await getDocs(q);
       if (!snap.empty) {
-        return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson)).filter(l => l.isPublished !== false);
       }
     } catch (orderErr) {
       console.warn('Query with orderBy failed, querying without orderBy and sorting locally:', orderErr);
@@ -82,7 +82,7 @@ export async function getLessonsByCourse(courseId: string): Promise<FirebaseLess
     );
     const snapSimple = await getDocs(qSimple);
     if (!snapSimple.empty) {
-      const list = snapSimple.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson));
+      const list = snapSimple.docs.map(d => ({ id: d.id, ...d.data() } as FirebaseLesson)).filter(l => l.isPublished !== false);
       list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
       return list;
     }
@@ -96,6 +96,7 @@ export async function getLessonById(lessonId: string): Promise<FirebaseLesson | 
   try {
     const snap = await getDoc(doc(db, 'lessons', lessonId));
     if (snap.exists()) {
+      if (snap.data().isPublished === false) return null;
       return { id: snap.id, ...snap.data() } as FirebaseLesson;
     }
   } catch (err) {
@@ -109,6 +110,12 @@ export async function getLessonById(lessonId: string): Promise<FirebaseLesson | 
 }
 
 // ======================== EXAMS & QUESTIONS ========================
+export async function getExamsByLesson(lessonId: string): Promise<FirebaseExam[]> {
+  const snap = await getDocs(query(collection(db, 'exams'), where('lessonId', '==', lessonId)));
+  return snap.docs.map(d => ({id: d.id, ...d.data()} as FirebaseExam)).filter(e => e.isActive !== false)
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
+
 export async function getExamByLesson(lessonId: string): Promise<FirebaseExam | null> {
   try {
     const q = query(

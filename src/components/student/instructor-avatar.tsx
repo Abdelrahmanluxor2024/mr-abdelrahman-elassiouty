@@ -45,7 +45,7 @@ export function InstructorAvatar({
       {glow && (
         <div
           aria-hidden
-          className="absolute -inset-4 -z-10 rounded-[inherit] bg-brand-gradient opacity-60 blur-2xl"
+          className="absolute -inset-4 -z-10 rounded-[inherit] theme-inverse bg-brand-gradient opacity-60 blur-2xl"
         />
       )}
       <div

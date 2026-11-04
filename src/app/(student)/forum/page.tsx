@@ -84,11 +84,11 @@ export default function ForumPage() {
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#0E172A] p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+          <h1 className="font-display text-2xl sm:text-3xl font-black text-ink dark:text-white flex items-center gap-2">
             <span>المنتدى والأسئلة</span>
             <span className="text-xl">💬</span>
           </h1>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs sm:text-sm text-muted dark:text-slate-400">
             اطرح سؤالك هنا نصياً أو ارفع صورة المسألة وسيتم الرد عليك مباشرة من مستر عبدالرحمن.
           </p>
         </div>
@@ -102,7 +102,7 @@ export default function ForumPage() {
       {/* New Question Form */}
       <Card className="rounded-3xl border border-blue-500/20 bg-white dark:bg-[#0E172A] shadow-md">
         <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-          <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-ink dark:text-white">
             <Plus className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
             اطرح سؤالاً أو ارفع صورة مسألة
           </CardTitle>
@@ -125,11 +125,11 @@ export default function ForumPage() {
           {attachedImage && (
             <div className="relative inline-block rounded-2xl overflow-hidden border-2 border-blue-500/40 shadow-md">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={attachedImage} alt="صورة السؤال" className="max-h-48 rounded-xl object-contain bg-black" />
+              <img src={attachedImage} alt="صورة السؤال" className="max-h-48 rounded-xl object-contain theme-inverse bg-black" />
               <button
                 type="button"
                 onClick={() => setAttachedImage(null)}
-                className="absolute top-2 right-2 rounded-xl bg-red-600 px-2.5 py-1 text-xs font-bold text-white shadow hover:bg-red-700"
+                className="absolute top-2 right-2 rounded-xl theme-inverse bg-red-600 px-2.5 py-1 text-xs font-bold text-ink shadow hover:bg-red-700"
               >
                 إلغاء الصورة ✕
               </button>
@@ -138,7 +138,7 @@ export default function ForumPage() {
 
           {/* Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer rounded-2xl border border-blue-500/30 bg-blue-50/80 dark:bg-blue-950/60 px-4 py-2 text-xs font-bold text-blue-700 dark:text-cyan-300 hover:bg-blue-100 transition">
+            <label className="flex items-center gap-2 cursor-pointer rounded-2xl border border-blue-500/30 bg-blue-50/80 dark:bg-blue-950/60 px-4 py-2 text-xs font-bold text-blue-700 dark:text-cyan-300 hover:bg-blue-100 dark:hover:bg-blue-950 transition">
               <Camera className="h-4 w-4 text-blue-600 dark:text-cyan-400" />
               <span>{attachedImage ? 'تغيير صورة السؤال' : '📸 إرفاق صورة للمسألة / السؤال'}</span>
               <input
@@ -153,7 +153,7 @@ export default function ForumPage() {
             <Button 
               onClick={onCreate} 
               disabled={creating || (!title.trim() && !content.trim() && !attachedImage)}
-              className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 shadow-md shadow-blue-600/20"
+              className="rounded-2xl theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold px-6 shadow-md shadow-blue-600/20"
             >
               {creating ? <><Loader2 className="h-4 w-4 animate-spin ms-2" /> جاري النشر...</> : 'نشر السؤال'}
             </Button>
@@ -180,8 +180,8 @@ export default function ForumPage() {
 
           {posts.length === 0 && (
             <div className="text-center py-16 bg-white dark:bg-[#0E172A] rounded-3xl border border-slate-100 dark:border-slate-800">
-              <MessageSquare className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
-              <p className="text-sm font-bold text-slate-600 dark:text-slate-400">لا توجد أسئلة بعد. كن أول من يطرح سؤالاً!</p>
+              <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted dark:text-slate-600" />
+              <p className="text-sm font-bold text-muted dark:text-slate-400">لا توجد أسئلة بعد. كن أول من يطرح سؤالاً!</p>
             </div>
           )}
         </div>
@@ -251,7 +251,7 @@ function PostCard({
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white leading-snug">
+              <h3 className="font-bold text-base text-ink dark:text-white leading-snug">
                 {post.title}
               </h3>
               {post.is_answered ? (
@@ -260,14 +260,14 @@ function PostCard({
                   تم الرد من المعلم ✅
                 </span>
               ) : (
-                <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-500">
+                <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-muted">
                   قيد الانتظار
                 </span>
               )}
             </div>
 
             {cleanContent && (
-              <p className={cn("text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed", !isExpanded && "line-clamp-2")}>
+              <p className={cn("text-xs sm:text-sm text-muted dark:text-slate-300 leading-relaxed", !isExpanded && "line-clamp-2")}>
                 {cleanContent}
               </p>
             )}
@@ -280,7 +280,7 @@ function PostCard({
                   src={attachedImgUrl}
                   alt="صورة السؤال المرفقة"
                   className={cn(
-                    "rounded-2xl border border-blue-500/30 object-contain bg-black shadow-md",
+                    "rounded-2xl border border-blue-500/30 object-contain theme-inverse bg-black shadow-md",
                     isExpanded ? "max-h-96 w-auto" : "max-h-40 w-auto"
                   )}
                 />
@@ -288,15 +288,15 @@ function PostCard({
             )}
           </div>
 
-          <div className="shrink-0 pt-1 text-slate-400">
+          <div className="shrink-0 pt-1 text-muted">
             {isExpanded ? <ChevronUp className="h-5 w-5 text-blue-600" /> : <ChevronDown className="h-5 w-5" />}
           </div>
         </div>
 
         {/* Footer Meta */}
-        <div className="mt-4 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-3 gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-between text-xs text-muted dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-3 gap-2">
           <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-            <span className="inline-flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200">
+            <span className="inline-flex items-center gap-1 font-bold text-ink dark:text-slate-200">
               <User className="h-3.5 w-3.5 text-blue-600 dark:text-cyan-400" />
               {(post as any).student?.full_name || 'طالب'}
             </span>
@@ -316,7 +316,7 @@ function PostCard({
       {/* Expanded Thread & Replies */}
       {isExpanded && (
         <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-[#070B14] p-5 space-y-4">
-          <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white flex items-center gap-2">
+          <h4 className="font-bold text-xs sm:text-sm text-ink dark:text-white flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-blue-600" />
             الردود وإجابات المستر:
           </h4>
@@ -329,7 +329,7 @@ function PostCard({
                 className={cn(
                   "p-4 rounded-2xl border transition-all",
                   r.is_admin_reply
-                    ? "border-blue-500/50 bg-gradient-to-tr from-blue-900/30 via-indigo-950/40 to-cyan-950/30 bg-blue-50/80 shadow-md shadow-blue-500/10"
+                    ? "border-blue-500/50 theme-inverse bg-gradient-to-tr from-blue-900/30 via-indigo-950/40 to-cyan-950/30 theme-panel bg-blue-50/80 dark:bg-blue-950/80 shadow-md shadow-blue-500/10"
                     : "border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A]"
                 )}
               >
@@ -337,38 +337,38 @@ function PostCard({
                   <div className="flex items-center gap-2">
                     {r.is_admin_reply ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-600 text-white font-bold text-xs shadow-sm">
+                        <span className="grid h-6 w-6 place-items-center rounded-lg theme-inverse bg-blue-600 text-ink font-bold text-xs shadow-sm">
                           👑
                         </span>
                         <span className="font-black text-xs sm:text-sm text-blue-700 dark:text-cyan-300">
                           مستر عبدالرحمن الأسيوطي (المعلم)
                         </span>
-                        <span className="rounded-md bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5">
+                        <span className="rounded-md theme-inverse bg-blue-600 text-ink text-[10px] font-bold px-1.5 py-0.5">
                           رد رسمي
                         </span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <User className="h-4 w-4 text-slate-400" />
-                        <span className="font-bold text-xs text-slate-700 dark:text-slate-300">
+                        <User className="h-4 w-4 text-muted" />
+                        <span className="font-bold text-xs text-ink dark:text-slate-300">
                           {r.student?.full_name ?? 'طالب'}
                         </span>
                       </div>
                     )}
                   </div>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-muted">
                     {new Date(r.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-200 font-medium">
+                <p className="text-xs sm:text-sm leading-relaxed text-ink dark:text-slate-200 font-medium">
                   {r.content}
                 </p>
               </div>
             ))}
 
             {replies.length === 0 && (
-              <div className="text-center py-6 text-xs text-slate-400">
+              <div className="text-center py-6 text-xs text-muted">
                 لم تتم إضافة أي ردود بعد. سيقوم المستر بالرد قريباً! ⏳
               </div>
             )}
@@ -387,7 +387,7 @@ function PostCard({
                 onClick={onSendReply}
                 disabled={sending || !replyText.trim()}
                 size="sm"
-                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-4"
+                className="rounded-xl theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold px-4"
               >
                 {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin ms-1" /> : <Send className="h-3.5 w-3.5 ms-1" />}
                 إرسال التعليق

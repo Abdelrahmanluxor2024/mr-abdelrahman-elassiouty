@@ -30,9 +30,9 @@ export function ThemeToggle() {
       title={isDark ? 'التحويل للوضع النهاري' : 'التحويل للوضع الليلي'}
     >
       {/* Background Icons */}
-      <div className="flex w-full items-center justify-between px-1.5 text-slate-400 dark:text-slate-500">
-        <Sun className={`h-3.5 w-3.5 ${isDark ? 'text-slate-500' : 'text-blue-600 font-bold'}`} />
-        <Moon className={`h-3.5 w-3.5 ${isDark ? 'text-cyan-400 font-bold' : 'text-slate-400'}`} />
+      <div className="flex w-full items-center justify-between px-1.5 text-muted dark:text-slate-500">
+        <Sun className={`h-3.5 w-3.5 ${isDark ? 'text-muted' : 'text-blue-600 font-bold'}`} />
+        <Moon className={`h-3.5 w-3.5 ${isDark ? 'text-cyan-400 font-bold' : 'text-muted'}`} />
       </div>
 
       {/* Sliding indicator */}
@@ -40,8 +40,8 @@ export function ThemeToggle() {
         style={{ left: isDark ? '34px' : '4px' }}
         className={`absolute top-1 grid h-6 w-6 place-items-center rounded-full shadow-md transition-all duration-300 ${
           isDark
-            ? 'bg-blue-600 text-white shadow-blue-500/40'
-            : 'bg-white text-blue-600 shadow-blue-300/50 border border-slate-100'
+            ? 'theme-inverse bg-blue-600 text-ink shadow-blue-500/40'
+            : 'theme-panel bg-white dark:bg-slate-900 text-blue-600 shadow-blue-300/50 border border-slate-100'
         }`}
       >
         {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}

@@ -34,11 +34,11 @@ export default function MyCoursesPage() {
   return (
     <div className="space-y-6" dir="rtl">
       <header>
-        <h1 className="font-display text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+        <h1 className="font-display text-2xl sm:text-3xl font-black text-ink dark:text-white flex items-center gap-2">
           <span>كورساتي والمناهج المشترك بها</span>
           <span>📚</span>
         </h1>
-        <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-xs sm:text-sm text-muted dark:text-slate-400">
           تابع تقدّمك في محاضرات وامتحانات مستر عبدالرحمن الأسيوطي.
         </p>
       </header>
@@ -47,10 +47,10 @@ export default function MyCoursesPage() {
         <Skeleton className="h-48 w-full rounded-3xl" />
       ) : courses.length === 0 ? (
         <Card className="rounded-3xl border border-slate-200 dark:border-slate-800">
-          <CardContent className="p-10 text-center text-slate-500">
+          <CardContent className="p-10 text-center text-muted">
             لست مشتركاً في أي كورس بعد. ابدأ الآن بالكورسات المجانية المتاحة!
             <div className="mt-4">
-              <Button asChild className="rounded-2xl bg-blue-600 text-white font-bold">
+              <Button asChild className="rounded-2xl theme-inverse bg-blue-600 text-ink font-bold">
                 <Link href="/courses">تصفّح الكورسات</Link>
               </Button>
             </div>
@@ -60,7 +60,7 @@ export default function MyCoursesPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((c, idx) => (
             <Card key={c.id} className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E172A] overflow-hidden shadow-sm hover:shadow-md transition">
-              <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+              <div className="relative h-44 w-full overflow-hidden theme-panel bg-white dark:bg-slate-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={c.thumbnailUrl || '/images/course-foundation-languages.jpg'}
@@ -69,15 +69,15 @@ export default function MyCoursesPage() {
                 />
               </div>
               <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm font-bold text-slate-900 dark:text-white line-clamp-2">{c.title}</CardTitle>
+                <CardTitle className="text-sm font-bold text-ink dark:text-white line-clamp-2">{c.title}</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-2 space-y-3">
 
-                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <div className="flex items-center justify-between text-xs text-muted dark:text-slate-400">
                   <span>اشتراك مفعّل</span>
                   <span>{c.lessonsCount || 0} محاضرة</span>
                 </div>
-                <Button asChild className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md">
+                <Button asChild className="w-full rounded-xl theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold text-xs shadow-md">
                   <Link href={`/course/${c.id}`}>
                     <PlayCircle className="h-4 w-4 ms-1" />
                     متابعة الكورس الآن

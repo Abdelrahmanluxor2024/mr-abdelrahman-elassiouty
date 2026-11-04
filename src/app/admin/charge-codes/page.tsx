@@ -108,7 +108,7 @@ export default function AdminChargeCodesPage() {
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {lastBatch.map((c) => (
-              <div key={c} className="flex items-center gap-2 rounded-xl border bg-slate-50 px-3 py-2 font-mono text-sm">
+              <div key={c} className="flex items-center gap-2 rounded-xl border theme-panel bg-slate-50 dark:bg-slate-900 px-3 py-2 font-mono text-sm">
                 <span className="flex-1">{c}</span>
                 <Button size="icon" variant="ghost" onClick={() => copy(c)}>
                   <Copy className="h-3.5 w-3.5" />
@@ -123,7 +123,7 @@ export default function AdminChargeCodesPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
             <CardTitle>سجل الأكواد ({codes.length})</CardTitle>
-            <p className="text-xs text-slate-500 mt-1">جميع كروت الشحن التي تم إنشاؤها وقيمتها وحالتها</p>
+            <p className="text-xs text-muted mt-1">جميع كروت الشحن التي تم إنشاؤها وقيمتها وحالتها</p>
           </div>
           <div className="flex items-center gap-2">
             <Input 
@@ -139,7 +139,7 @@ export default function AdminChargeCodesPage() {
             <Skeleton className="h-32 w-full rounded-2xl" />
           ) : (
             <table className="w-full min-w-[600px] text-sm">
-              <thead className="text-right text-xs text-slate-500 border-b border-slate-100 dark:border-slate-800">
+              <thead className="text-right text-xs text-muted border-b border-slate-100 dark:border-slate-800">
                 <tr>
                   <th className="p-3">الكود</th>
                   <th className="p-3">القيمة</th>
@@ -155,7 +155,7 @@ export default function AdminChargeCodesPage() {
                   .map((c: any) => (
                   <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition">
                     <td className="p-3 font-mono font-bold text-blue-600 dark:text-cyan-400">{c.code}</td>
-                    <td className="p-3 font-bold text-slate-900 dark:text-white">{c.amount} ج.م</td>
+                    <td className="p-3 font-bold text-ink dark:text-white">{c.amount} ج.م</td>
                     <td className="p-3">
                       <span className={c.is_used 
                         ? 'inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-950/60 px-2.5 py-0.5 text-xs font-bold text-red-600' 
@@ -167,19 +167,19 @@ export default function AdminChargeCodesPage() {
                     <td className="p-3 text-xs">
                       {c.used_by_student ? (
                         <div>
-                          <p className="font-bold text-slate-900 dark:text-white">{c.used_by_student.full_name}</p>
-                          <p className="text-slate-400 font-mono" dir="ltr">{c.used_by_student.phone}</p>
+                          <p className="font-bold text-ink dark:text-white">{c.used_by_student.full_name}</p>
+                          <p className="text-muted font-mono" dir="ltr">{c.used_by_student.phone}</p>
                         </div>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="p-3 text-xs text-slate-500">
+                    <td className="p-3 text-xs text-muted">
                       {c.used_at ? new Date(c.used_at).toLocaleString('ar-EG') : new Date(c.created_at).toLocaleDateString('ar-EG')}
                     </td>
                     <td className="p-3 text-center">
                       <Button size="icon" variant="ghost" className="h-8 w-8 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950" onClick={() => copy(c.code)}>
-                        <Copy className="h-4 w-4 text-slate-500" />
+                        <Copy className="h-4 w-4 text-muted" />
                       </Button>
                     </td>
                   </tr>

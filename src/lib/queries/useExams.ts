@@ -36,6 +36,7 @@ export function useExam(examId: string) {
         }
       } catch (err) {
         console.warn('Firebase useExam error:', err);
+        throw err;
       }
 
       // 2. Fallback to Supabase
@@ -90,6 +91,7 @@ export function useExamQuestions(examId: string) {
         }
       } catch (err) {
         console.warn('Firebase useExamQuestions error:', err);
+        throw err;
       }
 
       // 2. Fallback to Supabase
@@ -157,6 +159,7 @@ export function useAttempt(attemptId: string) {
 export function useLatestAttemptForExam(examId: string, explicitAttemptId?: string) {
   return useQuery({
     queryKey: ['attempts', 'latest', examId, explicitAttemptId, auth.currentUser?.uid],
+    refetchInterval: query => query.state.data?.status === 'pending' ? 15000 : false,
     enabled: !!examId || !!explicitAttemptId,
     queryFn: async (): Promise<ExamAttempt | null> => {
       await auth.authStateReady();
@@ -184,6 +187,7 @@ export function useLatestAttemptForExam(examId: string, explicitAttemptId?: stri
           }
         } catch (err) {
           console.warn('Firebase explicit attempt error:', err);
+        throw err;
         }
       }
 
@@ -221,6 +225,7 @@ export function useLatestAttemptForExam(examId: string, explicitAttemptId?: stri
         }
       } catch (err) {
         console.warn('Firebase latest attempt error:', err);
+        throw err;
       }
 
       return null;
@@ -228,9 +233,10 @@ export function useLatestAttemptForExam(examId: string, explicitAttemptId?: stri
   });
 }
 
-export function useAttemptAnswers(attemptId: string) {
+export function useAttemptAnswers(attemptId: string, pending = false) {
   return useQuery({
-    queryKey: ['attempts', attemptId, 'answers'],
+    queryKey: ['attempts', attemptId, 'answers', pending],
+    refetchInterval: pending ? 15000 : false,
     enabled: !!attemptId,
     queryFn: async (): Promise<StudentAnswer[]> => {
       try {
@@ -254,6 +260,7 @@ export function useAttemptAnswers(attemptId: string) {
         }
       } catch (err) {
         console.warn('Firebase attempt answers error:', err);
+        throw err;
       }
 
       return [];

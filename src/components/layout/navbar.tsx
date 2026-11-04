@@ -33,7 +33,7 @@ export function Navbar({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-100 bg-white/90 px-3 sm:px-4 backdrop-blur-md dark:border-slate-800/80 dark:bg-[#0A101D]/90 lg:px-8 transition-colors">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-100 theme-panel bg-white/90 dark:bg-slate-900/90 px-3 sm:px-4 backdrop-blur-md dark:border-slate-800/80 dark:bg-[#0A101D]/90 lg:px-8 transition-colors">
       {/* Right Brand & Mobile Menu Trigger on Navbar */}
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Mobile Hamburger Menu (الثلاث شرط) */}
@@ -56,7 +56,7 @@ export function Navbar({
             />
           </div>
           <div className="hidden xs:block">
-            <p className="font-display text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">
+            <p className="font-display text-xs sm:text-sm font-black text-ink dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">
               مستر عبدالرحمن الأسيوطي
             </p>
             <p className="text-[10px] sm:text-[11px] text-blue-600 dark:text-cyan-400 font-semibold">لغة عربية وثانوية عامة</p>
@@ -93,7 +93,7 @@ export function Navbar({
         {/* Avatar Profile Icon */}
         <Link
           href="/profile"
-          className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-sm font-bold text-white shadow-sm shadow-blue-500/30"
+          className="grid h-9 w-9 place-items-center rounded-full theme-inverse bg-gradient-to-tr from-blue-600 to-cyan-500 text-sm font-bold text-ink shadow-sm shadow-blue-500/30"
         >
           {studentName?.[0] ?? 'ط'}
         </Link>
@@ -102,7 +102,7 @@ export function Navbar({
         <button
           type="button"
           onClick={handleLogout}
-          className="grid h-9 w-9 place-items-center rounded-xl text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition"
+          className="grid h-9 w-9 place-items-center rounded-xl text-muted hover:text-red-600 dark:hover:text-red-400 transition"
           title="تسجيل الخروج"
         >
           <LogOut className="h-4 w-4" />

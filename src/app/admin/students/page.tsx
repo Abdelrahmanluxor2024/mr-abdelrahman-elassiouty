@@ -98,10 +98,10 @@ export default function AdminStudentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-black text-brand-900 dark:text-white">إدارة الطلاب والمشتركين</h1>
-          <p className="text-xs text-slate-500 mt-1">عرض بيانات الطلاب، الشحن المباشر، وتعديل المحاولات والتواصل</p>
+          <p className="text-xs text-muted mt-1">عرض بيانات الطلاب، الشحن المباشر، وتعديل المحاولات والتواصل</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">
+          <Badge className="theme-inverse bg-blue-600 text-ink font-bold px-3 py-1.5 rounded-xl text-xs">
             {formatArabicNumber(students.length)} طالب مسجل
           </Badge>
         </div>
@@ -109,25 +109,25 @@ export default function AdminStudentsPage() {
 
       {/* Recharge Modal Popup */}
       {selectedStudent && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 grid place-items-center theme-inverse bg-black/60 backdrop-blur-xs p-4">
           <Card className="w-full max-w-md rounded-3xl border-2 border-blue-500 bg-white dark:bg-[#0E172A] shadow-2xl p-6 space-y-4">
-            <h3 className="font-display text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-display text-lg font-black text-ink dark:text-white flex items-center gap-2">
               <Wallet className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
               شحن رصيد مباشر للطالب
             </h3>
             <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-sm space-y-1">
-              <p className="font-bold text-slate-900 dark:text-white">{selectedStudent.full_name}</p>
-              <p className="text-xs text-slate-500 font-mono" dir="ltr">{selectedStudent.phone}</p>
+              <p className="font-bold text-ink dark:text-white">{selectedStudent.full_name}</p>
+              <p className="text-xs text-muted font-mono" dir="ltr">{selectedStudent.phone}</p>
               <p className="text-xs text-blue-600 dark:text-cyan-400 font-bold">الرصيد الحالي: {formatCurrencyEGP(selectedStudent.wallet_balance)}</p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">المبلغ المراد إضافته (ج.م)</label>
+              <label className="text-xs font-bold text-ink dark:text-slate-300">المبلغ المراد إضافته (ج.م)</label>
               <Input 
                 type="number" 
                 min={5} 
                 value={rechargeAmount} 
                 onChange={(e) => setRechargeAmount(Number(e.target.value))} 
-                className="text-lg font-bold text-slate-900 dark:text-white"
+                className="text-lg font-bold text-ink dark:text-white"
               />
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -135,7 +135,7 @@ export default function AdminStudentsPage() {
               <Button 
                 onClick={() => handleRecharge(selectedStudent.phone, selectedStudent.full_name)} 
                 disabled={pending}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs"
+                className="theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold rounded-xl text-xs"
               >
                 {pending ? 'جاري الشحن...' : `تأكيد شحن ${rechargeAmount} ج.م`}
               </Button>
@@ -148,7 +148,7 @@ export default function AdminStudentsPage() {
       <Card className="rounded-3xl border border-slate-200 dark:border-slate-800">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
-            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input 
               placeholder="🔍 ابحث بالاسم، رقم هاتف الطالب، أو رقم ولي الأمر..." 
               value={search} 
@@ -159,7 +159,7 @@ export default function AdminStudentsPage() {
           <select
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
-            className="h-10 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 dark:text-slate-300"
+            className="h-10 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-xs font-bold text-ink dark:text-slate-300"
           >
             <option value="all">جميع الصفوف</option>
             <option value="1st_secondary">أولى ثانوي</option>
@@ -181,7 +181,7 @@ export default function AdminStudentsPage() {
             </div>
           ) : (
             <table className="w-full min-w-[750px] text-sm">
-              <thead className="text-right text-xs text-slate-500 bg-slate-50/75 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+              <thead className="text-right text-xs text-muted bg-slate-50/75 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
                 <tr>
                   <th className="p-3">الطالب</th>
                   <th className="p-3">الهاتف وولي الأمر</th>
@@ -204,8 +204,8 @@ export default function AdminStudentsPage() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-900 dark:text-white text-sm break-words leading-snug">{s.full_name ?? '—'}</p>
-                          <p className="text-[11px] text-slate-400">{new Date(s.created_at).toLocaleDateString('ar-EG')}</p>
+                          <p className="font-bold text-ink dark:text-white text-sm break-words leading-snug">{s.full_name ?? '—'}</p>
+                          <p className="text-[11px] text-muted">{new Date(s.created_at).toLocaleDateString('ar-EG')}</p>
                         </div>
                       </div>
                     </td>
@@ -217,7 +217,7 @@ export default function AdminStudentsPage() {
                         {s.phone}
                       </div>
                       {s.parent_phone && (
-                        <p className="text-[11px] text-slate-400 font-mono" dir="ltr">ولي الأمر: {s.parent_phone}</p>
+                        <p className="text-[11px] text-muted font-mono" dir="ltr">ولي الأمر: {s.parent_phone}</p>
                       )}
                     </td>
 
@@ -225,7 +225,7 @@ export default function AdminStudentsPage() {
                       <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
                         {s.grade?.replace(/_/g, ' ') || 'عام'}
                       </Badge>
-                      <p className="text-slate-500 text-[11px]">
+                      <p className="text-muted text-[11px]">
                         {s.governorate || 'محافظة غير محددة'}
                         {s.school ? ` • ${s.school}` : ''}
                       </p>
@@ -245,7 +245,7 @@ export default function AdminStudentsPage() {
                           size="sm" 
                           variant="outline"
                           onClick={() => setSelectedStudent(s)}
-                          className="h-8 rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50 text-xs px-2.5"
+                          className="h-8 rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 text-xs px-2.5"
                           title="شحن رصيد مباشر"
                         >
                           <Wallet className="h-3.5 w-3.5 ms-1 text-blue-600" />
@@ -258,7 +258,7 @@ export default function AdminStudentsPage() {
                           variant="outline"
                           onClick={() => handleGrantAttempt(s.phone, s.full_name)}
                           disabled={pending}
-                          className="h-8 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 text-xs px-2.5"
+                          className="h-8 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 text-xs px-2.5"
                           title="إعادة فتح محاولة الامتحان"
                         >
                           <RefreshCw className="h-3.5 w-3.5 ms-1 text-amber-600" />
@@ -266,7 +266,7 @@ export default function AdminStudentsPage() {
                         </Button>
 
                         {/* WhatsApp */}
-                        <Button asChild size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-emerald-600 hover:bg-emerald-50">
+                        <Button asChild size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950">
                           <a 
                             href={`https://wa.me/20${s.phone.replace(/^0/, '')}?text=مرحباً%20${encodeURIComponent(s.full_name)}،%20منصة%20مستر%20عبدالرحمن%20الأسيوطي`} 
                             target="_blank" 

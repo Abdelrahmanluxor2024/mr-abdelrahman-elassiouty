@@ -223,15 +223,15 @@ export default function ExamRunnerPage() {
             <AlertTriangle className="h-8 w-8" />
           </div>
           <div>
-            <h2 className="font-display text-xl font-black text-slate-900 dark:text-white">
+            <h2 className="font-display text-xl font-black text-ink dark:text-white">
               انتهت محاولتك الوحيدة
             </h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="mt-2 text-sm text-muted dark:text-slate-400 leading-relaxed">
               لقد قمت بأداء هذا الامتحان بالحد الأقصى للمحاولات المسموح بها (محاولة واحدة فقط).
             </p>
           </div>
           <div className="flex flex-col gap-2.5 pt-2">
-            <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 rounded-xl py-2.5 font-bold shadow-md shadow-blue-600/30 text-white">
+            <Button asChild className="w-full theme-inverse bg-blue-600 hover:bg-blue-700 rounded-xl py-2.5 font-bold shadow-md shadow-blue-600/30 text-ink">
               <Link href={`/exam/${examId}/result`}>
                 عرض نتيجتي في الامتحان
               </Link>
@@ -248,8 +248,8 @@ export default function ExamRunnerPage() {
   }
 
   if (!loadingExam && !loadingQuestions && (!exam || !questions.length)) return <div className="p-10 text-center space-y-4"><h1 className="font-black text-xl">الامتحان غير متاح أو لم تكتمل أسئلته بعد</h1><Link className="text-blue-500 underline" href="/courses">العودة للكورسات</Link></div>;
-  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><ShieldAlert className="h-10 w-10 text-amber-500"/><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-slate-500">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-8"><strong>محاولة واحدة فقط.</strong><ul className="list-disc pr-5"><li>مغادرة التبويب أو فقدان تركيز نافذة الامتحان يؤدي لتسليم المحاولة وقفل الإجابات.</li><li>لا تفتح تبويباً أو برنامجاً آخر أثناء الحل؛ افتح الامتحان في تبويب مستقل وأوقف الإشعارات قبل البداية.</li><li>اختصارات تصوير الشاشة المرصودة تقفل المحاولة. العلامة المائية تحمل اسمك ورقمك.</li><li>لا يمكن للمتصفح ضمان منع تصوير الشاشة من النظام أو بكاميرا خارجية.</li></ul></div><label className="flex items-start gap-3 text-sm leading-7"><input type="checkbox" checked={acceptedPolicy} onChange={e => setAcceptedPolicy(e.target.checked)} className="mt-2"/>قرأت التعليمات وفاهم أن مغادرة الامتحان تستهلك محاولتي الوحيدة.</label><Button disabled={!acceptedPolicy} onClick={() => setReady(true)}>موافق، ابدأ المحاولة الوحيدة</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
-  if (locked) return <div dir="rtl" role="status" className="mx-auto max-w-xl rounded-3xl border border-amber-500/30 p-8 text-center space-y-5"><ShieldAlert className="mx-auto h-12 w-12 text-amber-500"/><h1 className="font-black text-xl">{reasonRef.current === 'manual' ? 'جاري تسليم إجاباتك' : 'تم قفل المحاولة'}</h1><p className="text-sm leading-7 text-slate-500">{reasonRef.current === 'manual' ? 'تم تثبيت الإجابات ولا يمكن تعديلها بعد التسليم.' : 'انتهى وقت الامتحان أو تم رصد مغادرة النافذة أو اختصار تصوير. لن تُفتح محاولة جديدة.'}</p>{submitting ? <p className="flex justify-center items-center gap-2"><Loader2 className="h-5 w-5 animate-spin"/>جاري الحفظ والتصحيح…</p> : <><p className="text-sm text-amber-600">لو الاتصال انقطع، إعادة التسليم ترسل نفس الإجابات ولا تعيد فتح الامتحان.</p><Button onClick={() => void executeSubmission(reasonRef.current)}>إعادة التسليم</Button></>}</div>;
+  if (exam && questions.length && !ready) return <div dir="rtl" className="max-w-xl mx-auto rounded-3xl border border-blue-500/30 bg-blue-500/5 p-8 space-y-5"><ShieldAlert className="h-10 w-10 text-amber-500"/><h1 className="text-2xl font-black">{exam.title}</h1><p className="text-muted">{questions.length} سؤال · {exam.duration_minutes} دقيقة · درجة النجاح {exam.passing_marks} من {exam.total_marks}</p><div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-8"><strong>محاولة واحدة فقط.</strong><ul className="list-disc pr-5"><li>مغادرة التبويب أو فقدان تركيز نافذة الامتحان يؤدي لتسليم المحاولة وقفل الإجابات.</li><li>لا تفتح تبويباً أو برنامجاً آخر أثناء الحل؛ افتح الامتحان في تبويب مستقل وأوقف الإشعارات قبل البداية.</li><li>اختصارات تصوير الشاشة المرصودة تقفل المحاولة. العلامة المائية تحمل اسمك ورقمك.</li><li>لا يمكن للمتصفح ضمان منع تصوير الشاشة من النظام أو بكاميرا خارجية.</li></ul></div><label className="flex items-start gap-3 text-sm leading-7"><input type="checkbox" checked={acceptedPolicy} onChange={e => setAcceptedPolicy(e.target.checked)} className="mt-2"/>قرأت التعليمات وفاهم أن مغادرة الامتحان تستهلك محاولتي الوحيدة.</label><Button disabled={!acceptedPolicy} onClick={() => setReady(true)}>موافق، ابدأ المحاولة الوحيدة</Button><Link className="block text-blue-500 underline text-sm" href="/courses">الرجوع للكورسات</Link></div>;
+  if (locked) return <div dir="rtl" role="status" className="mx-auto max-w-xl rounded-3xl border border-amber-500/30 p-8 text-center space-y-5"><ShieldAlert className="mx-auto h-12 w-12 text-amber-500"/><h1 className="font-black text-xl">{reasonRef.current === 'manual' ? 'جاري تسليم إجاباتك' : 'تم قفل المحاولة'}</h1><p className="text-sm leading-7 text-muted">{reasonRef.current === 'manual' ? 'تم تثبيت الإجابات ولا يمكن تعديلها بعد التسليم.' : 'انتهى وقت الامتحان أو تم رصد مغادرة النافذة أو اختصار تصوير. لن تُفتح محاولة جديدة.'}</p>{submitting ? <p className="flex justify-center items-center gap-2"><Loader2 className="h-5 w-5 animate-spin"/>جاري الحفظ والتصحيح…</p> : <><p className="text-sm text-amber-600">لو الاتصال انقطع، إعادة التسليم ترسل نفس الإجابات ولا تعيد فتح الامتحان.</p><Button onClick={() => void executeSubmission(reasonRef.current)}>إعادة التسليم</Button></>}</div>;
   if (!exam || questions.length === 0 || !q || secondsLeft === null) {
     return (
       <div className="grid place-items-center py-20">
@@ -265,7 +265,7 @@ export default function ExamRunnerPage() {
 
   return (
     <div className="relative" dir="rtl">
-      {confirmSubmit && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/70 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="confirm-submit-title" className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl dark:bg-slate-900"><h2 id="confirm-submit-title" className="text-xl font-black">لسه فيه أسئلة ناقصة</h2><p className="mt-3 text-sm text-slate-500">باقي {questions.length - answered} سؤال بدون إجابة. التسليم ينهي محاولتك الوحيدة.</p><div className="mt-6 flex gap-3"><Button onClick={() => {setConfirmSubmit(false); void executeSubmission();}}>سلّم الإجابات</Button><Button variant="outline" autoFocus onClick={() => setConfirmSubmit(false)}>أكمل الحل</Button></div></div></div>}
+      {confirmSubmit && <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/70 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="confirm-submit-title" className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl dark:bg-slate-900"><h2 id="confirm-submit-title" className="text-xl font-black">لسه فيه أسئلة ناقصة</h2><p className="mt-3 text-sm text-muted">باقي {questions.length - answered} سؤال بدون إجابة. التسليم ينهي محاولتك الوحيدة.</p><div className="mt-6 flex gap-3"><Button onClick={() => {setConfirmSubmit(false); void executeSubmission();}}>سلّم الإجابات</Button><Button variant="outline" autoFocus onClick={() => setConfirmSubmit(false)}>أكمل الحل</Button></div></div></div>}
 
       {/* ── Background Security Dynamic Watermark (Anti-Screenshot) ──────────── */}
       <div
@@ -298,8 +298,8 @@ export default function ExamRunnerPage() {
         {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0E172A] p-5 shadow-sm">
           <div>
-            <h1 className="font-display text-xl font-black text-slate-900 dark:text-white">{exam.title}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">سؤال {current + 1} من {questions.length}</p>
+            <h1 className="font-display text-xl font-black text-ink dark:text-white">{exam.title}</h1>
+            <p className="text-xs text-muted dark:text-slate-400 mt-0.5">سؤال {current + 1} من {questions.length}</p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="font-mono rounded-xl border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs px-3 py-1 font-bold">
@@ -312,7 +312,7 @@ export default function ExamRunnerPage() {
           </div>
         </header>
 
-        <p className="text-xs text-slate-500" aria-live="polite">{saveStatus || 'يجري حفظ إجاباتك أثناء الحل'}</p>
+        <p className="text-xs text-muted" aria-live="polite">{saveStatus || 'يجري حفظ إجاباتك أثناء الحل'}</p>
         <Progress value={((current + 1) / questions.length) * 100} className="h-2 bg-blue-100 dark:bg-slate-800" />
 
         {/* Question Card */}
@@ -322,11 +322,11 @@ export default function ExamRunnerPage() {
               <span className="rounded-lg bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:text-blue-300">
                 {q.question_type === 'mcq' || (q.question_type as string) === 'multiple_choice' ? 'اختيار من متعدد' : 'سؤال مقالي'}
               </span>
-              <span className="text-xs text-slate-400 font-medium">الدرجة: {q.marks}</span>
+              <span className="text-xs text-muted font-medium">الدرجة: {q.marks}</span>
             </div>
-            <CardTitle className="leading-relaxed text-base font-bold text-slate-900 dark:text-white">{q.question_text}</CardTitle>
+            <CardTitle className="leading-relaxed text-base font-bold text-ink dark:text-white">{q.question_text}</CardTitle>
             {((q as any).image_url || (q as any).imageUrl) && (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700 bg-black/40 max-h-80 flex items-center justify-center">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 theme-inverse bg-black/40 max-h-80 flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={(q as any).image_url || (q as any).imageUrl}
@@ -353,20 +353,20 @@ export default function ExamRunnerPage() {
                       }`}
                     >
                       <span className={`grid h-8 w-8 place-items-center rounded-xl text-xs font-black transition-colors ${
-                        selected ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        selected ? 'theme-inverse bg-blue-600 text-ink' : 'bg-slate-100 dark:bg-slate-800 text-ink dark:text-slate-300'
                       }`}>
                         {opt.key.toUpperCase()}
                       </span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{opt.text}</span>
+                      <span className="font-semibold text-ink dark:text-slate-200 text-sm">{opt.text}</span>
                     </button>
                   );
                 })}
               </div>
             ) : (
               <div className="space-y-3">
-                <label htmlFor={`essay-${q.id}`} className="block text-sm font-bold text-slate-700 dark:text-slate-200">إجابتك المقالية</label>
-                <Textarea id={`essay-${q.id}`} value={answers[q.id] ?? ''} onChange={e => handleAnswerChange(q.id, e.target.value)} placeholder="اكتب إجابتك هنا بأسلوبك، مع توضيح الأفكار والأمثلة…" dir="auto" className="min-h-[240px] text-base leading-8 text-right font-sans bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
-                <p className="text-xs text-slate-500">سؤال مقالي عادي؛ لا يتطلب كتابة كود. تُراجع الإجابة بواسطة المعلم.</p>
+                <label htmlFor={`essay-${q.id}`} className="block text-sm font-bold text-ink dark:text-slate-200">إجابتك المقالية</label>
+                <Textarea id={`essay-${q.id}`} value={answers[q.id] ?? ''} onChange={e => handleAnswerChange(q.id, e.target.value)} placeholder="اكتب إجابتك هنا بأسلوبك، مع توضيح الأفكار والأمثلة…" dir="auto" className="min-h-[240px] text-base leading-8 text-right font-sans bg-white dark:bg-slate-900 text-ink dark:text-white" />
+                <p className="text-xs text-muted">سؤال مقالي عادي؛ لا يتطلب كتابة كود. تُراجع الإجابة بواسطة المعلم.</p>
               </div>
             )}
           </CardContent>
@@ -386,7 +386,7 @@ export default function ExamRunnerPage() {
           {current < questions.length - 1 ? (
             <Button 
               onClick={() => setCurrent((c) => Math.min(questions.length - 1, c + 1))}
-              className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white px-5 font-bold shadow-md shadow-blue-600/30"
+              className="rounded-2xl theme-inverse bg-blue-600 hover:bg-blue-700 text-ink px-5 font-bold shadow-md shadow-blue-600/30"
             >
               التالي
               <ChevronLeft className="h-4 w-4 me-1" />
@@ -395,7 +395,7 @@ export default function ExamRunnerPage() {
             <Button 
               onClick={onSubmit} 
               disabled={submitting} 
-              className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-6 font-bold text-white shadow-lg shadow-emerald-600/30"
+              className="rounded-2xl theme-inverse bg-emerald-600 hover:bg-emerald-700 px-6 font-bold text-ink shadow-lg shadow-emerald-600/30"
             >
               {submitting ? <><Loader2 className="h-4 w-4 animate-spin ms-2" /> جاري التسليم...</> : 'تسليم الامتحان'}
             </Button>
