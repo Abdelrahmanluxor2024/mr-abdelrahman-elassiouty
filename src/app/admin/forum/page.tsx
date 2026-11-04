@@ -111,10 +111,10 @@ export default function AdminForumPage() {
   return (
     <div className="space-y-6" dir="rtl">
       <div>
-        <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">
+        <h1 className="font-display text-2xl font-black text-ink dark:text-white">
           المنتدى والرد على أسئلة الطلاب 💬
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-muted mt-1">
           يمكنك هنا متابعة كافة أسئلة واستفسارات الطلاب في المنتدى والرد عليها مباشرة بصفتك المستر.
         </p>
       </div>
@@ -140,17 +140,17 @@ export default function AdminForumPage() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">
+                    <p className="font-bold text-sm text-ink dark:text-white line-clamp-1">
                       {p.title}
                     </p>
                     <Badge variant={p.is_answered ? 'success' : 'outline'} className="text-[10px] shrink-0 font-bold">
                       {p.is_answered ? 'تم الرد ✅' : 'جديد'}
                     </Badge>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                  <p className="text-xs text-muted dark:text-slate-400 mt-1 line-clamp-2">
                     {p.content}
                   </p>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2">
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-muted border-t border-slate-100 dark:border-slate-800 pt-2">
                     <span>{p.student?.full_name ?? 'طالب'}</span>
                     <span>{new Date(p.created_at).toLocaleDateString('ar-EG')}</span>
                   </div>
@@ -158,7 +158,7 @@ export default function AdminForumPage() {
               ))}
 
               {posts.length === 0 && (
-                <p className="text-center text-xs text-slate-400 py-8">لا توجد أسئلة بعد في المنتدى</p>
+                <p className="text-center text-xs text-muted py-8">لا توجد أسئلة بعد في المنتدى</p>
               )}
             </CardContent>
           </Card>
@@ -171,10 +171,10 @@ export default function AdminForumPage() {
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-display text-lg font-black text-slate-900 dark:text-white">
+                    <h2 className="font-display text-lg font-black text-ink dark:text-white">
                       {currentPost.title}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-muted mt-1">
                       طرحه الطالب: <span className="font-bold text-blue-600 dark:text-cyan-400">{currentPost.student?.full_name}</span> ({currentPost.student?.phone})
                     </p>
                   </div>
@@ -182,7 +182,7 @@ export default function AdminForumPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleDelete(currentPost.id)}
-                    className="text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl"
+                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-700 rounded-xl"
                   >
                     <Trash2 className="h-4 w-4 ms-1" />
                     حذف السؤال
@@ -200,7 +200,7 @@ export default function AdminForumPage() {
                   return (
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-3">
                       {cleanContent && (
-                        <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
+                        <p className="text-sm text-ink dark:text-slate-200 leading-relaxed font-medium">
                           {cleanContent}
                         </p>
                       )}
@@ -212,7 +212,7 @@ export default function AdminForumPage() {
                           <img
                             src={attachedImgUrl}
                             alt="صورة السؤال من الطالب"
-                            className="max-h-96 rounded-2xl border border-blue-500/30 object-contain bg-black shadow-lg"
+                            className="max-h-96 rounded-2xl border border-blue-500/30 object-contain theme-inverse bg-black shadow-lg"
                           />
                         </div>
                       )}
@@ -222,7 +222,7 @@ export default function AdminForumPage() {
 
                 {/* Replies Thread */}
                 <div className="space-y-3">
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-ink dark:text-white flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-blue-600" />
                     الردود والمناقشة ({replies.length})
                   </h3>
@@ -241,25 +241,25 @@ export default function AdminForumPage() {
                           <span className="text-xs font-black flex items-center gap-1.5">
                             {r.is_admin_reply ? (
                               <>
-                                <span className="bg-blue-600 text-white px-2 py-0.5 rounded-md text-[10px]">المستر</span>
+                                <span className="theme-inverse bg-blue-600 text-ink px-2 py-0.5 rounded-md text-[10px]">المستر</span>
                                 <span className="text-blue-700 dark:text-cyan-300">مستر عبدالرحمن الأسيوطي</span>
                               </>
                             ) : (
-                              <span className="text-slate-700 dark:text-slate-300">{r.student?.full_name ?? 'طالب'}</span>
+                              <span className="text-ink dark:text-slate-300">{r.student?.full_name ?? 'طالب'}</span>
                             )}
                           </span>
-                          <span className="text-[10px] text-slate-400">
+                          <span className="text-[10px] text-muted">
                             {new Date(r.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <p className="text-xs leading-relaxed text-slate-800 dark:text-slate-200">
+                        <p className="text-xs leading-relaxed text-ink dark:text-slate-200">
                           {r.content}
                         </p>
                       </div>
                     ))}
 
                     {replies.length === 0 && (
-                      <p className="text-xs text-slate-400 text-center py-4">لم يتم إضافة ردود على هذا السؤال بعد.</p>
+                      <p className="text-xs text-muted text-center py-4">لم يتم إضافة ردود على هذا السؤال بعد.</p>
                     )}
                   </div>
                 </div>
@@ -280,7 +280,7 @@ export default function AdminForumPage() {
                     <Button
                       onClick={handleSendReply}
                       disabled={isPending || !replyText.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 rounded-xl shadow-md shadow-blue-600/20"
+                      className="theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold px-6 rounded-xl shadow-md shadow-blue-600/20"
                     >
                       {isPending ? <Loader2 className="h-4 w-4 animate-spin ms-1" /> : <Send className="h-4 w-4 ms-1" />}
                       إرسال الرد للطالب
@@ -291,8 +291,8 @@ export default function AdminForumPage() {
             </Card>
           ) : (
             <div className="grid place-items-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A] py-24 text-center">
-              <MessageSquare className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-700" />
-              <p className="font-bold text-slate-600 dark:text-slate-400">اختر سؤالاً من القائمة الجانبية لعرضه والرد عليه</p>
+              <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted dark:text-slate-700" />
+              <p className="font-bold text-muted dark:text-slate-400">اختر سؤالاً من القائمة الجانبية لعرضه والرد عليه</p>
             </div>
           )}
         </div>

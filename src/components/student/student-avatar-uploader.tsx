@@ -69,7 +69,7 @@ export function StudentAvatarUploader({
 
   return (
     <div className="relative group shrink-0">
-      <div className="relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-3xl border-2 border-white/40 shadow-xl bg-slate-900">
+      <div className="relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-3xl border-2 border-white/40 shadow-xl theme-panel bg-white dark:bg-slate-900">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={avatar}
@@ -77,7 +77,7 @@ export function StudentAvatarUploader({
           className="h-full w-full object-cover"
         />
         {isPending && (
-          <div className="absolute inset-0 grid place-items-center bg-black/60 backdrop-blur-xs text-white">
+          <div className="absolute inset-0 grid place-items-center theme-inverse bg-black/60 backdrop-blur-xs text-ink">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         )}
@@ -85,7 +85,7 @@ export function StudentAvatarUploader({
 
       {/* Upload Camera Overlay Badge */}
       <label 
-        className="absolute -bottom-1 -left-1 grid h-8 w-8 cursor-pointer place-items-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/40 hover:bg-blue-500 hover:scale-110 active:scale-95 transition"
+        className="absolute -bottom-1 -left-1 grid h-8 w-8 cursor-pointer place-items-center rounded-2xl theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/40 hover:bg-blue-500 hover:scale-110 active:scale-95 transition"
         title="تغيير الصورة الشخصية"
       >
         <Camera className="h-4 w-4" />

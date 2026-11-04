@@ -43,8 +43,11 @@ export default function AdminCreateExamPage() {
   const [lessons, setLessons] = useState<{id: string; title: string; courseId: string}[]>([]);
   const [courseId, setCourseId] = useState('');
   useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    setCourseId(search.get('courseId') || '');
+    setLessonId(search.get('lessonId') || '');
     Promise.all([getDocs(collection(db, 'courses')), getDocs(collection(db, 'lessons'))])
-      .then(([c, l]) => { setCourses(c.docs.map(d => ({id: d.id, title: d.data().title}))); setLessons(l.docs.map(d => ({id: d.id, title: d.data().title, courseId: d.data().courseId}))); })
+      .then(([c, l]) => { setCourses(c.docs.map(d => ({id: d.id, title: d.data().title}))); setLessons(l.docs.filter(d => d.data().isPublished !== false).map(d => ({id: d.id, title: d.data().title, courseId: d.data().courseId}))); })
       .catch(() => toast.error('تعذر تحميل الكورسات. أعد تحميل الصفحة'));
   }, []);
 
@@ -266,26 +269,26 @@ export default function AdminCreateExamPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto rounded-3xl bg-[#070B14] p-4 sm:p-6 text-white" dir="rtl">
+    <div className="space-y-8 max-w-4xl mx-auto rounded-3xl theme-panel bg-slate-50 dark:bg-[#070B14] p-4 sm:p-6 text-ink" dir="rtl">
       {/* ── Top Header ────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-blue-400 mb-1">
             <Link href="/admin/exams" className="hover:underline flex items-center gap-1">
               <ArrowRight className="h-3.5 w-3.5" /> لوحة تحكم الامتحانات
             </Link>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-ink flex items-center gap-2">
             <span>📝</span> بناء وإنشاء امتحان تفاعلي جديد
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted mt-1">
             إضافة الأسئلة وصور التوضيح والخيارات مع الحفظ المباشر في Firebase
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="rounded-2xl bg-[#0B1324] border border-slate-800 px-4 py-2 text-center">
-            <div className="text-xs text-slate-400">مجموع الدرجات</div>
+          <div className="rounded-2xl theme-panel bg-white dark:bg-[#0B1324] border border-slate-200 dark:border-slate-800 px-4 py-2 text-center">
+            <div className="text-xs text-muted">مجموع الدرجات</div>
             <div className="text-lg font-black text-amber-400">{totalExamMarks} درجات</div>
           </div>
         </div>
@@ -293,36 +296,36 @@ export default function AdminCreateExamPage() {
 
       <section className="rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 space-y-4">
         <h2 className="font-bold">أين يظهر الامتحان؟</h2>
-        <p className="text-sm text-slate-400">اختر الكورس ثم الدرس. سيظهر الامتحان في صفحة الكورس وتحت فيديو الدرس تلقائياً.</p>
+        <p className="text-sm text-muted">اختر الكورس ثم الدرس. سيظهر الامتحان في صفحة الكورس وتحت فيديو الدرس تلقائياً.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2">الكورس<select aria-label="الكورس" className="w-full rounded-xl border p-3 bg-slate-900 text-white" value={courseId} onChange={e => {setCourseId(e.target.value); setLessonId('');}}><option value="">اختر الكورس</option>{courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
-          <label className="space-y-2">الدرس<select aria-label="الدرس" disabled={!courseId} className="w-full rounded-xl border p-3 bg-slate-900 text-white" value={lessonId} onChange={e => setLessonId(e.target.value)}><option value="">اختر الدرس</option>{lessons.filter(l => l.courseId === courseId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}</select></label>
+          <label className="space-y-2">الكورس<select aria-label="الكورس" className="w-full rounded-xl border p-3 theme-panel bg-white dark:bg-slate-900 text-ink" value={courseId} onChange={e => {setCourseId(e.target.value); setLessonId('');}}><option value="">اختر الكورس</option>{courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
+          <label className="space-y-2">الدرس<select aria-label="الدرس" disabled={!courseId} className="w-full rounded-xl border p-3 theme-panel bg-white dark:bg-slate-900 text-ink" value={lessonId} onChange={e => setLessonId(e.target.value)}><option value="">اختر الدرس</option>{lessons.filter(l => l.courseId === courseId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}</select></label>
         </div>
         {courseId && !lessons.some(l => l.courseId === courseId) && <Link href="/admin/courses" className="text-blue-400 underline">أضف درساً لهذا الكورس أولاً من إدارة الكورسات</Link>}
       </section>
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* ── Exam Metadata Card ────────────────────────────── */}
-        <div className="rounded-3xl border border-slate-800 bg-[#0B1324] p-6 shadow-xl space-y-5">
-          <h2 className="text-base font-black text-white flex items-center gap-2">
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 theme-panel bg-white dark:bg-[#0B1324] p-6 shadow-xl space-y-5">
+          <h2 className="text-base font-black text-ink flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-400" />
             بيانات الامتحان الأساسية
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-xs font-bold text-slate-300">اسم الامتحان *</label>
+              <label className="text-xs font-bold text-muted">اسم الامتحان *</label>
               <input
                 type="text"
                 required
                 value={examTitle}
                 onChange={(e) => setExamTitle(e.target.value)}
                 placeholder="مثال: امتحان الحصة الأولى - همزة الوصل والقطع والمشتقات"
-                className="w-full rounded-2xl border border-slate-800 bg-[#070B14] px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] px-4 py-3 text-sm text-ink placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300">مدة الامتحان (بالدقائق) *</label>
+              <label className="text-xs font-bold text-muted">مدة الامتحان (بالدقائق) *</label>
               <div className="relative">
                 <input
                   type="number"
@@ -331,14 +334,14 @@ export default function AdminCreateExamPage() {
                   required
                   value={durationMinutes}
                   onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-slate-800 bg-[#070B14] px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] px-4 py-3 text-sm text-ink focus:border-blue-500 focus:outline-none"
                 />
-                <span className="absolute left-4 top-3 text-xs text-slate-500">دقيقة</span>
+                <span className="absolute left-4 top-3 text-xs text-muted">دقيقة</span>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300">نسبة النجاح المطلوبة لفتح الدرس التالي *</label>
+              <label className="text-xs font-bold text-muted">نسبة النجاح المطلوبة لفتح الدرس التالي *</label>
               <div className="relative">
                 <input
                   type="number"
@@ -347,20 +350,20 @@ export default function AdminCreateExamPage() {
                   required
                   value={passingPercentage}
                   onChange={(e) => setPassingPercentage(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-slate-800 bg-[#070B14] px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] px-4 py-3 text-sm text-ink focus:border-blue-500 focus:outline-none"
                 />
-                <span className="absolute left-4 top-3 text-xs text-slate-500">%</span>
+                <span className="absolute left-4 top-3 text-xs text-muted">%</span>
               </div>
             </div>
 
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="text-xs font-bold text-slate-300">وصف وتعليمات الامتحان للطلاب</label>
+              <label className="text-xs font-bold text-muted">وصف وتعليمات الامتحان للطلاب</label>
               <textarea
                 rows={2}
                 value={examDescription}
                 onChange={(e) => setExamDescription(e.target.value)}
                 placeholder="تعليمات الامتحان (تنبيه: الخروج من الشاشة أو فتح نافذة جديدة يسلم الامتحان تلقائياً)"
-                className="w-full rounded-2xl border border-slate-800 bg-[#070B14] px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] px-4 py-3 text-sm text-ink placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
               />
             </div>
           </div>
@@ -369,7 +372,7 @@ export default function AdminCreateExamPage() {
         {/* ── Questions Builder List ────────────────────────── */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-white flex items-center gap-2">
+            <h2 className="text-lg font-black text-ink flex items-center gap-2">
               <Layers className="h-5 w-5 text-blue-500" />
               أسئلة الامتحان ({questions.length})
             </h2>
@@ -385,14 +388,14 @@ export default function AdminCreateExamPage() {
               <button
                 type="button"
                 onClick={() => addQuestion('mcq')}
-                className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-3.5 py-2 text-xs font-black text-white shadow-md transition"
+                className="flex items-center gap-1.5 rounded-xl theme-inverse bg-blue-600 hover:bg-blue-500 px-3.5 py-2 text-xs font-black text-ink shadow-md transition"
               >
                 <Plus className="h-4 w-4" /> إضافة سؤال اختيار من متعدد (MCQ)
               </button>
               <button
                 type="button"
                 onClick={() => addQuestion('essay')}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 px-3.5 py-2 text-xs font-bold text-slate-200 transition"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 theme-panel bg-white/80 dark:bg-slate-800/80 hover:bg-slate-700 px-3.5 py-2 text-xs font-bold text-ink transition"
               >
                 <Plus className="h-4 w-4" /> إضافة سؤال مقالي
               </button>
@@ -410,13 +413,13 @@ export default function AdminCreateExamPage() {
                 <button
                   type="button"
                   onClick={() => setShowCodeImportModal(false)}
-                  className="rounded-xl border border-slate-700 px-3 py-1 text-xs text-slate-400 hover:text-white"
+                  className="rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs text-muted hover:text-white"
                 >
                   إلغاء ✕
                 </button>
               </div>
 
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-muted">
                 الصق كود الأسئلة الجاهز (JSON) الذي قمت بإنشائه، وسيتم تحويله فوراً لأسئلة تفاعلية مع الخيارات والإجابات النموذجية:
               </p>
 
@@ -443,11 +446,11 @@ export default function AdminCreateExamPage() {
     "correctAnswer": "إجابة نموذجية..."
   }
 ]`}
-                className="w-full rounded-2xl border border-slate-800 bg-black/90 p-4 font-mono text-xs text-emerald-400 placeholder:text-slate-600 focus:border-amber-400 focus:outline-none"
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 theme-inverse bg-black/90 p-4 font-mono text-xs text-emerald-400 placeholder:text-slate-600 focus:border-amber-400 focus:outline-none"
               />
 
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-muted">
                   يدعم أسئلة الاختيار من متعدد والأسئلة المقالية تلقائياً.
                 </span>
                 <button
@@ -464,21 +467,21 @@ export default function AdminCreateExamPage() {
           {questions.map((q, qIndex) => (
             <div
               key={q.id}
-              className="rounded-3xl border border-slate-800 bg-[#0B1324] p-6 shadow-xl space-y-5 relative"
+              className="rounded-3xl border border-slate-200 dark:border-slate-800 theme-panel bg-white dark:bg-[#0B1324] p-6 shadow-xl space-y-5 relative"
             >
               {/* Question Header & Delete */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-xl bg-blue-600 text-xs font-black text-white">
+                  <span className="grid h-7 w-7 place-items-center rounded-xl theme-inverse bg-blue-600 text-xs font-black text-ink">
                     {qIndex + 1}
                   </span>
-                  <span className="text-sm font-black text-white">
+                  <span className="text-sm font-black text-ink">
                     {q.type === 'mcq' ? 'سؤال اختيار من متعدد (MCQ)' : 'سؤال مقالي (كتابة وإجابة تفصيلية)'}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <div className="flex items-center gap-1.5 text-xs text-muted">
                     <span>الدرجة:</span>
                     <input
                       type="number"
@@ -491,7 +494,7 @@ export default function AdminCreateExamPage() {
                           prev.map((item, idx) => (idx === qIndex ? { ...item, marks: val } : item))
                         );
                       }}
-                      className="w-14 rounded-xl border border-slate-800 bg-[#070B14] px-2 py-1 text-center text-xs text-white"
+                      className="w-14 rounded-xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] px-2 py-1 text-center text-xs text-ink"
                     />
                   </div>
 
@@ -510,7 +513,7 @@ export default function AdminCreateExamPage() {
 
               {/* Question Text */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">نص السؤال *</label>
+                <label className="text-xs font-bold text-muted">نص السؤال *</label>
                 <textarea
                   rows={2}
                   required
@@ -522,18 +525,18 @@ export default function AdminCreateExamPage() {
                     );
                   }}
                   placeholder="اكتب صيغة السؤال هنا..."
-                  className="w-full rounded-2xl border border-slate-800 bg-[#070B14] px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] px-4 py-3 text-sm text-ink placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
               {/* Upload Image Section */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-muted flex items-center gap-1.5">
                   <ImageIcon className="h-4 w-4 text-cyan-400" />
                   صورة توضيحية للسؤال (اختياري)
                 </label>
                 <div className="flex items-center gap-4">
-                  <label className="cursor-pointer rounded-2xl border border-dashed border-slate-700 bg-[#070B14] hover:border-blue-500 px-4 py-2.5 text-xs font-bold text-slate-300 flex items-center gap-2 transition">
+                  <label className="cursor-pointer rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 theme-panel bg-slate-50 dark:bg-[#070B14] hover:border-blue-500 px-4 py-2.5 text-xs font-bold text-muted flex items-center gap-2 transition">
                     <Upload className="h-4 w-4 text-blue-400" />
                     اختر صورة من جهازك
                     <input
@@ -545,7 +548,7 @@ export default function AdminCreateExamPage() {
                   </label>
 
                   {q.imagePreview && (
-                    <div className="relative h-14 w-24 overflow-hidden rounded-xl border border-slate-700">
+                    <div className="relative h-14 w-24 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={q.imagePreview} alt="معاينة" className="h-full w-full object-cover" />
                     </div>
@@ -556,7 +559,7 @@ export default function AdminCreateExamPage() {
               {/* MCQ Options with Radio Select for Correct Answer */}
               {q.type === 'mcq' ? (
                 <div className="space-y-3 pt-2">
-                  <label className="text-xs font-bold text-slate-300">
+                  <label className="text-xs font-bold text-muted">
                     الخيارات الأربعة (حدد علامة الاختيار أمام الإجابة الصحيحة) *
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -571,7 +574,7 @@ export default function AdminCreateExamPage() {
                             'flex items-center gap-3 rounded-2xl border p-2.5 transition',
                             isCorrect
                               ? 'border-emerald-500 bg-emerald-950/30'
-                              : 'border-slate-800 bg-[#070B14]'
+                              : 'border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14]'
                           )}
                         >
                           <input
@@ -590,7 +593,7 @@ export default function AdminCreateExamPage() {
                           <span
                             className={cn(
                               'grid h-6 w-6 shrink-0 place-items-center rounded-lg text-xs font-black',
-                              isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'
+                              isCorrect ? 'theme-inverse bg-emerald-600 text-ink' : 'theme-panel bg-white dark:bg-slate-800 text-muted'
                             )}
                           >
                             {letters[optIndex]}
@@ -601,7 +604,7 @@ export default function AdminCreateExamPage() {
                             value={opt.text}
                             onChange={(e) => handleOptionChange(qIndex, optIndex, e.target.value)}
                             placeholder={`الخيار (${letters[optIndex]})`}
-                            className="w-full bg-transparent text-xs text-white placeholder:text-slate-600 focus:outline-none"
+                            className="w-full bg-transparent text-xs text-ink placeholder:text-slate-600 focus:outline-none"
                           />
                         </div>
                       );
@@ -609,7 +612,7 @@ export default function AdminCreateExamPage() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-800 bg-[#070B14] p-4 text-xs text-slate-400">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 theme-panel bg-slate-50 dark:bg-[#070B14] p-4 text-xs text-muted">
                   سيكون للطالب مساحة كتابة نصية أو رفع صورة إجابته لتصحيحها من قبل المعلم.
                 </div>
               )}
@@ -618,8 +621,8 @@ export default function AdminCreateExamPage() {
         </div>
 
         {/* ── Submit / Publish Button ────────────────────────── */}
-        <div className="sticky bottom-6 z-20 rounded-3xl border border-slate-700 bg-[#0B1324]/90 backdrop-blur-md p-4 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-xs text-slate-300">
+        <div className="sticky bottom-6 z-20 rounded-3xl border border-slate-200 dark:border-slate-700 theme-panel bg-white/90 dark:bg-[#0B1324]/90 backdrop-blur-md p-4 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-xs text-muted">
             <span className="flex items-center gap-1.5 font-bold">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
               جاهز للنشر على Firebase
@@ -633,7 +636,7 @@ export default function AdminCreateExamPage() {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 px-8 py-3.5 text-xs font-black text-white shadow-xl shadow-blue-600/30 transition hover:scale-105 disabled:opacity-50"
+            className="w-full sm:w-auto rounded-2xl theme-inverse bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 px-8 py-3.5 text-xs font-black text-ink shadow-xl shadow-blue-600/30 transition hover:scale-105 disabled:opacity-50"
           >
             {isPending ? 'جاري نشر الامتحان...' : 'نشر الامتحان فوراً 🚀'}
           </button>

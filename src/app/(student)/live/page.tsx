@@ -15,12 +15,12 @@ export default function LivePage() {
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-3xl font-black text-brand-900">البث المباشر</h1>
-        <p className="mt-1 text-slate-600">تابع محاضرات لايف مع مستر عبدالرحمن الأسيوطي.</p>
+        <p className="mt-1 text-muted">تابع محاضرات لايف مع مستر عبدالرحمن الأسيوطي.</p>
       </header>
 
       {upcoming.length === 0 ? (
         <Card>
-          <CardContent className="p-10 text-center text-slate-500">
+          <CardContent className="p-10 text-center text-muted">
             مفيش لايفات مجدولة حالياً. تابعنا عشان أول ما يتحدد ميعاد هنبعتلك إشعار.
           </CardContent>
         </Card>
@@ -37,8 +37,8 @@ export default function LivePage() {
                 <CardTitle>{s.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {s.description && <p className="text-sm text-slate-600">{s.description}</p>}
-                <p className="flex items-center gap-2 text-xs text-slate-500">
+                {s.description && <p className="text-sm text-muted">{s.description}</p>}
+                <p className="flex items-center gap-2 text-xs text-muted">
                   <Calendar className="h-3.5 w-3.5" />
                   {new Date(s.scheduled_at).toLocaleString('ar-EG')}
                 </p>

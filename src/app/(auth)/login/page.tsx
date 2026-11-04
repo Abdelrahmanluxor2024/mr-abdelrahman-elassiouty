@@ -15,7 +15,7 @@ import { loginWithPhone } from '@/lib/firebase/auth-service';
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="grid min-h-screen place-items-center bg-[#070B14] text-white">جاري التحميل...</div>}>
+    <Suspense fallback={<div className="grid min-h-screen place-items-center theme-panel bg-slate-50 dark:bg-[#070B14] text-ink">جاري التحميل...</div>}>
       <LoginForm />
     </Suspense>
   );
@@ -66,7 +66,7 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative grid min-h-screen place-items-center px-4 overflow-hidden bg-[#070B14]" dir="rtl">
+    <main className="relative grid min-h-screen place-items-center px-4 overflow-hidden theme-panel bg-slate-50 dark:bg-[#070B14]" dir="rtl">
       {/* Background */}
       <div className="absolute inset-0 -z-10">
         <Image
@@ -76,10 +76,10 @@ function LoginForm() {
           priority
           className="object-cover opacity-35"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#070B14]/80 via-[#070B14]/70 to-[#070B14]" />
+        <div className="absolute inset-0 theme-inverse bg-gradient-to-b from-[#070B14]/80 via-[#070B14]/70 to-[#070B14]" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-blue-500/30 bg-[#0B1324]/90 p-8 shadow-2xl shadow-blue-500/20 backdrop-blur-xl">
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-blue-500/30 theme-panel bg-white/90 dark:bg-[#0B1324]/90 p-8 shadow-2xl shadow-blue-500/20 backdrop-blur-xl">
         <div className="mb-6 text-center">
           <div className="relative mx-auto mb-3 h-16 w-20">
             <Image
@@ -89,15 +89,15 @@ function LoginForm() {
               className="object-contain drop-shadow-lg"
             />
           </div>
-          <h1 className="font-display text-2xl font-black text-white">تسجيل الدخول</h1>
-          <p className="mt-1 text-sm text-slate-400">أهلاً بيك تاني، يلا نكمل المشوار 👋</p>
+          <h1 className="font-display text-2xl font-black text-ink">تسجيل الدخول</h1>
+          <p className="mt-1 text-sm text-muted">أهلاً بيك تاني، يلا نكمل المشوار 👋</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5 text-right">
-            <Label htmlFor="phone" className="text-slate-200 font-bold text-xs sm:text-sm">رقم الهاتف</Label>
+            <Label htmlFor="phone" className="text-ink font-bold text-xs sm:text-sm">رقم الهاتف</Label>
             <div className="relative">
-              <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Phone className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
               <Input
                 id="phone"
                 inputMode="tel"
@@ -105,16 +105,16 @@ function LoginForm() {
                 placeholder="01xxxxxxxxx"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="ps-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
+                className="ps-10 theme-panel bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 text-ink placeholder:text-slate-500 focus:border-blue-500"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-1.5 text-right">
-            <Label htmlFor="password" className="text-slate-200 font-bold text-xs sm:text-sm">كلمة المرور</Label>
+            <Label htmlFor="password" className="text-ink font-bold text-xs sm:text-sm">كلمة المرور</Label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Lock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
               <Input
                 id="password"
                 autoComplete="current-password"
@@ -122,13 +122,13 @@ function LoginForm() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="ps-10 pe-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 font-bold"
+                className="ps-10 pe-10 theme-panel bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 text-ink placeholder:text-slate-500 focus:border-blue-500 font-bold"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-slate-200"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -144,7 +144,7 @@ function LoginForm() {
 
           <Button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-2xl shadow-lg shadow-blue-600/30"
+            className="w-full theme-inverse bg-blue-600 hover:bg-blue-500 text-ink font-black py-3 rounded-2xl shadow-lg shadow-blue-600/30"
             size="lg"
             disabled={isPending}
           >
@@ -162,7 +162,7 @@ function LoginForm() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="mt-6 text-center text-sm text-muted">
           مش معاك حساب؟{' '}
           <Link href="/register" className="font-bold text-cyan-400 hover:underline">
             أنشئ حساب

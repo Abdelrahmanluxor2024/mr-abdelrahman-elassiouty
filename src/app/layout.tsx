@@ -49,7 +49,7 @@ export default function RootLayout({
 
       suppressHydrationWarning
     >
-      <body className="min-h-screen bg-soft font-sans text-slate-900">
+      <body className="min-h-screen theme-panel bg-slate-50 dark:bg-[#070B14] font-sans text-ink">
         <Providers>{children}</Providers>
         <Toaster />
       </body>

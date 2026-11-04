@@ -38,6 +38,9 @@ export interface FirebaseLesson {
   description?: string;
   moduleId?: string;
   moduleTitle?: string;
+  videos?: {id: string; title: string; url: string}[];
+  files?: {id: string; title: string; url: string; locked?: boolean}[];
+  isPublished?: boolean;
   videoUrl?: string;
   videoDuration?: number;
   pdfUrl?: string;

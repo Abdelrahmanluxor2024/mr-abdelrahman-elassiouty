@@ -26,8 +26,8 @@ export default function NotificationsPage() {
         <Skeleton className="h-32 w-full rounded-3xl" />
       ) : !data || data.length === 0 ? (
         <Card className="rounded-3xl border border-slate-200 dark:border-slate-800">
-          <CardContent className="p-10 text-center text-slate-500">
-            <Bell className="mx-auto h-8 w-8 text-slate-400" />
+          <CardContent className="p-10 text-center text-muted">
+            <Bell className="mx-auto h-8 w-8 text-muted" />
             <p className="mt-2 text-sm font-semibold">لا توجد إشعارات جديدة حالياً.</p>
           </CardContent>
         </Card>
@@ -55,24 +55,24 @@ export default function NotificationsPage() {
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="font-bold text-slate-900 dark:text-white text-base">{n.title}</p>
+                    <p className="font-bold text-ink dark:text-white text-base">{n.title}</p>
                     {!n.is_read && (
-                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                      <span className="rounded-full theme-inverse bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-ink">
                         جديد
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{n.message}</p>
+                  <p className="text-sm text-muted dark:text-slate-300 leading-relaxed whitespace-pre-line">{n.message}</p>
                   
                   {/* Attached Image */}
                   {hasImage && (
-                    <div className="mt-3 relative max-h-72 w-full max-w-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-black">
+                    <div className="mt-3 relative max-h-72 w-full max-w-md rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 theme-inverse bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={hasImage} alt="مرفق الإشعار" className="max-h-72 w-full object-contain" />
                     </div>
                   )}
 
-                  <p className="mt-1 text-[11px] text-slate-400">{new Date(n.created_at).toLocaleString('ar-EG')}</p>
+                  <p className="mt-1 text-[11px] text-muted">{new Date(n.created_at).toLocaleString('ar-EG')}</p>
                 </div>
               </div>
             );

@@ -11,16 +11,16 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-brand-600 text-white shadow-blue-soft hover:bg-brand-500',
+          'theme-inverse bg-brand-600 text-ink shadow-blue-soft hover:bg-brand-700',
         outline:
-          'border border-brand-600/30 bg-white text-brand-700 hover:bg-brand-50',
-        ghost: 'hover:bg-brand-50 text-brand-700',
+          'border border-brand-600/30 theme-panel bg-white dark:bg-slate-900 text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950',
+        ghost: 'hover:bg-brand-50 dark:hover:bg-brand-950 text-brand-700',
         secondary:
-          'bg-brand-100 text-brand-800 hover:bg-brand-200',
+          'theme-panel bg-brand-100 dark:bg-brand-950 text-brand-800 hover:bg-brand-200 dark:hover:bg-brand-950',
         destructive:
-          'bg-error text-white hover:bg-red-600',
+          'theme-inverse bg-red-700 text-ink hover:bg-red-600',
         success:
-          'bg-success text-white hover:bg-emerald-600',
+          'theme-inverse bg-emerald-700 text-ink hover:bg-emerald-800',
         link: 'text-brand-700 underline-offset-4 hover:underline',
       },
       size: {

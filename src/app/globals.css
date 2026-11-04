@@ -1,11 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;500;700;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #475569;
+  --line: #e2e8f0;
+  --chart-text: #475569;
+  --chart-grid: #e2e8f0;
 }
 
 html,
@@ -66,3 +70,52 @@ body {
 
 /* Bundled fonts: no Google Fonts request required at build time. */
 :root { --font-cairo: "Cairo"; --font-tajawal: "Tajawal"; --font-inter: "Inter"; }
+
+/* Semantic contrast tokens are reset by real panels, and inverted only on
+   intentionally dark/colored media, headers, badges and action buttons. */
+.dark {
+  color-scheme: dark;
+  --panel: #0f172a;
+  --ink: #f1f5f9;
+  --muted: #cbd5e1;
+  --line: #334155;
+  --chart-text: #cbd5e1;
+  --chart-grid: #334155;
+}
+.theme-panel { color: var(--ink); --ink: #0f172a; --muted: #475569; }
+.dark .theme-panel { color: var(--ink); --ink: #f1f5f9; --muted: #cbd5e1; }
+.theme-inverse, .dark .theme-inverse { color: var(--ink); --ink: #fff; --muted: #e2e8f0; }
+.text-ink { color: var(--ink); }
+.text-muted { color: var(--muted); }
+.studio-select {
+  width: 100%; border: 1px solid var(--line); background: var(--panel);
+  color: var(--ink); border-radius: .75rem; padding: .75rem; font-size: .875rem;
+}
+.studio-select:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+/* Make older unpaired status/link utilities readable on both panel themes. */
+html:not(.dark) :where(.text-blue-300, .text-blue-400, .text-blue-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #1d4ed8; }
+html.dark :where(.text-blue-500, .text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900) { color: #93c5fd; }
+html:not(.dark) :where(.text-brand-300, .text-brand-400, .text-brand-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #1d4ed8; }
+html.dark :where(.text-brand-500, .text-brand-600, .text-brand-700, .text-brand-800, .text-brand-900) { color: #93c5fd; }
+html:not(.dark) :where(.text-cyan-300, .text-cyan-400, .text-cyan-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #0e7490; }
+html.dark :where(.text-cyan-500, .text-cyan-600, .text-cyan-700, .text-cyan-800, .text-cyan-900) { color: #67e8f9; }
+html:not(.dark) :where(.text-purple-300, .text-purple-400, .text-purple-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #7e22ce; }
+html.dark :where(.text-purple-500, .text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900) { color: #d8b4fe; }
+html:not(.dark) :where(.text-indigo-300, .text-indigo-400, .text-indigo-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #4338ca; }
+html.dark :where(.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900) { color: #a5b4fc; }
+html:not(.dark) :where(.text-violet-300, .text-violet-400, .text-violet-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #6d28d9; }
+html.dark :where(.text-violet-500, .text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900) { color: #c4b5fd; }
+html:not(.dark) :where(.text-emerald-300, .text-emerald-400, .text-emerald-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #047857; }
+html.dark :where(.text-emerald-500, .text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900) { color: #6ee7b7; }
+html:not(.dark) :where(.text-teal-300, .text-teal-400, .text-teal-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #0f766e; }
+html.dark :where(.text-teal-500, .text-teal-600, .text-teal-700, .text-teal-800, .text-teal-900) { color: #5eead4; }
+html:not(.dark) :where(.text-green-300, .text-green-400, .text-green-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #15803d; }
+html.dark :where(.text-green-500, .text-green-600, .text-green-700, .text-green-800, .text-green-900) { color: #86efac; }
+html:not(.dark) :where(.text-red-300, .text-red-400, .text-red-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #b91c1c; }
+html.dark :where(.text-red-500, .text-red-600, .text-red-700, .text-red-800, .text-red-900) { color: #fca5a5; }
+html:not(.dark) :where(.text-rose-300, .text-rose-400, .text-rose-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #be123c; }
+html.dark :where(.text-rose-500, .text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900) { color: #fda4af; }
+html:not(.dark) :where(.text-amber-300, .text-amber-400, .text-amber-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #92400e; }
+html.dark :where(.text-amber-500, .text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) { color: #fde68a; }
+html:not(.dark) :where(.text-orange-300, .text-orange-400, .text-orange-500):not(:where(.theme-inverse, .theme-inverse *)) { color: #9a3412; }
+html.dark :where(.text-orange-500, .text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900) { color: #fdba74; }

@@ -9,7 +9,7 @@ const Progress = React.forwardRef<
 >(({ className, value = 0, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('h-2 w-full overflow-hidden rounded-full bg-slate-200', className)}
+    className={cn('h-2 w-full overflow-hidden rounded-full theme-panel bg-slate-200 dark:bg-slate-800', className)}
     role="progressbar"
     aria-valuenow={value}
     aria-valuemin={0}
@@ -17,7 +17,7 @@ const Progress = React.forwardRef<
     {...props}
   >
     <div
-      className="h-full bg-brand-gradient transition-all"
+      className="h-full theme-inverse bg-brand-gradient transition-all"
       style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
     />
   </div>

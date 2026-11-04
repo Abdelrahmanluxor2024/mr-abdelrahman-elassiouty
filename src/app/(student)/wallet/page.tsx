@@ -54,18 +54,18 @@ export default function WalletPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto" dir="rtl">
       <header>
-        <h1 className="font-display text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+        <h1 className="font-display text-2xl sm:text-3xl font-black text-ink dark:text-white flex items-center gap-2">
           <span>المحفظة والشحن</span>
           <span>💳</span>
         </h1>
-        <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-xs sm:text-sm text-muted dark:text-slate-400">
           اشحن محفظتك بكود السنتر أو وسائل الدفع الإلكتروني للاشتراك في الكورسات.
         </p>
       </header>
 
       {/* Balance Card */}
       <Card className="overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-md">
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 p-6 text-white relative overflow-hidden">
+        <div className="theme-inverse bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 p-6 text-ink relative overflow-hidden">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
               <WalletIcon className="h-5 w-5 text-cyan-300" />
@@ -91,14 +91,14 @@ export default function WalletPage() {
         <TabsContent value="code">
           <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E172A]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-ink dark:text-white">
                 <Hash className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
                 شحن بكود من السنتر
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="code" className="text-xs font-bold text-slate-700 dark:text-slate-300">كود الشحن</Label>
+                <Label htmlFor="code" className="text-xs font-bold text-ink dark:text-slate-300">كود الشحن</Label>
                 <Input
                   id="code"
                   value={code}
@@ -110,7 +110,7 @@ export default function WalletPage() {
               <Button
                 onClick={onRedeem}
                 disabled={loading || !code.trim()}
-                className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 shadow-md shadow-blue-600/20"
+                className="w-full rounded-xl theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold py-2.5 shadow-md shadow-blue-600/20"
               >
                 {loading ? 'جاري التحقق والشحن...' : 'شحن الرصيد ⚡'}
               </Button>
@@ -121,14 +121,14 @@ export default function WalletPage() {
         <TabsContent value="fawry">
           <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0E172A]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-ink dark:text-white">
                 <CreditCard className="h-5 w-5 text-blue-600 dark:text-cyan-400" />
                 الشحن عن طريق Fawry Pay
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="amount" className="text-xs font-bold text-slate-700 dark:text-slate-300">قيمة الشحن (ج.م)</Label>
+                <Label htmlFor="amount" className="text-xs font-bold text-ink dark:text-slate-300">قيمة الشحن (ج.م)</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -155,7 +155,7 @@ export default function WalletPage() {
               <Button
                 onClick={onFawry}
                 disabled={loading}
-                className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 shadow-md shadow-emerald-600/20"
+                className="w-full rounded-xl theme-inverse bg-emerald-600 hover:bg-emerald-700 text-ink font-bold py-2.5 shadow-md shadow-emerald-600/20"
               >
                 {loading ? 'جاري التحويل...' : 'ادفع بـ Fawry'}
               </Button>

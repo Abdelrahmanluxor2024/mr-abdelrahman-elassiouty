@@ -11,7 +11,7 @@ const Separator = React.forwardRef<
     ref={ref}
     role="separator"
     className={cn(
-      'shrink-0 bg-slate-200',
+      'shrink-0 theme-panel bg-slate-200 dark:bg-slate-800',
       orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
       className
     )}

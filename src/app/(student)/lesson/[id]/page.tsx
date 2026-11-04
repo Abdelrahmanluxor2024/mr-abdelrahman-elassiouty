@@ -1,271 +1,293 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { getLessonById, getExamByLesson, getStudentPassedExams, isEnrolledInCourse } from '@/lib/firebase/services';
-import type { FirebaseLesson, FirebaseExam } from '@/lib/firebase/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { SecureVideoPlayer } from '@/components/course/secure-video-player';
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/config";
+import {
+  getLessonById,
+  getExamsByLesson,
+  getStudentPassedExams,
+  isEnrolledInCourse,
+} from "@/lib/firebase/services";
+import { lessonVideos, lessonFiles } from "@/lib/learning-content";
+import { completeLesson } from "@/app/actions/learning";
+import { useCurrentStudent } from "@/lib/firebase/use-student-auth";
+import type { FirebaseLesson, FirebaseExam } from "@/lib/firebase/types";
+import { SecureVideoPlayer } from "@/components/course/secure-video-player";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   PlayCircle,
   FileText,
   ClipboardList,
   CheckCircle2,
   Lock,
-  Clock,
-  Sparkles,
   ArrowRight,
-  Eye,
-  Download,
-  AlertCircle
-} from 'lucide-react';
-import { useCurrentStudent } from '@/lib/firebase/use-student-auth';
-import { cn } from '@/lib/utils';
-
-export default function LessonDetailsPage() {
-  const params = useParams<{ id: string }>();
-  const id = params.id;
-  const router = useRouter();
-  const {student} = useCurrentStudent();
-
-  const [access, setAccess] = useState(false);
-  const [courseId, setCourseId] = useState('');
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+export default function LessonPage() {
+  const { id } = useParams<{ id: string }>();
+  const { student } = useCurrentStudent();
   const [lesson, setLesson] = useState<FirebaseLesson | null>(null);
-  const [exam, setExam] = useState<FirebaseExam | null>(null);
-  const [passedExams, setPassedExams] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeVideoPart, setActiveVideoPart] = useState(1);
-
+  const [exams, setExams] = useState<FirebaseExam[]>([]);
+  const [passed, setPassed] = useState<Set<string>>(new Set());
+  const [courseId, setCourseId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [active, setActive] = useState("");
+  const [completed, setCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [progressError, setProgressError] = useState("");
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setIsLoading(true); setAccess(false); setLesson(null);
+      setLoading(true);
+      setLesson(null);
+      setError("");
+      setCompleted(false);
+      setProgressError("");
       try {
         const l = await getLessonById(id);
-        if (cancelled || !l) return;
+        if (!l || cancelled) return;
         setCourseId(l.courseId);
         if (!(await isEnrolledInCourse(student.id, l.courseId))) return;
+        const list = await getExamsByLesson(id),
+          p = await getStudentPassedExams(student.id);
         if (cancelled) return;
-        setAccess(true); setLesson(l);
-        const ex = await getExamByLesson(id);
-        setExam(ex);
-        const passed = await getStudentPassedExams(student.id);
-        setPassedExams(passed);
-      } catch (err) {
-        console.error('Failed to load lesson', err);
+        setLesson(l);
+        setExams(list);
+        setPassed(p);
+        setActive(lessonVideos(l)[0]?.id || "");
+        await auth.authStateReady();
+        if (auth.currentUser) {
+          try {
+            const done = await getDoc(
+              doc(db, "lesson_progress", `${auth.currentUser.uid}_${id}`),
+            );
+            if (!cancelled) setCompleted(done.exists());
+          } catch {
+            if (!cancelled)
+              setProgressError(
+                "تعذر قراءة تقدمك المحفوظ. المحتوى متاح، لكن حفظ التقدم قد يحتاج مراجعة صلاحيات الحساب.",
+              );
+          }
+        }
+      } catch {
+        if (!cancelled)
+          setError("تعذر تحميل المحتوى. تحقق من الاتصال أو صلاحيات الوصول");
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-    return () => {cancelled = true;};
+    return () => {
+      cancelled = true;
+    };
   }, [id, student.id]);
-
-  if (isLoading) {
+  if (loading) return <Skeleton className="h-96 rounded-3xl" />;
+  if (error)
     return (
-      <div className="space-y-6" dir="rtl">
-        <Skeleton className="h-96 w-full rounded-3xl bg-slate-800/40" />
-        <Skeleton className="h-48 w-full rounded-3xl bg-slate-800/40" />
+      <div role="alert" className="p-10 text-center space-y-4">
+        <p>{error}</p>
+        <Button onClick={() => location.reload()}>إعادة المحاولة</Button>
       </div>
     );
-  }
-
-  if (!access && courseId) return <div className="p-10 text-center space-y-4" dir="rtl"><Lock className="mx-auto h-12 w-12 text-amber-400"/><h1 className="text-xl font-black">اشترك في الكورس أولاً</h1><p>لا يُفتح الفيديو أو الملف إلا بعد تأكيد دفع الاشتراك.</p><Link className="inline-block rounded-xl bg-blue-600 text-white px-6 py-3" href={`/course/${courseId}`}>الرجوع للكورس والدفع</Link></div>;
-  if (!lesson) {
+  if (!lesson)
     return (
-      <div className="py-20 text-center text-slate-400" dir="rtl">
-        <p className="text-lg font-bold">المحاضرة غير موجودة أو تم حذفها.</p>
-        <Link href="/courses" className="mt-4 inline-block text-blue-400 font-bold hover:underline">
-          العودة للكورسات
+      <div className="py-16 text-center space-y-4">
+        <Lock className="mx-auto h-10 w-10 text-amber-500" />
+        <h1 className="text-xl font-black">
+          {courseId
+            ? "اشترك في الكورس لفتح هذا الدرس"
+            : "الدرس غير موجود أو مخفي"}
+        </h1>
+        <Link
+          href={courseId ? `/course/${courseId}` : "/courses"}
+          className="text-blue-600 dark:text-cyan-300 underline"
+        >
+          الرجوع للكورس
         </Link>
       </div>
     );
-  }
-
-  const examId = exam?.id || `exam-${lesson.id}`;
-  const isExamPassed = passedExams.has(examId);
-  const isPdfLocked = lesson.isPdfLocked && !!exam && !isExamPassed;
-
+  const videos = lessonVideos(lesson),
+    files = lessonFiles(lesson),
+    current = videos.find((v) => v.id === active) || videos[0];
+  const allPassed = exams.length > 0 && exams.every((e) => passed.has(e.id));
   return (
-    <div className="space-y-8" dir="rtl">
-      {/* ── Top Header ────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-400 mb-1">
-            <Link href={`/course/${lesson.courseId}`} className="hover:underline flex items-center gap-1">
-              <ArrowRight className="h-3.5 w-3.5" /> الرجوع للكورس
-            </Link>
-            <span>•</span>
-            <span>الدرس {lesson.orderIndex || 1}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white">
-            {lesson.title}
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isExamPassed ? (
-            <span className="flex items-center gap-1.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 px-3.5 py-1.5 text-xs font-bold text-emerald-400">
-              <CheckCircle2 className="h-4 w-4" /> اجتزت امتحان هذا الدرس
-            </span>
-          ) : exam ? (
-            <span className="flex items-center gap-1.5 rounded-2xl bg-amber-950/80 border border-amber-500/30 px-3.5 py-1.5 text-xs font-bold text-amber-400">
-              <AlertCircle className="h-4 w-4" /> مطلوب اجتياز الامتحان لفتح التالي
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* ── SECTION 1: أجزاء الدرس (Matching Screenshot 4) ────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-            <PlayCircle className="h-5 w-5 text-amber-400" />
-            أجزاء الدرس والشرح التفاعلي
-          </h2>
-          <span className="text-xs text-slate-400">{lesson.videoUrl ? 'فيديو واحد متاح' : 'لم يُضف فيديو بعد'}</span>
-        </div>
-
-        {/* Video Player Box */}
-        {lesson.videoUrl && (
-          <div className="overflow-hidden rounded-3xl border border-slate-800 bg-black shadow-2xl">
+    <div dir="rtl" className="space-y-8">
+      <header className="space-y-3">
+        <Link
+          href={`/course/${lesson.courseId}`}
+          className="inline-flex gap-2 items-center text-sm font-bold text-blue-600 dark:text-cyan-300"
+        >
+          <ArrowRight className="h-4 w-4" />
+          العودة للكورس
+        </Link>
+        <p className="text-sm text-muted">
+          {lesson.moduleTitle || `الدرس ${lesson.orderIndex}`}
+        </p>
+        <h1 className="text-3xl font-black">{lesson.title}</h1>
+        <p className="text-muted leading-8">{lesson.description}</p>
+      </header>
+      <section className="space-y-4">
+        <h2 className="text-xl font-black flex gap-2 items-center">
+          <PlayCircle className="text-blue-500" />
+          فيديوهات الشرح{" "}
+          <span className="text-sm text-muted">({videos.length})</span>
+        </h2>
+        {current ? (
+          <>
             <SecureVideoPlayer
-              src={lesson.videoUrl}
-              watermarkText="منصة الأستاذ عبدالرحمن الأسيوطي • الدفعة 2026"
-              embed={true}
+              key={current.id}
+              src={current.url}
+              watermarkText={`${student.fullName} • ${student.phone}`}
             />
-          </div>
-        )}
-
-        {!lesson.videoUrl && <p className="rounded-2xl border border-dashed p-6 text-slate-400">سيضيف المعلم فيديو الشرح قريباً.</p>}
-      </div>
-
-      {/* ── SECTION 2: ملفات ومرفقات الدرس (PDF) (Matching Screenshot 4) ────────── */}
-      {lesson.pdfUrl && <div className="space-y-4 pt-4 border-t border-slate-800/80">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-            <FileText className="h-5 w-5 text-cyan-400" />
-            ملفات ومرفقات الدرس
-          </h2>
-          <span className="text-xs text-slate-400">ملف تدريبات ومذكرة</span>
-        </div>
-
-        <div className="rounded-3xl border border-slate-800 bg-[#0B1324] p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-cyan-950/80 border border-cyan-500/30 text-cyan-400">
-              <FileText className="h-7 w-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-white">مذكرة وتطبيقات المحاضرة الشاملة (PDF)</h3>
-                {isPdfLocked && (
-                  <span className="rounded-lg bg-amber-950/80 border border-amber-600/30 px-2 py-0.5 text-[11px] font-bold text-amber-400 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> مقفول حتى اجتياز الامتحان
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                ملف PDF يحتوي على أهم الخرائط الذهنية وشرح القواعد والتدريبات الشاملة
-              </p>
-            </div>
-          </div>
-
-          <div className="w-full sm:w-auto shrink-0">
-            {isPdfLocked ? (
-              <button
-                type="button"
-                onClick={() => toast.error('🔒 عذراً، يجب عليك اجتياز امتحان الدرس أولاً لفتح مذكرة الـ PDF!')}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border border-slate-700 bg-slate-800/60 px-6 py-3 text-xs font-bold text-slate-400 cursor-not-allowed"
-              >
-                <Lock className="h-4 w-4" />
-                ملف مقفول
-              </button>
-            ) : (
-              <a
-                href={lesson.pdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 hover:bg-cyan-500 px-6 py-3 text-xs font-black text-white shadow-lg shadow-cyan-600/30 transition hover:scale-105"
-              >
-                <Eye className="h-4 w-4" />
-                شوف الملف 📄
-              </a>
-            )}
-          </div>
-        </div>
-      </div>}
-
-      {/* ── SECTION 3: اختبارات الدرس (Matching Screenshot 5) ────────────────── */}
-      {exam && <div className="space-y-4 pt-4 border-t border-slate-800/80 pb-10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-red-500" />
-            اختبارات وواجبات الدرس
-          </h2>
-          <span className="text-xs text-slate-400">نظام تقييم فوري وتتابع إجباري</span>
-        </div>
-
-        {/* Exam Card (Matching Screenshot 5) */}
-        <div className="rounded-3xl border border-slate-800 bg-[#0B1324] p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-red-500/40 transition">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="rounded-xl bg-red-600/90 px-3 py-1 text-xs font-black text-white shadow">
-                اختبار إجباري
-              </span>
-              <h3 className="text-base sm:text-lg font-black text-white">
-                {exam?.title || 'اختبار تقييم الدرس - قياس الفهم والاستيعاب'}
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400">
-              {exam?.description || 'يجب عليك اجتياز هذا الاختبار بنسبة 50% على الأقل لفتح باقي المحاضرات والملفات'}
-            </p>
-
-            {/* Exam Meta: Time, Questions, Marks (Matching Screenshot 5) */}
-            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-300 pt-2">
-              <div className="flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5">
-                <Clock className="h-4 w-4 text-amber-400" />
-                <span>{exam?.durationMinutes || 20} دقيقة</span>
-              </div>
-
-              <div className="flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5">
-                <ClipboardList className="h-4 w-4 text-blue-400" />
-                <span>{exam?.questionsCount || 4} أسئلة</span>
-              </div>
-
-              <div className="flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-800 px-3 py-1.5">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
-                <span>درجة النجاح: {Math.round(exam.passingMarks / exam.totalMarks * 100)}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Button: الدخول للاختبار (Red Button - Screenshot 5) */}
-          <div className="w-full md:w-auto shrink-0">
-            {isExamPassed ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" /> لقد اجتزت هذا الاختبار بنجاح
-                </div>
-                <Link
-                  href={`/exam/${examId}/result`}
-                  className="w-full md:w-auto rounded-2xl border border-emerald-500/40 bg-emerald-950/60 hover:bg-emerald-900/60 px-8 py-3 text-center text-xs font-black text-emerald-300 transition"
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {videos.map((v, i) => (
+                <button
+                  key={v.id}
+                  onClick={() => setActive(v.id)}
+                  aria-pressed={v.id === current.id}
+                  className={`rounded-2xl border p-4 text-right transition ${v.id === current.id ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-cyan-300" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}
                 >
-                  عرض نتيجتي
-                </Link>
-              </div>
-            ) : (
-              <Link
-                href={`/exam/${examId}`}
-                className="w-full md:w-auto block rounded-2xl bg-red-600 hover:bg-red-500 px-8 py-3.5 text-center text-xs font-black text-white shadow-xl shadow-red-600/30 transition hover:scale-105"
-              >
-                الدخول للاختبار ✍️
-              </Link>
-            )}
-          </div>
+                  <span className="text-xs text-muted">الفيديو {i + 1}</span>
+                  <strong className="mt-2 block text-sm">{v.title}</strong>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="rounded-2xl border border-dashed p-6 text-muted">
+            لم يضف المعلم فيديوهات بعد.
+          </p>
+        )}
+      </section>
+      <section className="space-y-4">
+        <h2 className="text-xl font-black flex gap-2 items-center">
+          <FileText className="text-teal-500" />
+          مكتبة ملفات الدرس{" "}
+          <span className="text-sm text-muted">({files.length})</span>
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {files.map((file) => {
+            const locked = file.locked && !allPassed;
+            return (
+              <Card key={file.id}>
+                <CardContent className="p-5 flex justify-between items-center gap-3">
+                  <div>
+                    <h3 className="font-bold">{file.title}</h3>
+                    <p className="mt-2 text-xs text-muted">
+                      {locked
+                        ? exams.length
+                          ? "يفتح بعد اجتياز كل امتحانات الدرس"
+                          : "الملف مقفل؛ المعلم لم يضف الامتحان بعد"
+                        : "ملف PDF متاح للمراجعة"}
+                    </p>
+                  </div>
+                  {locked ? (
+                    <Lock className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-xl theme-inverse bg-blue-600 text-ink px-4 py-2 text-sm font-bold"
+                    >
+                      فتح الملف
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+          {!files.length && (
+            <p className="text-sm text-muted">لا توجد ملفات مرفقة بعد.</p>
+          )}
         </div>
-      </div>}
+      </section>
+      <section className="space-y-4">
+        <h2 className="text-xl font-black flex gap-2 items-center">
+          <ClipboardList className="text-purple-500" />
+          اختبارات الدرس{" "}
+          <span className="text-sm text-muted">({exams.length})</span>
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {exams.map((exam) => (
+            <Card key={exam.id}>
+              <CardContent className="p-5 space-y-3">
+                <h3 className="font-bold">{exam.title}</h3>
+                <p className="text-xs text-muted">
+                  {exam.questionsCount} سؤال · {exam.durationMinutes} دقيقة ·
+                  محاولة واحدة
+                </p>
+                <Link
+                  className="inline-block rounded-xl theme-inverse bg-blue-600 text-ink px-4 py-2 text-sm font-bold"
+                  href={
+                    passed.has(exam.id)
+                      ? `/exam/${exam.id}/result`
+                      : `/exam/${exam.id}`
+                  }
+                >
+                  {passed.has(exam.id) ? "عرض النتيجة" : "فتح الامتحان"}
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+          {!exams.length && (
+            <p className="text-sm text-muted">
+              لا توجد امتحانات منشورة لهذا الدرس بعد.
+            </p>
+          )}
+        </div>
+      </section>
+      {progressError && (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-300 p-4 text-sm text-amber-800 dark:text-amber-200"
+        >
+          {progressError}
+        </p>
+      )}
+      <Card className="border-blue-300 dark:border-blue-700">
+        <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-black">خلصت مذاكرة الدرس؟</h2>
+            <p className="mt-2 text-sm text-muted">
+              سجّل إكماله لتحديث تقدمك ونشاطك. هذا تأكيد منك، وليس قياساً
+              تلقائياً لمدة مشاهدة الفيديو.
+            </p>
+          </div>
+          <Button
+            disabled={saving || completed}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const result = await completeLesson(
+                  id,
+                  await auth.currentUser?.getIdToken(),
+                );
+                if (!result.ok) throw new Error(result.error);
+                setCompleted(true);
+                toast.success("اتسجل تقدمك على حسابك");
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "تعذر الحفظ");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            {completed ? "الدرس مكتمل ✓" : "أنهيت هذا الدرس"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

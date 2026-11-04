@@ -19,13 +19,13 @@ export function WhatsAppButton() {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="hidden sm:flex items-center gap-2 rounded-2xl border border-blue-500/20 bg-[#0B1324]/90 px-4 py-2.5 shadow-2xl backdrop-blur-md transition-all hover:scale-105 border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0B1324]/95 group"
+        className="hidden sm:flex items-center gap-2 rounded-2xl border border-blue-500/20 theme-panel bg-white/90 dark:bg-[#0B1324]/90 px-4 py-2.5 shadow-2xl backdrop-blur-md transition-all hover:scale-105 border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0B1324]/95 group"
       >
         <div className="text-right">
           <p className="text-xs font-black text-cyan-500 dark:text-cyan-400">
             أهلاً يا صديقي! 👋
           </p>
-          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+          <p className="text-[11px] text-muted dark:text-slate-300">
             اسألنا هنا لو عندك أي استفسار ❤️
           </p>
         </div>
@@ -36,15 +36,15 @@ export function WhatsAppButton() {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="group relative grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white shadow-2xl shadow-blue-500/40 transition-all duration-300 hover:scale-110 active:scale-95"
+        className="group relative grid h-14 w-14 place-items-center rounded-2xl theme-inverse bg-gradient-to-tr from-blue-600 to-cyan-500 text-ink shadow-2xl shadow-blue-500/40 transition-all duration-300 hover:scale-110 active:scale-95"
         aria-label="تواصل معنا عبر واتساب: 01064106070"
         title="تواصل معنا على واتساب: 01064106070"
       >
         <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900"></span>
+          <span className="relative inline-flex rounded-full h-3.5 w-3.5 theme-inverse bg-emerald-500 border-2 border-white dark:border-slate-900"></span>
         </span>
-        <MessageCircle className="h-7 w-7 text-white group-hover:rotate-12 transition-transform" />
+        <MessageCircle className="h-7 w-7 text-ink group-hover:rotate-12 transition-transform" />
       </a>
     </div>
   );

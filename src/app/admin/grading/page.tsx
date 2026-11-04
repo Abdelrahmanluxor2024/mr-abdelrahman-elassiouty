@@ -132,7 +132,7 @@ export default function AdminGradingPage() {
         <Skeleton className="h-32 w-full" />
       ) : answers.length === 0 ? (
         <Card>
-          <CardContent className="p-10 text-center text-slate-500">
+          <CardContent className="p-10 text-center text-muted">
             🎉 مفيش إجابات مقالية مستنية التصحيح.
           </CardContent>
         </Card>
@@ -150,15 +150,15 @@ export default function AdminGradingPage() {
                     <Badge variant="outline">{q?.branch ?? '—'}</Badge>
                     <Badge variant="secondary">درجة كاملة: {q?.marks ?? '?'}</Badge>
                   </div>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted">
                     الطالب: <strong>{stu?.full_name ?? '—'}</strong> • {stu?.phone}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="rounded-xl bg-slate-50 p-3 text-sm leading-7">{a.answer_text ?? '—'}</div>
+                  <div className="rounded-xl theme-panel bg-slate-50 dark:bg-slate-900 p-3 text-sm leading-7">{a.answer_text ?? '—'}</div>
                   <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
                     <div>
-                      <label className="text-xs text-slate-500">الدرجة</label>
+                      <label className="text-xs text-muted">الدرجة</label>
                       <Input
                         type="number"
                         min={0}
@@ -168,7 +168,7 @@ export default function AdminGradingPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-slate-500">تعليق المصحح (اختياري)</label>
+                      <label className="text-xs text-muted">تعليق المصحح (اختياري)</label>
                       <Textarea
                         value={feedback[a.id] ?? ''}
                         onChange={(e) => setFeedback((p) => ({ ...p, [a.id]: e.target.value }))}
