@@ -13,13 +13,19 @@ export type Json =
   | Json[];
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
-export type GradeLevel = '1st_secondary' | '2nd_secondary' | '3rd_secondary';
-export type ExamStatus = 'in_progress' | 'submitted' | 'graded' | 'pending' | 'passed' | 'failed';
-export type AnswerStatus = 'pending' | 'auto_graded' | 'manually_graded';
-export type QuestionType = 'mcq' | 'essay';
-export type TxnType = 'topup' | 'purchase' | 'refund' | 'reward';
-export type PaymentMethod = 'fawry' | 'code' | 'admin';
-export type CodeStatus = 'available' | 'used' | 'expired';
+export type GradeLevel = "1st_secondary" | "2nd_secondary" | "3rd_secondary";
+export type ExamStatus =
+  | "in_progress"
+  | "submitted"
+  | "graded"
+  | "pending"
+  | "passed"
+  | "failed";
+export type AnswerStatus = "pending" | "auto_graded" | "manually_graded";
+export type QuestionType = "mcq" | "essay";
+export type TxnType = "topup" | "purchase" | "refund" | "reward";
+export type PaymentMethod = "fawry" | "code" | "admin";
+export type CodeStatus = "available" | "used" | "expired";
 
 // ─── Relationship helper ───────────────────────────────────────────────────────
 type Rel = {
@@ -60,10 +66,10 @@ export interface Admin {
   username: string;
   password_hash: string;
   full_name: string;
-  role: 'admin' | 'grader';
+  role: "admin" | "grader";
   created_at: string;
 }
-export type AdminInsert = Omit<Admin, 'id' | 'created_at'> & {
+export type AdminInsert = Omit<Admin, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -83,7 +89,7 @@ export interface Course {
   created_at: string;
   updated_at: string;
 }
-export type CourseInsert = Omit<Course, 'id' | 'created_at' | 'updated_at'> & {
+export type CourseInsert = Omit<Course, "id" | "created_at" | "updated_at"> & {
   id?: string;
   created_at?: string;
   updated_at?: string;
@@ -105,7 +111,7 @@ export interface Lesson {
   is_free_preview: boolean;
   created_at: string;
 }
-export type LessonInsert = Omit<Lesson, 'id' | 'created_at'> & {
+export type LessonInsert = Omit<Lesson, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -119,13 +125,14 @@ export interface Enrollment {
   progress_percentage: number;
   completed_lessons: number;
 }
-export type EnrollmentInsert = Omit<Enrollment, 'id' | 'enrolled_at'> & {
+export type EnrollmentInsert = Omit<Enrollment, "id" | "enrolled_at"> & {
   id?: string;
   enrolled_at?: string;
 };
 export type EnrollmentUpdate = Partial<Enrollment>;
 
 export interface Exam {
+  antiCheat?: boolean;
   id: string;
   lesson_id: string;
   title: string;
@@ -137,7 +144,7 @@ export interface Exam {
   is_active: boolean;
   created_at: string;
 }
-export type ExamInsert = Omit<Exam, 'id' | 'created_at'> & {
+export type ExamInsert = Omit<Exam, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -161,13 +168,14 @@ export interface Question {
   order_index: number;
   created_at: string;
 }
-export type QuestionInsert = Omit<Question, 'id' | 'created_at'> & {
+export type QuestionInsert = Omit<Question, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
 export type QuestionUpdate = Partial<Question>;
 
 export interface ExamAttempt {
+  total_marks?: number;
   id: string;
   student_id: string;
   exam_id: string;
@@ -180,16 +188,21 @@ export interface ExamAttempt {
   unanswered_count: number;
   status: ExamStatus;
   submission_reason?: string;
-  performance_by_branch: Record<string, { correct: number; total: number }> | null;
+  performance_by_branch: Record<
+    string,
+    { correct: number; total: number }
+  > | null;
   created_at: string;
 }
-export type ExamAttemptInsert = Omit<ExamAttempt, 'id' | 'created_at'> & {
+export type ExamAttemptInsert = Omit<ExamAttempt, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
 export type ExamAttemptUpdate = Partial<ExamAttempt>;
 
 export interface StudentAnswer {
+  max_marks?: number;
+  explanation?: string;
   id: string;
   attempt_id: string;
   question_id: string;
@@ -202,7 +215,7 @@ export interface StudentAnswer {
   status: AnswerStatus;
   created_at: string;
 }
-export type StudentAnswerInsert = Omit<StudentAnswer, 'id' | 'created_at'> & {
+export type StudentAnswerInsert = Omit<StudentAnswer, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -218,12 +231,12 @@ export interface WalletTransaction {
   description: string | null;
   balance_before: number | null;
   balance_after: number | null;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  status: "pending" | "completed" | "failed" | "cancelled";
   created_at: string;
 }
 export type WalletTransactionInsert = Omit<
   WalletTransaction,
-  'id' | 'created_at'
+  "id" | "created_at"
 > & { id?: string; created_at?: string };
 export type WalletTransactionUpdate = Partial<WalletTransaction>;
 
@@ -237,7 +250,7 @@ export interface ChargeCode {
   created_by: string | null;
   created_at: string;
 }
-export type ChargeCodeInsert = Omit<ChargeCode, 'id' | 'created_at'> & {
+export type ChargeCodeInsert = Omit<ChargeCode, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -254,7 +267,7 @@ export interface ForumPost {
   is_answered: boolean;
   created_at: string;
 }
-export type ForumPostInsert = Omit<ForumPost, 'id' | 'created_at'> & {
+export type ForumPostInsert = Omit<ForumPost, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -269,7 +282,7 @@ export interface ForumReply {
   is_admin_reply: boolean;
   created_at: string;
 }
-export type ForumReplyInsert = Omit<ForumReply, 'id' | 'created_at'> & {
+export type ForumReplyInsert = Omit<ForumReply, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -285,7 +298,7 @@ export interface Notification {
   link: string | null;
   created_at: string;
 }
-export type NotificationInsert = Omit<Notification, 'id' | 'created_at'> & {
+export type NotificationInsert = Omit<Notification, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -297,10 +310,10 @@ export interface LiveSession {
   description: string | null;
   scheduled_at: string;
   stream_url: string | null;
-  status: 'scheduled' | 'live' | 'ended' | 'cancelled';
+  status: "scheduled" | "live" | "ended" | "cancelled";
   created_at: string;
 }
-export type LiveSessionInsert = Omit<LiveSession, 'id' | 'created_at'> & {
+export type LiveSessionInsert = Omit<LiveSession, "id" | "created_at"> & {
   id?: string;
   created_at?: string;
 };
@@ -314,7 +327,7 @@ export interface VideoView {
   completed: boolean;
   last_watched_at: string;
 }
-export type VideoViewInsert = Omit<VideoView, 'id' | 'last_watched_at'> & {
+export type VideoViewInsert = Omit<VideoView, "id" | "last_watched_at"> & {
   id?: string;
   last_watched_at?: string;
 };
@@ -460,4 +473,3 @@ export type Database = {
     };
   };
 };
-

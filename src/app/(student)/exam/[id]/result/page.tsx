@@ -31,8 +31,15 @@ export default function ExamResultPage() {
       attempt?.id || "",
       attempt?.status === "pending",
     );
-  const questions = questionsQuery.data || [],
-    answers = answersQuery.data || [];
+  const answers = answersQuery.data || [];
+  const questions = (questionsQuery.data || []).map((q) => {
+    const answer = answers.find((a) => a.question_id === q.id);
+    return {
+      ...q,
+      marks: answer?.max_marks ?? q.marks,
+      explanation: answer?.explanation || q.explanation,
+    };
+  });
   if (
     examQuery.isLoading ||
     attemptQuery.isLoading ||
@@ -126,7 +133,7 @@ export default function ExamResultPage() {
             <strong className="mt-2 block text-2xl">
               {pending
                 ? `${summary.mcqScore} / ${summary.mcqTotal}`
-                : `${attempt.score} / ${exam.total_marks}`}
+                : `${attempt.score} / ${attempt.total_marks ?? exam.total_marks}`}
             </strong>
           </div>
           <div className="rounded-2xl bg-white/10 p-4">

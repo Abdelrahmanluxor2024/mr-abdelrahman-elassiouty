@@ -1,19 +1,37 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
-import { MessageSquare, Send, Trash2, CheckCircle2, User, Sparkles, Loader2 } from 'lucide-react';
-import { collection, getDocs, addDoc, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import {
+  MessageSquare,
+  Send,
+  Trash2,
+  CheckCircle2,
+  User,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  deleteDoc,
+  updateDoc,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
 export default function AdminForumPage() {
   const [selectedPost, setSelectedPost] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
+  const [replyText, setReplyText] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [posts, setPosts] = useState<any[]>([]);
   const [replies, setReplies] = useState<any[]>([]);
@@ -22,16 +40,20 @@ export default function AdminForumPage() {
   async function loadPosts() {
     setIsLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'forum_posts'));
-      const list = snap.docs.map(d => ({
+      const snap = await getDocs(collection(db, "forum_posts"));
+      const list = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-        student: { full_name: d.data().studentName || 'طالب', phone: d.data().studentPhone || '' },
-        created_at: d.data().createdAt || d.data().created_at || new Date().toISOString()
+        student: {
+          full_name: d.data().studentName || "طالب",
+          phone: d.data().studentPhone || "",
+        },
+        created_at:
+          d.data().createdAt || d.data().created_at || new Date().toISOString(),
       }));
       setPosts(list);
     } catch (err) {
-      console.error('Error loading forum posts:', err);
+      console.error("Error loading forum posts:", err);
     } finally {
       setIsLoading(false);
     }
@@ -39,16 +61,19 @@ export default function AdminForumPage() {
 
   async function loadReplies(postId: string) {
     try {
-      const q = query(collection(db, 'forum_replies'), where('postId', '==', postId));
+      const q = query(
+        collection(db, "forum_replies"),
+        where("postId", "==", postId),
+      );
       const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({
+      const list = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-        student: { full_name: d.data().authorName || 'المستر' }
+        student: { full_name: d.data().authorName || "المستر" },
       }));
       setReplies(list);
     } catch (err) {
-      console.error('Error loading replies:', err);
+      console.error("Error loading replies:", err);
     }
   }
 
@@ -68,37 +93,37 @@ export default function AdminForumPage() {
     if (!selectedPost || !replyText.trim()) return;
     setIsPending(true);
     try {
-      await addDoc(collection(db, 'forum_replies'), {
+      await addDoc(collection(db, "forum_replies"), {
         postId: selectedPost,
         content: replyText.trim(),
-        authorName: 'مستر عبدالرحمن الأسيوطي',
+        authorName: "مستر عبدالرحمن الأسيوطي",
         isAdminReply: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
-      await updateDoc(doc(db, 'forum_posts', selectedPost), {
-        isAnswered: true
+      await updateDoc(doc(db, "forum_posts", selectedPost), {
+        isAnswered: true,
       });
-      toast.success('تم إرسال رد المستر بنجاح');
-      setReplyText('');
+      toast.success("تم إرسال رد المستر بنجاح");
+      setReplyText("");
       await loadReplies(selectedPost);
       await loadPosts();
     } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ أثناء الإرسال');
+      toast.error(err.message || "حدث خطأ أثناء الإرسال");
     } finally {
       setIsPending(false);
     }
   }
 
   async function handleDelete(postId: string) {
-    if (!confirm('هل أنت متأكد من حذف هذا السؤال؟')) return;
+    if (!confirm("هل أنت متأكد من حذف هذا السؤال؟")) return;
     setIsPending(true);
     try {
-      await deleteDoc(doc(db, 'forum_posts', postId));
-      toast.success('تم حذف السؤال');
+      await deleteDoc(doc(db, "forum_posts", postId));
+      toast.success("تم حذف السؤال");
       if (selectedPost === postId) setSelectedPost(null);
       await loadPosts();
     } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ أثناء الحذف');
+      toast.error(err.message || "حدث خطأ أثناء الحذف");
     } finally {
       setIsPending(false);
     }
@@ -110,12 +135,19 @@ export default function AdminForumPage() {
 
   return (
     <div className="space-y-6" dir="rtl">
+      <Link
+        href="/admin/forum/courses"
+        className="block rounded-2xl bg-blue-600 p-4 text-white"
+      >
+        منتديات الكورسات — الرد على أسئلة المشتركين
+      </Link>
       <div>
         <h1 className="font-display text-2xl font-black text-ink dark:text-white">
           المنتدى والرد على أسئلة الطلاب 💬
         </h1>
         <p className="text-sm text-muted mt-1">
-          يمكنك هنا متابعة كافة أسئلة واستفسارات الطلاب في المنتدى والرد عليها مباشرة بصفتك المستر.
+          يمكنك هنا متابعة كافة أسئلة واستفسارات الطلاب في المنتدى والرد عليها
+          مباشرة بصفتك المستر.
         </p>
       </div>
 
@@ -135,30 +167,37 @@ export default function AdminForumPage() {
                   onClick={() => setSelectedPost(p.id)}
                   className={`p-3.5 rounded-2xl border transition cursor-pointer ${
                     selectedPost === p.id
-                      ? 'border-blue-600 bg-blue-50/80 dark:bg-blue-950/60 shadow-sm'
-                      : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900'
+                      ? "border-blue-600 bg-blue-50/80 dark:bg-blue-950/60 shadow-sm"
+                      : "border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-bold text-sm text-ink dark:text-white line-clamp-1">
                       {p.title}
                     </p>
-                    <Badge variant={p.is_answered ? 'success' : 'outline'} className="text-[10px] shrink-0 font-bold">
-                      {p.is_answered ? 'تم الرد ✅' : 'جديد'}
+                    <Badge
+                      variant={p.is_answered ? "success" : "outline"}
+                      className="text-[10px] shrink-0 font-bold"
+                    >
+                      {p.is_answered ? "تم الرد ✅" : "جديد"}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted dark:text-slate-400 mt-1 line-clamp-2">
                     {p.content}
                   </p>
                   <div className="mt-2 flex items-center justify-between text-[11px] text-muted border-t border-slate-100 dark:border-slate-800 pt-2">
-                    <span>{p.student?.full_name ?? 'طالب'}</span>
-                    <span>{new Date(p.created_at).toLocaleDateString('ar-EG')}</span>
+                    <span>{p.student?.full_name ?? "طالب"}</span>
+                    <span>
+                      {new Date(p.created_at).toLocaleDateString("ar-EG")}
+                    </span>
                   </div>
                 </div>
               ))}
 
               {posts.length === 0 && (
-                <p className="text-center text-xs text-muted py-8">لا توجد أسئلة بعد في المنتدى</p>
+                <p className="text-center text-xs text-muted py-8">
+                  لا توجد أسئلة بعد في المنتدى
+                </p>
               )}
             </CardContent>
           </Card>
@@ -175,7 +214,11 @@ export default function AdminForumPage() {
                       {currentPost.title}
                     </h2>
                     <p className="text-xs text-muted mt-1">
-                      طرحه الطالب: <span className="font-bold text-blue-600 dark:text-cyan-400">{currentPost.student?.full_name}</span> ({currentPost.student?.phone})
+                      طرحه الطالب:{" "}
+                      <span className="font-bold text-blue-600 dark:text-cyan-400">
+                        {currentPost.student?.full_name}
+                      </span>{" "}
+                      ({currentPost.student?.phone})
                     </p>
                   </div>
                   <Button
@@ -193,9 +236,15 @@ export default function AdminForumPage() {
               <CardContent className="pt-5 space-y-6">
                 {/* Question Details */}
                 {(() => {
-                  const imgMatch = currentPost.content?.match(/\[ATTACHED_IMG\]:([\s\S]+)$/);
+                  const imgMatch = currentPost.content?.match(
+                    /\[ATTACHED_IMG\]:([\s\S]+)$/,
+                  );
                   const attachedImgUrl = imgMatch ? imgMatch[1].trim() : null;
-                  const cleanContent = currentPost.content ? currentPost.content.replace(/\[ATTACHED_IMG\]:[\s\S]+$/, '').trim() : '';
+                  const cleanContent = currentPost.content
+                    ? currentPost.content
+                        .replace(/\[ATTACHED_IMG\]:[\s\S]+$/, "")
+                        .trim()
+                    : "";
 
                   return (
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-3">
@@ -207,7 +256,9 @@ export default function AdminForumPage() {
 
                       {attachedImgUrl && (
                         <div>
-                          <p className="text-xs font-bold text-blue-600 dark:text-cyan-400 mb-2">📸 صورة المسألة المرفقة من الطالب:</p>
+                          <p className="text-xs font-bold text-blue-600 dark:text-cyan-400 mb-2">
+                            📸 صورة المسألة المرفقة من الطالب:
+                          </p>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={attachedImgUrl}
@@ -233,23 +284,32 @@ export default function AdminForumPage() {
                         key={r.id}
                         className={`p-3.5 rounded-2xl border ${
                           r.is_admin_reply
-                            ? 'border-blue-500/40 bg-gradient-to-r from-blue-50 to-cyan-50/50 dark:from-blue-950/60 dark:to-cyan-950/40'
-                            : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'
+                            ? "border-blue-500/40 bg-gradient-to-r from-blue-50 to-cyan-50/50 dark:from-blue-950/60 dark:to-cyan-950/40"
+                            : "border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-xs font-black flex items-center gap-1.5">
                             {r.is_admin_reply ? (
                               <>
-                                <span className="theme-inverse bg-blue-600 text-ink px-2 py-0.5 rounded-md text-[10px]">المستر</span>
-                                <span className="text-blue-700 dark:text-cyan-300">مستر عبدالرحمن الأسيوطي</span>
+                                <span className="theme-inverse bg-blue-600 text-ink px-2 py-0.5 rounded-md text-[10px]">
+                                  المستر
+                                </span>
+                                <span className="text-blue-700 dark:text-cyan-300">
+                                  مستر عبدالرحمن الأسيوطي
+                                </span>
                               </>
                             ) : (
-                              <span className="text-ink dark:text-slate-300">{r.student?.full_name ?? 'طالب'}</span>
+                              <span className="text-ink dark:text-slate-300">
+                                {r.student?.full_name ?? "طالب"}
+                              </span>
                             )}
                           </span>
                           <span className="text-[10px] text-muted">
-                            {new Date(r.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(r.created_at).toLocaleTimeString(
+                              "ar-EG",
+                              { hour: "2-digit", minute: "2-digit" },
+                            )}
                           </span>
                         </div>
                         <p className="text-xs leading-relaxed text-ink dark:text-slate-200">
@@ -259,7 +319,9 @@ export default function AdminForumPage() {
                     ))}
 
                     {replies.length === 0 && (
-                      <p className="text-xs text-muted text-center py-4">لم يتم إضافة ردود على هذا السؤال بعد.</p>
+                      <p className="text-xs text-muted text-center py-4">
+                        لم يتم إضافة ردود على هذا السؤال بعد.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -282,7 +344,11 @@ export default function AdminForumPage() {
                       disabled={isPending || !replyText.trim()}
                       className="theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold px-6 rounded-xl shadow-md shadow-blue-600/20"
                     >
-                      {isPending ? <Loader2 className="h-4 w-4 animate-spin ms-1" /> : <Send className="h-4 w-4 ms-1" />}
+                      {isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin ms-1" />
+                      ) : (
+                        <Send className="h-4 w-4 ms-1" />
+                      )}
                       إرسال الرد للطالب
                     </Button>
                   </div>
@@ -292,7 +358,9 @@ export default function AdminForumPage() {
           ) : (
             <div className="grid place-items-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0E172A] py-24 text-center">
               <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted dark:text-slate-700" />
-              <p className="font-bold text-muted dark:text-slate-400">اختر سؤالاً من القائمة الجانبية لعرضه والرد عليه</p>
+              <p className="font-bold text-muted dark:text-slate-400">
+                اختر سؤالاً من القائمة الجانبية لعرضه والرد عليه
+              </p>
             </div>
           )}
         </div>

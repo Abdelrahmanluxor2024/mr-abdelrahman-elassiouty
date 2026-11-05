@@ -1,33 +1,33 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  LayoutGrid, 
-  BookOpen, 
-  User, 
-  Wallet, 
-  MessageSquare, 
-  Menu, 
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  LayoutGrid,
+  BookOpen,
+  User,
+  Wallet,
+  MessageSquare,
+  Menu,
   X,
   Sparkles,
   GraduationCap,
-  ShieldCheck
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  ShieldCheck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export function Sidebar({ 
-  studentName, 
-  avatarUrl, 
-  role 
-}: { 
-  studentName: string; 
-  avatarUrl?: string | null; 
-  role?: string; 
+export function Sidebar({
+  studentName,
+  avatarUrl,
+  role,
+}: {
+  studentName: string;
+  avatarUrl?: string | null;
+  role?: string;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -38,15 +38,18 @@ export function Sidebar({
     function handleToggle() {
       setMobileOpen((prev) => !prev);
     }
-    window.addEventListener('toggle-sidebar', handleToggle);
-    return () => window.removeEventListener('toggle-sidebar', handleToggle);
+    window.addEventListener("toggle-sidebar", handleToggle);
+    return () => window.removeEventListener("toggle-sidebar", handleToggle);
   }, []);
 
-  const isHome = pathname === '/dashboard';
-  const isCourses = pathname.startsWith('/course') || pathname === '/my-courses' || pathname === '/courses';
-  const isProfile = pathname.startsWith('/profile');
-  const isWallet = pathname.startsWith('/wallet');
-  const isForum = pathname.startsWith('/forum');
+  const isHome = pathname === "/dashboard";
+  const isCourses =
+    pathname.startsWith("/course") ||
+    pathname === "/my-courses" ||
+    pathname === "/courses";
+  const isProfile = pathname.startsWith("/profile");
+  const isWallet = pathname.startsWith("/wallet");
+  const isForum = pathname.startsWith("/forum");
 
   return (
     <>
@@ -60,9 +63,9 @@ export function Sidebar({
 
       <aside
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-100 theme-panel bg-white dark:bg-slate-900 dark:border-slate-800/80 dark:bg-[#0A101D] shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shadow-none',
-          collapsed ? 'w-20' : 'w-72 sm:w-64',
-          mobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+          "fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-100 theme-panel bg-white dark:bg-slate-900 dark:border-slate-800/80 dark:bg-[#0A101D] shadow-2xl transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:shadow-none",
+          collapsed ? "w-20" : "w-72 sm:w-64",
+          mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0",
         )}
       >
         {/* Top Header / Collapse bar */}
@@ -74,7 +77,11 @@ export function Sidebar({
             className="hidden items-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 lg:flex"
           >
             <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
-              {collapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {collapsed ? (
+                <ChevronLeft className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
             </span>
             {!collapsed && <span>تصغير القائمة</span>}
           </button>
@@ -83,11 +90,15 @@ export function Sidebar({
           <div className="flex items-center justify-between w-full lg:hidden">
             <div className="flex items-center gap-2">
               <div className="grid h-8 w-8 place-items-center rounded-lg theme-inverse bg-blue-600 text-ink font-black text-xs">
-                {studentName?.[0] ?? 'ط'}
+                {studentName?.[0] ?? "ط"}
               </div>
               <div>
-                <p className="text-xs font-black text-ink dark:text-white leading-none">{studentName}</p>
-                <span className="text-[10px] text-cyan-500 font-bold">القائمة الرئيسية</span>
+                <p className="text-xs font-black text-ink dark:text-white leading-none">
+                  {studentName}
+                </p>
+                <span className="text-[10px] text-cyan-500 font-bold">
+                  القائمة الرئيسية
+                </span>
               </div>
             </div>
             <button
@@ -104,17 +115,19 @@ export function Sidebar({
         {/* Navigation list */}
         <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto">
           {/* Admin Panel Quick Access */}
-          {role === 'admin' && (
+          {role === "admin" && (
             <Link
               href="/admin"
               onClick={() => {
-                document.cookie = 'user_role=admin; path=/; max-age=2592000';
+                document.cookie = "user_role=admin; path=/; max-age=2592000";
                 setMobileOpen(false);
               }}
               className="flex items-center gap-3 rounded-2xl px-4 py-3 font-black transition-all bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black shadow-lg shadow-amber-500/25 hover:scale-[1.02] mb-2"
             >
               <ShieldCheck className="h-5 w-5 shrink-0 text-black" />
-              {!collapsed && <span className="text-sm">لوحة التحكم (Admin) 👑</span>}
+              {!collapsed && (
+                <span className="text-sm">لوحة التحكم (Admin) 👑</span>
+              )}
             </Link>
           )}
 
@@ -123,26 +136,40 @@ export function Sidebar({
             href="/dashboard"
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
+              "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all",
               isHome
-                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20'
-                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? "theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20"
+                : "text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400",
             )}
           >
             <LayoutGrid className="h-5 w-5 shrink-0" />
             {!collapsed && <span className="text-sm">الرئيسية</span>}
           </Link>
 
+          <Link
+            href="/my-exams"
+            onClick={() => setMobileOpen(false)}
+            className={cn(
+              "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold",
+              pathname.startsWith("/my-exams")
+                ? "bg-blue-600 text-white"
+                : "hover:bg-blue-500/10",
+            )}
+            title="امتحاناتي"
+          >
+            <GraduationCap className="h-5 w-5 shrink-0" />
+            {!collapsed && <span className="text-sm">امتحاناتي</span>}
+          </Link>
           {/* 2. الكورسات (Courses) */}
           <div className="space-y-1">
             <Link
               href="/courses"
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
+                "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all",
                 isCourses
-                  ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20'
-                  : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                  ? "theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30 dark:shadow-blue-500/20"
+                  : "text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400",
               )}
             >
               <BookOpen className="h-5 w-5 shrink-0" />
@@ -156,10 +183,10 @@ export function Sidebar({
                   href="/courses"
                   onClick={() => setMobileOpen(false)}
                   className={cn(
-                    'block rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors',
-                    pathname === '/courses'
-                      ? 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-bold'
-                      : 'text-muted dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300'
+                    "block rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors",
+                    pathname === "/courses"
+                      ? "bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-bold"
+                      : "text-muted dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300",
                   )}
                 >
                   جميع الكورسات
@@ -180,10 +207,10 @@ export function Sidebar({
             href="/forum"
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
+              "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all",
               isForum
-                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30'
-                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? "theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30"
+                : "text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400",
             )}
           >
             <MessageSquare className="h-5 w-5 shrink-0" />
@@ -195,17 +222,19 @@ export function Sidebar({
             href="/community"
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
-              pathname === '/community'
-                ? 'theme-inverse bg-gradient-to-r from-blue-600 to-indigo-600 text-ink shadow-lg shadow-blue-600/30'
-                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+              "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all",
+              pathname === "/community"
+                ? "theme-inverse bg-gradient-to-r from-blue-600 to-indigo-600 text-ink shadow-lg shadow-blue-600/30"
+                : "text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400",
             )}
           >
             <Sparkles className="h-5 w-5 shrink-0 text-cyan-500" />
             {!collapsed && (
               <div className="flex items-center gap-2">
                 <span className="text-sm">جروب المنصة</span>
-                <span className="rounded-md bg-blue-500/20 text-blue-600 dark:text-cyan-300 text-[10px] px-1.5 py-0.2">جديد</span>
+                <span className="rounded-md bg-blue-500/20 text-blue-600 dark:text-cyan-300 text-[10px] px-1.5 py-0.2">
+                  جديد
+                </span>
               </div>
             )}
           </Link>
@@ -215,10 +244,10 @@ export function Sidebar({
             href="/wallet"
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
+              "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all",
               isWallet
-                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30'
-                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? "theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30"
+                : "text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400",
             )}
           >
             <Wallet className="h-5 w-5 shrink-0" />
@@ -230,10 +259,10 @@ export function Sidebar({
             href="/profile"
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all',
+              "flex items-center gap-3 rounded-2xl px-4 py-3 font-bold transition-all",
               isProfile
-                ? 'theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30'
-                : 'text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400'
+                ? "theme-inverse bg-blue-600 text-ink shadow-lg shadow-blue-600/30"
+                : "text-ink dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400",
             )}
           >
             <User className="h-5 w-5 shrink-0" />
@@ -252,7 +281,9 @@ export function Sidebar({
             {!collapsed && (
               <div className="flex flex-col text-right">
                 <span className="text-sm">الاستفسارات والدعم</span>
-                <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal">واتساب: 01064106070</span>
+                <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal">
+                  واتساب: 01064106070
+                </span>
               </div>
             )}
           </a>
@@ -266,10 +297,12 @@ export function Sidebar({
               className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-900/80 p-3 transition hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl theme-inverse bg-gradient-to-tr from-blue-600 to-cyan-500 font-bold text-ink shadow-md shadow-blue-500/20">
-                {studentName?.[0] ?? 'ط'}
+                {studentName?.[0] ?? "ط"}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-ink dark:text-white">{studentName}</p>
+                <p className="truncate text-xs font-bold text-ink dark:text-white">
+                  {studentName}
+                </p>
                 <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-cyan-400 font-semibold">
                   <Sparkles className="h-3 w-3" />
                   <span>طالب متميز</span>
@@ -282,4 +315,3 @@ export function Sidebar({
     </>
   );
 }
-
