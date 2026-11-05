@@ -249,12 +249,7 @@ test("additive fourth lesson never resets courses, wallets, purchases or prior a
     modules: [{ id: "intro", title: "Old module" }],
   });
   s.data.set("wallet_transactions/receipt", { amount: 200 });
-  const r = await s
-    .addition()
-    .addFourthLesson(
-      "token",
-      "https://firebasestorage.googleapis.com/v0/b/bucket/o/courses%2Fbasic-bundle-200-v1%2Fpdf%2Ftest.pdf?alt=media&token=test",
-    );
+  const r = await s.addition().addFourthLesson("token");
   assert.equal(r.ok, true);
   const saved = s.data.get("courses/" + content.ARABIC_COURSE_ID);
   assert.equal(saved.title, "Existing title");
@@ -264,12 +259,7 @@ test("additive fourth lesson never resets courses, wallets, purchases or prior a
   assert.equal(s.data.get("wallet_transactions/receipt").amount, 200);
   const count = s.writes();
   s.data.get("lessons/" + content.ARABIC_LESSON_ID).title = "Teacher edit";
-  await s
-    .addition()
-    .addFourthLesson(
-      "token",
-      "https://firebasestorage.googleapis.com/v0/b/bucket/o/courses%2Fbasic-bundle-200-v1%2Fpdf%2Ftest.pdf?alt=media&token=test",
-    );
+  await s.addition().addFourthLesson("token");
   assert.equal(s.writes(), count);
   assert.equal(
     s.data.get("lessons/" + content.ARABIC_LESSON_ID).title,
@@ -279,35 +269,50 @@ test("additive fourth lesson never resets courses, wallets, purchases or prior a
 test("fourth lesson importer refuses a missing course or non-admin without writes", async () => {
   for (const role of ["admin", "student"]) {
     const s = store({ role });
-    assert.equal(
-      (
-        await s
-          .addition()
-          .addFourthLesson(
-            "token",
-            "https://firebasestorage.googleapis.com/v0/b/bucket/o/courses%2Fbasic-bundle-200-v1%2Fpdf%2Ftest.pdf?alt=media&token=test",
-          )
-      ).ok,
-      false,
-    );
+    assert.equal((await s.addition().addFourthLesson("token")).ok, false);
     assert.equal(s.writes(), 0);
   }
 });
 
-test("new fourth lesson requires an uploaded PDF, and arbitrary URLs cannot be used", async () => {
+test("bundled PDF is present in Git assets and matches the original Drive file", () => {
+  const bytes = fs.readFileSync("public" + content.ARABIC_PDF_URL);
+  assert.equal(bytes.length, content.ARABIC_PDF_SIZE);
+  assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
+  assert.equal(
+    require("node:crypto").createHash("sha256").update(bytes).digest("hex"),
+    content.ARABIC_PDF_SHA256,
+  );
+  assert.equal(
+    content.fourthLessonDocuments()[0].data.files[0].url,
+    content.ARABIC_PDF_URL,
+  );
+  const page = fs.readFileSync("src/app/admin/courses/page.tsx", "utf8");
+  assert.equal(page.includes("setFourthPdf"), false);
+  assert.equal(page.includes("onAuthStateChanged"), true);
+});
+test("existing fourth lesson migrates its PDF once, preserving teacher edits and other files", async () => {
   const s = store();
   s.data.set("courses/" + content.ARABIC_COURSE_ID, {
     revision: 0,
     modules: [],
   });
-  assert.equal((await s.addition().addFourthLesson("token")).ok, false);
-  assert.equal(
-    (
-      await s
-        .addition()
-        .addFourthLesson("token", "https://example.com/not-the-file.pdf")
-    ).ok,
-    false,
-  );
-  assert.equal(s.writes(), 0);
+  await s.addition().addFourthLesson("token");
+  const key = "lessons/" + content.ARABIC_LESSON_ID,
+    prior = s.data.get(key);
+  delete prior.bundledPdfVersion;
+  prior.title = "Edited title";
+  prior.files[0].url = "https://old-storage.test/file";
+  prior.files.push({
+    id: "other",
+    title: "Another PDF",
+    url: "https://example.com/other.pdf",
+  });
+  await s.addition().addFourthLesson("token");
+  assert.equal(s.data.get(key).title, "Edited title");
+  assert.equal(s.data.get(key).files[0].url, content.ARABIC_PDF_URL);
+  assert.equal(s.data.get(key).files[1].id, "other");
+  s.data.get(key).files[0].url = "https://example.com/teacher-new.pdf";
+  const count = s.writes();
+  await s.addition().addFourthLesson("token");
+  assert.equal(s.writes(), count);
 });
