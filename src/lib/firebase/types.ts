@@ -2,7 +2,7 @@
   uid: string;
   phone?: string;
   fullName: string;
-  role: 'student' | 'admin';
+  role: "student" | "admin";
   grade?: string;
   governorate?: string;
   school?: string;
@@ -21,7 +21,7 @@ export interface FirebaseCourse {
   thumbnailUrl: string;
   isPublished: boolean;
   sequentialLearning?: boolean;
-  modules?: {id: string; title: string}[];
+  modules?: { id: string; title: string }[];
   tag?: string;
   discountPrice?: number;
   features?: string[];
@@ -38,8 +38,8 @@ export interface FirebaseLesson {
   description?: string;
   moduleId?: string;
   moduleTitle?: string;
-  videos?: {id: string; title: string; url: string}[];
-  files?: {id: string; title: string; url: string; locked?: boolean}[];
+  videos?: { id: string; title: string; url: string }[];
+  files?: { id: string; title: string; url: string; locked?: boolean }[];
   isPublished?: boolean;
   videoUrl?: string;
   videoDuration?: number;
@@ -59,7 +59,7 @@ export interface FirebaseQuestion {
   id: string;
   examId: string;
   questionText: string;
-  questionType: 'mcq' | 'essay';
+  questionType: "mcq" | "essay";
   imageUrl?: string;
   marks: number;
   options: QuestionOption[];
@@ -69,6 +69,7 @@ export interface FirebaseQuestion {
 }
 
 export interface FirebaseExam {
+  antiCheat?: boolean;
   id: string;
   lessonId: string;
   courseId?: string;
@@ -92,7 +93,7 @@ export interface FirebaseExamAttempt {
   score: number;
   totalMarks: number;
   percentage: number;
-  status: 'in_progress' | 'pending' | 'passed' | 'failed';
+  status: "in_progress" | "pending" | "passed" | "failed";
   answers: Record<string, string>;
   createdAt: string;
 }

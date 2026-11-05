@@ -1,5 +1,6 @@
 "use client";
 
+import { upgradeCourseLearning } from "@/app/actions/upgrade-course-learning";
 import { addFourthLesson } from "@/app/actions/add-fourth-lesson";
 import { auth } from "@/lib/firebase/config";
 import { ARABIC_COURSE_ID } from "@/lib/arabic-fourth-lesson";
@@ -89,6 +90,16 @@ export default function CourseStudio() {
             const result = await addFourthLesson(await user.getIdToken());
             if (!result.ok) throw new Error(result.message);
             if (active && result.changed) toast.success(result.message);
+            if (result.ok) {
+              const upgrade = await upgradeCourseLearning(
+                await user.getIdToken(),
+              );
+              if (!upgrade.ok) toast.error(upgrade.error);
+              else if (active && upgrade.changed)
+                toast.success(
+                  "تم تفعيل التدريب المفتوح وإضافة الامتحان الشامل",
+                );
+            }
           }
         } catch (e) {
           if (active)

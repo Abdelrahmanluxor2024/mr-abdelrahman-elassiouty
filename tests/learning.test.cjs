@@ -6,7 +6,7 @@ const ts = require('typescript');
 function load(path, mocks = {}) {
   const exports = {};
   const js = ts.transpileModule(fs.readFileSync(path, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
-  vm.runInNewContext(js, {exports, require: id => {if (id === './course-payment' || id === '@/lib/firebase/course-payment') return load('src/lib/firebase/course-payment.ts', mocks); if (id in mocks) return mocks[id]; throw new Error(id);}, console, setTimeout, URL});
+  vm.runInNewContext(js, {exports, require: id => {if (id === '@/lib/exam-policy') return load('src/lib/exam-policy.ts', mocks); if (id === './course-payment' || id === '@/lib/firebase/course-payment') return load('src/lib/firebase/course-payment.ts', mocks); if (id in mocks) return mocks[id]; throw new Error(id);}, console, setTimeout, URL});
   return exports;
 }
 const {getVideoSource} = load('src/lib/video-url.ts');
@@ -69,7 +69,7 @@ test('paid demo has three lessons/PDFs/exams and repeats without overwriting', a
 function actionsDatabase({essay = false, owner = 'student-1', active = true, fail = false} = {}) {
   const state = database();
   const attemptId = 'student-1_exam_1';
-  state.data.set('exams/exam', {isActive: active, durationMinutes: 10, passingMarks: 2, totalMarks: 2, maxAttempts: 2});
+  state.data.set('exams/exam', {isActive: active, durationMinutes: 10, passingMarks: 2, totalMarks: 2, maxAttempts: 1, antiCheat: true});
   state.data.set('exam_attempts/' + attemptId, {examId: 'exam', studentId: owner, status: 'in_progress', createdAt: new Date().toISOString()});
   const firestore = state.mocks['firebase/firestore'];
   firestore.getFirestore = () => ({});
@@ -120,9 +120,9 @@ test('write failure returns an error, never a fabricated success', async () => {
   const state = actionsDatabase({fail: true});
   assert.equal((await state.actions.submitExam({examId: 'exam', attemptId: state.attemptId, idToken: 'token', answers: []})).ok, false);
 });
-test('single-attempt rule ignores a legacy exam maxAttempts value of 99', async () => {
+test('single-attempt policy rejects a second completed attempt', async () => {
   const s = actionsDatabase();
-  s.data.get('exams/exam').maxAttempts = 99;
+  s.data.get('exams/exam').maxAttempts = 1;
   s.data.get('exam_attempts/' + s.attemptId).status = 'passed';
   assert.equal((await s.actions.startExam('exam', 'token')).ok, false);
   assert.equal(s.data.has('exam_attempts/student-1_exam_2'), false);
@@ -189,5 +189,50 @@ test('an administrative retake keeps normal freeze, timeout and owner protection
  const s=actionsDatabase();s.data.get('exam_attempts/'+s.attemptId).status='failed';s.data.set('exam_attempt_grants/student-1_exam',{studentId:'student-1',examId:'exam',generation:2,usedGeneration:1,grantedBy:'admin'});
  const start=await s.actions.startExam('exam','token');const input={attemptId:start.attemptId,examId:'exam',idToken:'token',answers:[{questionId:'q1',answerText:'a'}],reason:'window_blur'};
  assert.equal((await s.actions.saveExamDraft(input)).locked,true);assert.equal((await s.actions.startExam('exam','token')).locked,true);
- await s.actions.submitExam({...input,answers:[{questionId:'q1',answerText:'b'}]});assert.equal(s.data.get('exam_attempts/'+start.attemptId).score,2);
+ await s.actions.submitExam({...input,answers:[{questionId:'q1',answerText:'b'}]});assert.equal(s.data.get('exam_attempts/'+start.attemptId).score,1);
+});
+
+test('ordinary unlimited practice creates new attempts, resumes active and retains history',async()=>{
+ const s=actionsDatabase();s.data.get('exams/exam').maxAttempts=0;s.data.get('exams/exam').antiCheat=false;
+ s.data.get('exam_attempts/'+s.attemptId).status='passed';
+ const first=await s.actions.startExam('exam','token');assert.equal(first.ok,true);assert.notEqual(first.attemptId,s.attemptId);
+ const resumed=await s.actions.startExam('exam','token');assert.equal(resumed.attemptId,first.attemptId);
+ const input={attemptId:first.attemptId,examId:'exam',idToken:'token',answers:[{questionId:'q1',answerText:'a'}]};
+ const draft=await s.actions.saveExamDraft({...input,reason:'tab_hidden'});assert.equal(draft.locked,false);
+ const submission=await s.actions.submitExam(input);assert.equal(submission.ok,true);assert.equal(submission.score,1);
+ const next=await s.actions.startExam('exam','token');assert.equal(next.ok,true);assert.notEqual(next.attemptId,first.attemptId);
+ assert.equal(s.data.get('exam_attempts/'+s.attemptId).status,'passed');
+});
+test('finite attempts honor configured limit and admin credit after exhaustion',async()=>{
+ const s=actionsDatabase();s.data.get('exams/exam').maxAttempts=2;s.data.get('exam_attempts/'+s.attemptId).status='passed';
+ const next=await s.actions.startExam('exam','token');assert.equal(next.ok,true);
+ await s.actions.submitExam({attemptId:next.attemptId,examId:'exam',idToken:'token',answers:[]});
+ assert.equal((await s.actions.startExam('exam','token')).ok,false);
+ s.data.set('exam_attempt_grants/student-1_exam',{studentId:'student-1',examId:'exam',generation:1,usedGeneration:0});
+ const extra=await s.actions.startExam('exam','token');assert.equal(extra.ok,true);assert.ok(extra.attemptId.endsWith('_grant_1'));
+ assert.equal(s.data.get('exam_attempt_grants/student-1_exam').usedGeneration,1);
+});
+test('missing policy defaults to ordinary unlimited practice',()=>{
+ const p=load('src/lib/exam-policy.ts');assert.equal(p.examPolicy({}).maxAttempts,0);assert.equal(p.examPolicy({}).antiCheat,false);assert.equal(p.questionMarks('mcq'),1);assert.equal(p.questionMarks('essay'),2);
+});
+
+test('essay grading honors two-mark snapshot, half marks and real admin role',async()=>{
+ const s=database();
+ s.mocks['./config']={db:{},auth:{authStateReady:async()=>{},currentUser:{uid:'admin'}}};
+ s.data.set('users/admin',{role:'admin'});
+ s.data.set('exam_attempts/a',{examId:'e',scoringVersion:2,totalMarks:3,status:'pending'});
+ s.data.set('exams/e',{totalMarks:10,passingMarks:5});
+ s.data.set('questions/q',{questionType:'essay',marks:10});
+ s.data.set('student_answers/essay',{attempt_id:'a',question_id:'q',maxMarks:2,marks_obtained:0,status:'pending'});
+ s.data.set('student_answers/mcq',{attempt_id:'a',question_id:'choice',maxMarks:1,marks_obtained:1,status:'auto_graded'});
+ const f=s.mocks['firebase/firestore'];
+ f.getDoc=async ref=>({id:ref.id,exists:()=>s.data.has(ref.key),data:()=>s.data.get(ref.key)});
+ f.getDocs=async()=>({docs:['essay','mcq'].map(id=>({id,data:()=>s.data.get('student_answers/'+id)}))});
+ f.runTransaction=async(_,cb)=>cb({get:f.getDoc,update:(ref,row)=>s.data.set(ref.key,{...s.data.get(ref.key),...row})});
+ const services=load('src/lib/firebase/services.ts',s.mocks);
+ await assert.rejects(services.gradeEssayAnswer('essay',2.5,''));
+ await assert.rejects(services.gradeEssayAnswer('essay',1.25,''));
+ await services.gradeEssayAnswer('essay',0.5,'feedback');
+ assert.equal(s.data.get('exam_attempts/a').score,1.5);assert.equal(s.data.get('exam_attempts/a').percentage,50);assert.equal(s.data.get('exam_attempts/a').status,'passed');
+ s.data.get('users/admin').role='student';await assert.rejects(services.gradeEssayAnswer('essay',2,''));
 });

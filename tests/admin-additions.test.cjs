@@ -54,6 +54,7 @@ function store({ role = "admin", access = true } = {}) {
   let writes = 0;
   const snapshot = (key) => ({
     id: key.split("/")[1],
+    ref: {key},
     exists: () => data.has(key),
     data: () => data.get(key),
   });
@@ -72,7 +73,7 @@ function store({ role = "admin", access = true } = {}) {
               q.filters.every((f) => data.get(k)[f.field] === f.value)),
         )
         .map(snapshot);
-      return { docs, empty: !docs.length };
+      return { docs, size: docs.length, empty: !docs.length };
     },
     runTransaction: async (_, fn) => {
       let writing = false;
@@ -110,6 +111,7 @@ function store({ role = "admin", access = true } = {}) {
   };
   return {
     data,
+    mocks,
     writes: () => writes,
     grants: () => load("src/app/actions/attempt-grants.ts", mocks),
     addition: () => load("src/app/actions/add-fourth-lesson.ts", mocks),
@@ -315,4 +317,53 @@ test("existing fourth lesson migrates its PDF once, preserving teacher edits and
   const count = s.writes();
   await s.addition().addFourthLesson("token");
   assert.equal(s.writes(), count);
+});
+
+const comprehensive = load('src/lib/comprehensive-exam.ts', {'./arabic-fourth-lesson':content});
+const courseExplanations = load('src/lib/learning-explanations.ts');
+test('comprehensive is lesson five, covers four topics, has eight MCQ and three essays totaling fourteen',()=>{
+ const rows=comprehensive.comprehensiveDocuments('fixed'),exam=rows.find(r=>r.collection==='exams').data,lesson=rows[0].data,qs=rows.filter(r=>r.collection==='questions');
+ assert.equal(lesson.orderIndex,5);assert.equal(exam.antiCheat,true);assert.equal(exam.maxAttempts,1);
+ assert.equal(qs.filter(q=>q.data.questionType==='mcq').length,8);assert.equal(qs.filter(q=>q.data.questionType==='essay').length,3);
+ assert.equal(qs.reduce((n,q)=>n+q.data.marks,0),14);assert.equal(exam.totalMarks,14);
+ assert.ok(qs.every(q=>q.data.explanation.length>15));assert.ok(qs.some(q=>q.data.branch==='النحو'));assert.ok(qs.some(q=>q.data.branch==='أساسيات البرمجة'));
+});
+function upgradeStore(){
+ const s=store();s.data.set('courses/'+content.ARABIC_COURSE_ID,{revision:0});
+ s.data.set('exams/practice',{courseId:content.ARABIC_COURSE_ID,lessonId:'l',isActive:true,maxAttempts:1,antiCheat:true});
+ s.data.set('questions/known',{examId:'practice',questionText:'ما وظيفة المتغير؟',orderIndex:1});
+ s.data.set('questions/edited',{examId:'practice',questionText:'سؤال مدرس جديد',orderIndex:2});
+ s.data.set('exam_attempts/preserved',{score:9,totalMarks:10,status:'passed'});
+ Object.assign(s.mocks,{'@/lib/arabic-fourth-lesson':content,'@/lib/comprehensive-exam':comprehensive,'@/lib/learning-explanations':courseExplanations});
+ return {...s,upgrade:load('src/app/actions/upgrade-course-learning.ts',s.mocks).upgradeCourseLearning};
+}
+test('versioned migration opens practice, adds comprehensive and explanations, preserves history and later teacher edits',async()=>{
+ const s=upgradeStore();const result=await s.upgrade('token');assert.equal(result.ok,true);assert.equal(result.changed,true);
+ assert.equal(s.data.get('exams/practice').maxAttempts,0);assert.equal(s.data.get('exams/practice').antiCheat,false);
+ assert.ok(s.data.get('questions/known').explanation);assert.equal(s.data.get('questions/edited').explanation,undefined);
+ assert.equal(s.data.get('exam_attempts/preserved').score,9);
+ assert.equal(s.data.get('exams/'+comprehensive.COMPREHENSIVE_EXAM_ID).antiCheat,true);
+ s.data.get('exams/practice').maxAttempts=3;
+ assert.equal((await s.upgrade('token')).changed,false);assert.equal(s.data.get('exams/practice').maxAttempts,3);
+});
+test('migration refuses comprehensive IDs owned by another course',async()=>{
+ const s=upgradeStore();s.data.set('lessons/'+comprehensive.COMPREHENSIVE_LESSON_ID,{courseId:'someone-else'});
+ assert.equal((await s.upgrade('token')).ok,false);assert.equal(s.data.get('exams/practice').maxAttempts,1);
+});
+function forumStore(options){
+ const s=store(options);
+ s.mocks['@/lib/firebase/student-database']={studentDatabase:async token=>{if(!token)throw Error('unauthenticated');return {db:{},uid:'s'};}};
+ return {...s,forum:load('src/app/actions/student-learning.ts',s.mocks)};
+}
+test('course forum denies anonymous and non-subscribers for reads and writes',async()=>{
+ const s=forumStore({access:false});
+ await assert.rejects(s.forum.courseForum('c'));
+ await assert.rejects(s.forum.courseForum('c','token'));
+ await assert.rejects(s.forum.writeCourseForum({courseId:'c',title:'test',content:'test'},'token'));
+});
+test('forum only returns requested course; cross-course replies rejected',async()=>{
+ const s=forumStore();s.data.set('course_forum_posts/a',{courseId:'c',title:'A',content:'text',author:'name',createdAt:'2026-01-01'});s.data.set('course_forum_posts/b',{courseId:'other',title:'B',content:'text',author:'name',createdAt:'2026-01-01'});
+ const rows=await s.forum.courseForum('c','token');assert.equal(rows.length,1);assert.equal(rows[0].id,'a');
+ await assert.rejects(s.forum.writeCourseForum({courseId:'c',postId:'b',content:'reply'},'token'));
+ await s.forum.writeCourseForum({courseId:'c',postId:'a',content:'reply'},'token');assert.equal(s.data.get('course_forum_posts/a').replies.length,1);
 });
