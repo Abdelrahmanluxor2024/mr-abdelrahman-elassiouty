@@ -118,6 +118,7 @@ export async function saveCourseDraft(draft: CourseDraft, publish: boolean) {
           courseId: draft.id,
           title: l.title.trim(),
           description: l.description,
+          imageUrl: l.imageUrl || "",
           moduleId: l.moduleId,
           moduleTitle:
             draft.modules.find((m) => m.id === l.moduleId)?.title || "",

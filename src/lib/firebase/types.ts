@@ -32,6 +32,7 @@ export interface FirebaseCourse {
 }
 
 export interface FirebaseLesson {
+  imageUrl?: string;
   id: string;
   courseId: string;
   title: string;

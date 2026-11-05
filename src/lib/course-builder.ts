@@ -10,6 +10,7 @@ export type BuilderLesson = {
   id: string;
   title: string;
   description: string;
+  imageUrl?: string;
   moduleId: string;
   videos: LessonVideo[];
   files: LessonFile[];
@@ -37,6 +38,7 @@ export function builderLesson(
     id: lesson.id,
     title: lesson.title,
     description: lesson.description || "",
+    imageUrl: lesson.imageUrl || "",
     moduleId: lesson.moduleId || "",
     videos: lesson.videos ?? lessonVideos(lesson),
     files: lesson.files ?? lessonFiles(lesson),
@@ -73,10 +75,18 @@ export function validateCourseDraft(draft: CourseDraft, publish: boolean) {
     if (!lesson.id || ids.has(lesson.id))
       errors.push("توجد معرّفات دروس مكررة");
     ids.add(lesson.id);
+    if (lesson.imageUrl && !validContentUrl(lesson.imageUrl))
+      errors.push(`رابط صورة الدرس ${index + 1} غير صالح`);
     if (!lesson.title.trim()) errors.push(`اكتب عنوان الدرس ${index + 1}`);
     if (lesson.moduleId && !draft.modules.some((m) => m.id === lesson.moduleId))
       errors.push(`وحدة الدرس ${index + 1} غير موجودة`);
-    if (publish && !lesson.videos.length && !lesson.files.length)
+    if (
+      publish &&
+      !lesson.videos.length &&
+      !lesson.files.length &&
+      !lesson.examIds.length &&
+      !lesson.imageUrl
+    )
       errors.push(`أضف فيديو أو ملفاً للدرس ${index + 1}`);
     [...lesson.videos, ...lesson.files].forEach((resource) => {
       if (

@@ -10,7 +10,7 @@ import {
 } from "firebase/firestore";
 import { adminDatabase } from "@/lib/firebase/admin-database";
 import { hasCourseAccess } from "@/lib/firebase/course-payment";
-import { normalizeStudentPhone } from "@/lib/phone";
+import { normalizeStudentPhone, studentPhoneMatches } from "@/lib/phone";
 export async function manageLessonAttempts(input: {
   phone: string;
   lessonId: string;
@@ -25,8 +25,11 @@ export async function manageLessonAttempts(input: {
     const users = await getDocs(collection(db, "users"));
     const matches = users.docs.filter(
       (u) =>
-        (!u.data().role || u.data().role === "student") &&
-        normalizeStudentPhone(u.data().phone || "") === phone,
+        (!u.data().role ||
+          ["student", "user", "طالب"].includes(
+            String(u.data().role).trim().toLowerCase(),
+          )) &&
+        studentPhoneMatches(u.data(), phone, u.id),
     );
     if (matches.length !== 1)
       throw new Error(

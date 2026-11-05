@@ -1,20 +1,30 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { collection, getDocs, doc, updateDoc, query } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { formatArabicNumber, formatCurrencyEGP } from '@/lib/utils';
-import { toast } from 'sonner';
-import { Search, Phone, MessageCircle, Wallet, Award, CheckCircle2, User, Sparkles, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { collection, getDocs, doc, updateDoc, query } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { formatArabicNumber, formatCurrencyEGP } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  Search,
+  Phone,
+  MessageCircle,
+  Wallet,
+  Award,
+  CheckCircle2,
+  User,
+  Sparkles,
+  RefreshCw,
+} from "lucide-react";
 
 export default function AdminStudentsPage() {
-  const [search, setSearch] = useState('');
-  const [gradeFilter, setGradeFilter] = useState('all');
+  const [search, setSearch] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [rechargeAmount, setRechargeAmount] = useState(50);
   const [pending, setPending] = useState(false);
@@ -24,25 +34,28 @@ export default function AdminStudentsPage() {
   async function loadStudents() {
     setIsLoading(true);
     try {
-      const q = query(collection(db, 'users'));
+      const q = query(collection(db, "users"));
       const snap = await getDocs(q);
       const list = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-        full_name: d.data().fullName || d.data().full_name || 'طالب',
-        phone: d.data().phone || '',
-        parent_phone: d.data().parentPhone || d.data().parent_phone || '',
-        wallet_balance: Number(d.data().walletBalance || d.data().wallet_balance || 0),
-        grade: d.data().grade || '',
-        governorate: d.data().governorate || '',
-        school: d.data().school || '',
-        avatar_url: d.data().avatarUrl || d.data().avatar_url || '',
-        created_at: d.data().createdAt || d.data().created_at || new Date().toISOString()
+        full_name: d.data().fullName || d.data().full_name || "طالب",
+        phone: d.data().phone || "",
+        parent_phone: d.data().parentPhone || d.data().parent_phone || "",
+        wallet_balance: Number(
+          d.data().walletBalance || d.data().wallet_balance || 0,
+        ),
+        grade: d.data().grade || "",
+        governorate: d.data().governorate || "",
+        school: d.data().school || "",
+        avatar_url: d.data().avatarUrl || d.data().avatar_url || "",
+        created_at:
+          d.data().createdAt || d.data().created_at || new Date().toISOString(),
       }));
       setStudents(list);
     } catch (err) {
-      console.error('Error loading students:', err);
-      toast.error('حدث خطأ أثناء تحميل بيانات الطلاب');
+      console.error("Error loading students:", err);
+      toast.error("حدث خطأ أثناء تحميل بيانات الطلاب");
     } finally {
       setIsLoading(false);
     }
@@ -53,43 +66,44 @@ export default function AdminStudentsPage() {
   }, []);
 
   const filtered = students.filter((s: any) => {
-    const matchesSearch = 
-      !search || 
-      s.full_name?.toLowerCase().includes(search.toLowerCase()) || 
-      s.phone?.includes(search) || 
+    const matchesSearch =
+      !search ||
+      s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.phone?.includes(search) ||
       s.parent_phone?.includes(search);
-    const matchesGrade = gradeFilter === 'all' || s.grade === gradeFilter;
+    const matchesGrade = gradeFilter === "all" || s.grade === gradeFilter;
     return matchesSearch && matchesGrade;
   });
 
   async function handleRecharge(phone: string, name: string) {
     if (rechargeAmount <= 0) {
-      toast.error('يرجى إدخال مبلغ صالح للشحن');
+      toast.error("يرجى إدخال مبلغ صالح للشحن");
       return;
     }
     setPending(true);
     try {
       if (selectedStudent?.id) {
-        const studentRef = doc(db, 'users', selectedStudent.id);
-        const newBal = (selectedStudent.wallet_balance || 0) + Number(rechargeAmount);
+        const studentRef = doc(db, "users", selectedStudent.id);
+        const newBal =
+          (selectedStudent.wallet_balance || 0) + Number(rechargeAmount);
         await updateDoc(studentRef, {
           walletBalance: newBal,
-          wallet_balance: newBal
+          wallet_balance: newBal,
         });
         toast.success(`تم شحن ${rechargeAmount} ج.م بنجاح للطالب ${name} 🎉`);
         setSelectedStudent(null);
         await loadStudents();
       }
     } catch (err: any) {
-      console.error('Recharge error:', err);
-      toast.error(err.message || 'فشل شحن الرصيد');
+      console.error("Recharge error:", err);
+      toast.error(err.message || "فشل شحن الرصيد");
     } finally {
       setPending(false);
     }
   }
 
   async function handleGrantAttempt(phone: string, name: string) {
-    toast.success(`تم تجديد الصلاحيات والمحاولات للطالب ${name} بنجاح ✅`);
+    window.location.href = `/admin/attempts?phone=${encodeURIComponent(phone)}`;
   }
 
   return (
@@ -97,8 +111,12 @@ export default function AdminStudentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-black text-brand-900 dark:text-white">إدارة الطلاب والمشتركين</h1>
-          <p className="text-xs text-muted mt-1">عرض بيانات الطلاب، الشحن المباشر، وتعديل المحاولات والتواصل</p>
+          <h1 className="font-display text-2xl font-black text-brand-900 dark:text-white">
+            إدارة الطلاب والمشتركين
+          </h1>
+          <p className="text-xs text-muted mt-1">
+            عرض بيانات الطلاب، الشحن المباشر، وتعديل المحاولات والتواصل
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge className="theme-inverse bg-blue-600 text-ink font-bold px-3 py-1.5 rounded-xl text-xs">
@@ -116,28 +134,48 @@ export default function AdminStudentsPage() {
               شحن رصيد مباشر للطالب
             </h3>
             <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-sm space-y-1">
-              <p className="font-bold text-ink dark:text-white">{selectedStudent.full_name}</p>
-              <p className="text-xs text-muted font-mono" dir="ltr">{selectedStudent.phone}</p>
-              <p className="text-xs text-blue-600 dark:text-cyan-400 font-bold">الرصيد الحالي: {formatCurrencyEGP(selectedStudent.wallet_balance)}</p>
+              <p className="font-bold text-ink dark:text-white">
+                {selectedStudent.full_name}
+              </p>
+              <p className="text-xs text-muted font-mono" dir="ltr">
+                {selectedStudent.phone}
+              </p>
+              <p className="text-xs text-blue-600 dark:text-cyan-400 font-bold">
+                الرصيد الحالي:{" "}
+                {formatCurrencyEGP(selectedStudent.wallet_balance)}
+              </p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-ink dark:text-slate-300">المبلغ المراد إضافته (ج.م)</label>
-              <Input 
-                type="number" 
-                min={5} 
-                value={rechargeAmount} 
-                onChange={(e) => setRechargeAmount(Number(e.target.value))} 
+              <label className="text-xs font-bold text-ink dark:text-slate-300">
+                المبلغ المراد إضافته (ج.م)
+              </label>
+              <Input
+                type="number"
+                min={5}
+                value={rechargeAmount}
+                onChange={(e) => setRechargeAmount(Number(e.target.value))}
                 className="text-lg font-bold text-ink dark:text-white"
               />
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setSelectedStudent(null)} className="rounded-xl text-xs">إلغاء</Button>
-              <Button 
-                onClick={() => handleRecharge(selectedStudent.phone, selectedStudent.full_name)} 
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedStudent(null)}
+                className="rounded-xl text-xs"
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={() =>
+                  handleRecharge(
+                    selectedStudent.phone,
+                    selectedStudent.full_name,
+                  )
+                }
                 disabled={pending}
                 className="theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold rounded-xl text-xs"
               >
-                {pending ? 'جاري الشحن...' : `تأكيد شحن ${rechargeAmount} ج.م`}
+                {pending ? "جاري الشحن..." : `تأكيد شحن ${rechargeAmount} ج.م`}
               </Button>
             </div>
           </Card>
@@ -149,10 +187,10 @@ export default function AdminStudentsPage() {
         <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <Input 
-              placeholder="🔍 ابحث بالاسم، رقم هاتف الطالب، أو رقم ولي الأمر..." 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
+            <Input
+              placeholder="🔍 ابحث بالاسم، رقم هاتف الطالب، أو رقم ولي الأمر..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="ps-10 text-xs bg-slate-50 dark:bg-slate-900 rounded-2xl"
             />
           </div>
@@ -172,7 +210,9 @@ export default function AdminStudentsPage() {
       {/* Students Table */}
       <Card className="rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
-          <CardTitle className="text-base font-bold">قائمة الطلاب ({filtered.length})</CardTitle>
+          <CardTitle className="text-base font-bold">
+            قائمة الطلاب ({filtered.length})
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {isLoading ? (
@@ -192,45 +232,67 @@ export default function AdminStudentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filtered.map((s: any) => (
-                  <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition">
+                  <tr
+                    key={s.id}
+                    className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition"
+                  >
                     <td className="p-3 min-w-[160px]">
                       <div className="flex items-center gap-2.5">
                         <div className="h-9 w-9 shrink-0 rounded-xl overflow-hidden bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 grid place-items-center font-black text-xs border border-blue-500/20">
                           {s.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={s.avatar_url} alt={s.full_name ?? 'طالب'} className="h-full w-full object-cover" />
+                            <img
+                              src={s.avatar_url}
+                              alt={s.full_name ?? "طالب"}
+                              className="h-full w-full object-cover"
+                            />
                           ) : (
-                            <span>{s.full_name?.[0]?.toUpperCase() ?? 'ط'}</span>
+                            <span>
+                              {s.full_name?.[0]?.toUpperCase() ?? "ط"}
+                            </span>
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-ink dark:text-white text-sm break-words leading-snug">{s.full_name ?? '—'}</p>
-                          <p className="text-[11px] text-muted">{new Date(s.created_at).toLocaleDateString('ar-EG')}</p>
+                          <p className="font-bold text-ink dark:text-white text-sm break-words leading-snug">
+                            {s.full_name ?? "—"}
+                          </p>
+                          <p className="text-[11px] text-muted">
+                            {new Date(s.created_at).toLocaleDateString("ar-EG")}
+                          </p>
                         </div>
                       </div>
                     </td>
 
-
                     <td className="p-3 text-xs space-y-0.5">
-                      <div className="flex items-center gap-1.5 font-mono font-bold text-blue-600 dark:text-cyan-400" dir="ltr">
+                      <div
+                        className="flex items-center gap-1.5 font-mono font-bold text-blue-600 dark:text-cyan-400"
+                        dir="ltr"
+                      >
                         <Phone className="h-3 w-3" />
                         {s.phone}
                       </div>
                       {s.parent_phone && (
-                        <p className="text-[11px] text-muted font-mono" dir="ltr">ولي الأمر: {s.parent_phone}</p>
+                        <p
+                          className="text-[11px] text-muted font-mono"
+                          dir="ltr"
+                        >
+                          ولي الأمر: {s.parent_phone}
+                        </p>
                       )}
                     </td>
 
                     <td className="p-3 text-xs space-y-1 min-w-[130px]">
-                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
-                        {s.grade?.replace(/_/g, ' ') || 'عام'}
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] px-2 py-0.5"
+                      >
+                        {s.grade?.replace(/_/g, " ") || "عام"}
                       </Badge>
                       <p className="text-muted text-[11px]">
-                        {s.governorate || 'محافظة غير محددة'}
-                        {s.school ? ` • ${s.school}` : ''}
+                        {s.governorate || "محافظة غير محددة"}
+                        {s.school ? ` • ${s.school}` : ""}
                       </p>
                     </td>
-
 
                     <td className="p-3">
                       <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 font-mono">
@@ -241,8 +303,8 @@ export default function AdminStudentsPage() {
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         {/* Direct Recharge */}
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => setSelectedStudent(s)}
                           className="h-8 rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 text-xs px-2.5"
@@ -253,10 +315,12 @@ export default function AdminStudentsPage() {
                         </Button>
 
                         {/* Grant Exam Attempt */}
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
-                          onClick={() => handleGrantAttempt(s.phone, s.full_name)}
+                          onClick={() =>
+                            handleGrantAttempt(s.phone, s.full_name)
+                          }
                           disabled={pending}
                           className="h-8 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 text-xs px-2.5"
                           title="إعادة فتح محاولة الامتحان"
@@ -266,10 +330,15 @@ export default function AdminStudentsPage() {
                         </Button>
 
                         {/* WhatsApp */}
-                        <Button asChild size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950">
-                          <a 
-                            href={`https://wa.me/20${s.phone.replace(/^0/, '')}?text=مرحباً%20${encodeURIComponent(s.full_name)}،%20منصة%20مستر%20عبدالرحمن%20الأسيوطي`} 
-                            target="_blank" 
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 rounded-xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+                        >
+                          <a
+                            href={`https://wa.me/20${s.phone.replace(/^0/, "")}?text=مرحباً%20${encodeURIComponent(s.full_name)}،%20منصة%20مستر%20عبدالرحمن%20الأسيوطي`}
+                            target="_blank"
                             rel="noreferrer"
                             title="مراسلة واتساب"
                           >
@@ -288,4 +357,3 @@ export default function AdminStudentsPage() {
     </div>
   );
 }
-

@@ -129,6 +129,13 @@ export default function LessonPage() {
         <p className="text-sm text-muted">
           {lesson.moduleTitle || `الدرس ${lesson.orderIndex}`}
         </p>
+        {lesson.imageUrl && (
+          <img
+            src={lesson.imageUrl}
+            alt={lesson.title}
+            className="max-h-96 w-full rounded-2xl object-contain"
+          />
+        )}
         <h1 className="text-3xl font-black">{lesson.title}</h1>
         <p className="text-muted leading-8">{lesson.description}</p>
       </header>
@@ -229,7 +236,12 @@ export default function LessonPage() {
                 >
                   فتح الامتحان / المحاولة المتاحة
                 </Link>
-                <Link href={`/exam/${exam.id}/result`} className="mr-3 text-sm text-blue-600 dark:text-cyan-300 underline">عرض النتيجة السابقة</Link>
+                <Link
+                  href={`/exam/${exam.id}/result`}
+                  className="mr-3 text-sm text-blue-600 dark:text-cyan-300 underline"
+                >
+                  عرض النتيجة السابقة
+                </Link>
               </CardContent>
             </Card>
           ))}

@@ -23,6 +23,7 @@ export default function AttemptGrantsPage() {
     examCount: number;
   } | null>(null);
   useEffect(() => {
+    setPhone(new URLSearchParams(window.location.search).get("phone") || "");
     Promise.all([
       getDocs(collection(db, "courses")),
       getDocs(collection(db, "lessons")),

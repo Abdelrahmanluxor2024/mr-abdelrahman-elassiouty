@@ -352,6 +352,8 @@ test('migration refuses comprehensive IDs owned by another course',async()=>{
 });
 function forumStore(options){
  const s=store(options);
+ s.mocks['@/lib/image-attachments']=load('src/lib/image-attachments.ts');
+ s.mocks['@/lib/firebase/config']={firebaseConfig:{storageBucket:'bucket'}};
  s.mocks['@/lib/firebase/student-database']={studentDatabase:async token=>{if(!token)throw Error('unauthenticated');return {db:{},uid:'s'};}};
  return {...s,forum:load('src/app/actions/student-learning.ts',s.mocks)};
 }
@@ -366,4 +368,45 @@ test('forum only returns requested course; cross-course replies rejected',async(
  const rows=await s.forum.courseForum('c','token');assert.equal(rows.length,1);assert.equal(rows[0].id,'a');
  await assert.rejects(s.forum.writeCourseForum({courseId:'c',postId:'b',content:'reply'},'token'));
  await s.forum.writeCourseForum({courseId:'c',postId:'a',content:'reply'},'token');assert.equal(s.data.get('course_forum_posts/a').replies.length,1);
+});
+
+test('phone lookup accepts legacy fields, leading-zero loss, international and localized formats without matching parents',async()=>{
+ for(const [field,value] of [['phoneNumber','+20 101 234 5678'],['phone_number','٠١٠١٢٣٤٥٦٧٨'],['mobile',1012345678],['student_phone','010.1234.5678'],['email','01012345678@mr-ass.app']]) {
+  const s=store();s.data.set('users/s',{role:'student',fullName:'Legacy',[field]:value});
+  const r=await s.grants().manageLessonAttempts(request);assert.equal(r.ok,true,field);assert.equal(r.studentId,'s');
+ }
+ assert.equal(phone.normalizeStudentPhone('+20 (0)10 1234 5678'),'01012345678');
+ assert.equal(phone.normalizeStudentPhone('1012345678'),'01012345678');
+ assert.equal(phone.studentPhoneMatches({parent_phone:'01012345678'},'01012345678'),false);
+});
+test('legacy phone lookup still rejects ambiguity and never selects an admin',async()=>{
+ const s=store();s.data.set('users/second',{role:'student',phoneNumber:'+201012345678'});
+ assert.equal((await s.grants().manageLessonAttempts(request)).ok,false);
+ s.data.delete('users/second');s.data.get('users/s').role='admin';
+ assert.equal((await s.grants().manageLessonAttempts(request)).ok,false);
+});
+test('forum permits image-only post and reply with owned course storage path, rejects foreign paths',async()=>{
+ const s=forumStore();
+ const path='course-forums/c/s/image-1.png';
+ const image={url:`https://firebasestorage.googleapis.com/v0/b/bucket/o/${encodeURIComponent(path)}?alt=media&token=test`,path,name:'test.png'};
+ await s.forum.writeCourseForum({courseId:'c',content:'',image},'token');
+ const post=[...s.data.values()].find(d=>d.image?.path===path);assert.ok(post);assert.equal(post.title,'سؤال بصورة');
+ s.data.set('course_forum_posts/p',{courseId:'c',replies:[]});
+ await s.forum.writeCourseForum({courseId:'c',postId:'p',content:'',image},'token');assert.equal(s.data.get('course_forum_posts/p').replies[0].image.path,path);
+ await assert.rejects(s.forum.writeCourseForum({courseId:'c',content:'',image:{...image,path:'course-forums/c/other/image.png'}},'token'));
+ await assert.rejects(s.forum.writeCourseForum({courseId:'c',content:'',image:{...image,url:'https://evil.test/image.png'}},'token'));
+ await assert.rejects(s.forum.writeCourseForum({courseId:'c',content:''},'token'));
+});
+test('image validation checks real signatures, content type and size; SVG rejected',async()=>{
+ const {validateImageFile,MAX_IMAGE_BYTES}=load('src/lib/image-attachments.ts');
+ const file=(type,bytes,size=bytes.length)=>({type,size,slice:()=>({arrayBuffer:async()=>new Uint8Array(bytes).buffer})});
+ assert.equal(await validateImageFile(file('image/png',[137,80,78,71,13,10,26,10])), 'image/png');
+ assert.equal(await validateImageFile(file('image/jpeg',[255,216,255,0])), 'image/jpeg');
+ await assert.rejects(validateImageFile(file('image/png',[60,115,118,103])));
+ await assert.rejects(validateImageFile(file('image/svg+xml',[60,115,118,103])));
+ await assert.rejects(validateImageFile(file('image/jpeg',[255,216,255],MAX_IMAGE_BYTES+1)));
+});
+test('YouTube shielding and custom quality button are removed',()=>{
+ const source=fs.readFileSync('src/components/course/secure-video-player.tsx','utf8');
+ assert.ok(!source.includes('data-youtube-shield'));assert.ok(!source.includes('youtubeSettingsOpen'));assert.ok(!source.includes('إعدادات الجودة والتحكم'));assert.ok(source.includes('allowFullScreen'));
 });
