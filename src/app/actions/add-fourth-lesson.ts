@@ -12,9 +12,10 @@ import { adminDatabase } from "@/lib/firebase/admin-database";
 import {
   ARABIC_COURSE_ID,
   ARABIC_LESSON_ID,
+  ARABIC_PDF_URL,
   fourthLessonDocuments,
 } from "@/lib/arabic-fourth-lesson";
-export async function addFourthLesson(token?: string, pdfUrl?: string) {
+export async function addFourthLesson(token?: string) {
   try {
     const { db, uid } = await adminDatabase(token),
       courseRef = doc(db, "courses", ARABIC_COURSE_ID);
@@ -35,18 +36,7 @@ export async function addFourthLesson(token?: string, pdfUrl?: string) {
     ]);
     if (!course.exists())
       throw new Error("الكورس الأساسي غير موجود. لن ننشئ أو نستبدل أي كورس");
-    if (pdfUrl) {
-      const url = new URL(pdfUrl);
-      if (
-        url.protocol !== "https:" ||
-        url.hostname !== "firebasestorage.googleapis.com" ||
-        !decodeURIComponent(url.pathname).includes(
-          `/o/courses/${ARABIC_COURSE_ID}/pdf/`,
-        )
-      )
-        throw new Error("ارفع ملف PDF إلى مساحة الكورس أولاً");
-    }
-    const rows = fourthLessonDocuments(new Date().toISOString(), pdfUrl || "");
+    const rows = fourthLessonDocuments();
     const created = await runTransaction(db, async (tx) => {
       const [live, admin, ...existing] = await Promise.all([
         tx.get(courseRef),
@@ -69,10 +59,29 @@ export async function addFourthLesson(token?: string, pdfUrl?: string) {
         )
       )
         throw new Error("تعارض مع محتوى موجود؛ لم يتم استبداله");
-      if (!existing[0].exists() && !pdfUrl)
-        throw new Error("اختر ملف المحاضرة التاسيسية عربي.pdf ثم أعد الإضافة");
       const missing = rows.filter((_, i) => !existing[i].exists());
-      if (!missing.length) return 0;
+      // A one-time migration replaces only this lesson's bundled PDF URL.
+      // Later teacher edits/archives remain intact on repeated page visits.
+      const prior = existing[0].data();
+      const migratePdf = existing[0].exists() && prior?.bundledPdfVersion !== 1;
+      if (!missing.length && !migratePdf) return 0;
+      if (migratePdf) {
+        const files = Array.isArray(prior?.files) ? [...prior.files] : [];
+        const index = files.findIndex((f) => f.id === "arabic-pdf");
+        if (index >= 0) files[index] = { ...files[index], url: ARABIC_PDF_URL };
+        else
+          files.push({
+            id: "arabic-pdf",
+            title: "المحاضرة التاسيسية عربي",
+            url: ARABIC_PDF_URL,
+            locked: !!prior?.isPdfLocked,
+          });
+        tx.update(doc(db, "lessons", ARABIC_LESSON_ID), {
+          files,
+          pdfUrl: files[0].url,
+          bundledPdfVersion: 1,
+        });
+      }
       missing.forEach((row) =>
         tx.set(doc(db, row.collection, row.id), row.data),
       );
@@ -95,10 +104,11 @@ export async function addFourthLesson(token?: string, pdfUrl?: string) {
         revision: (live.data()?.revision || 0) + 1,
         updatedAt: new Date().toISOString(),
       });
-      return missing.length;
+      return missing.length + (migratePdf ? 1 : 0);
     });
     return {
       ok: true,
+      changed: created > 0,
       message: created
         ? "تمت إضافة الدرس الرابع وملفه وفيديوه وامتحانيه دون تغيير المحتوى القديم"
         : "الدرس الرابع موجود بالفعل؛ لم يتم تكراره أو تعديل نتائجه",

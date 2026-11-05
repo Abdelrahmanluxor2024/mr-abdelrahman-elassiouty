@@ -4,6 +4,7 @@ export const ARABIC_LESSON_ID = `${ARABIC_COURSE_ID}-arabic-foundation`;
 export const ARABIC_PDF_SHA256 =
   "0858cc0fefbbadca9af94731ee4ceb7309da528aaca5b0e093b1ebcbd03da206";
 export const ARABIC_PDF_SIZE = 19475744;
+export const ARABIC_PDF_URL = "/files/arabic-foundation.pdf";
 export const ARABIC_VIDEO = "https://www.youtube.com/watch?v=M3oCkj25J2o";
 const banks = [
   {
@@ -47,7 +48,7 @@ const banks = [
 ] as const;
 export function fourthLessonDocuments(
   now = new Date().toISOString(),
-  pdfUrl = "",
+  pdfUrl = ARABIC_PDF_URL,
 ) {
   const lesson = {
     collection: "lessons",
@@ -63,6 +64,7 @@ export function fourthLessonDocuments(
       isPublished: true,
       videoUrl: ARABIC_VIDEO,
       pdfUrl,
+      bundledPdfVersion: 1,
       isPdfLocked: false,
       videos: [
         {
