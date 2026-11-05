@@ -1,5 +1,7 @@
 "use client";
 
+import { ImagePicker } from "@/components/common/image-picker";
+import { uploadLessonImage } from "@/lib/firebase/image-upload";
 import { upgradeCourseLearning } from "@/app/actions/upgrade-course-learning";
 import { addFourthLesson } from "@/app/actions/add-fourth-lesson";
 import { auth } from "@/lib/firebase/config";
@@ -57,6 +59,7 @@ export default function CourseStudio() {
   const [draft, setDraft] = useState<CourseDraft | null>(null);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [imageUploads, setImageUploads] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -135,12 +138,18 @@ export default function CourseStudio() {
     }
   }
   function updateLesson(id: string, patch: Partial<BuilderLesson>) {
-    if (draft)
-      update({
-        lessons: draft.lessons.map((l) =>
-          l.id === id ? { ...l, ...patch } : l,
-        ),
-      });
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            lessons: current.lessons.map((l) =>
+              l.id === id ? { ...l, ...patch } : l,
+            ),
+          }
+        : current,
+    );
+    setDirty(true);
+    setIssues([]);
   }
   function leave() {
     if (!dirty || confirm("فيه تغييرات لم تُحفظ. هل تريد الخروج بدون حفظ؟")) {
@@ -182,6 +191,10 @@ export default function CourseStudio() {
     }
   }
   async function save(publish: boolean) {
+    if (imageUploads > 0) {
+      toast.error("انتظر اكتمال رفع الصورة قبل الحفظ");
+      return;
+    }
     if (!draft) return;
     const errors = validateCourseDraft(draft, publish);
     setIssues(errors);
@@ -238,7 +251,7 @@ export default function CourseStudio() {
               ابنِ الكورس، رتّب الوحدات، وأضف كل محتوى الدرس من مكان واحد.
             </p>
           </div>
-          <Button disabled={busy} onClick={create}>
+          <Button disabled={busy || imageUploads > 0} onClick={create}>
             <Plus className="h-4 w-4" />
             كورس جديد من الصفر
           </Button>
@@ -298,7 +311,7 @@ export default function CourseStudio() {
                     <Button
                       className="w-full"
                       variant="outline"
-                      disabled={busy}
+                      disabled={busy || imageUploads > 0}
                       onClick={() => edit(c.id)}
                     >
                       افتح في الاستوديو
@@ -319,7 +332,11 @@ export default function CourseStudio() {
     <div dir="rtl" className="space-y-6 pb-24">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Button variant="ghost" disabled={busy} onClick={leave}>
+          <Button
+            variant="ghost"
+            disabled={busy || imageUploads > 0}
+            onClick={leave}
+          >
             <ArrowRight className="h-4 w-4" />
             كل الكورسات
           </Button>
@@ -335,11 +352,18 @@ export default function CourseStudio() {
           </h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" disabled={busy} onClick={() => save(false)}>
+          <Button
+            variant="outline"
+            disabled={busy || imageUploads > 0}
+            onClick={() => save(false)}
+          >
             <Save className="h-4 w-4" />
             حفظ مسودة وإخفاء الكورس
           </Button>
-          <Button disabled={busy} onClick={() => setStep(2)}>
+          <Button
+            disabled={busy || imageUploads > 0}
+            onClick={() => setStep(2)}
+          >
             <Eye className="h-4 w-4" />
             معاينة
           </Button>
@@ -349,7 +373,7 @@ export default function CourseStudio() {
         {["بيانات الكورس", "الوحدات والدروس", "المراجعة والنشر"].map(
           (label, i) => (
             <button
-              disabled={busy}
+              disabled={busy || imageUploads > 0}
               key={label}
               onClick={() => setStep(i)}
               aria-current={step === i ? "step" : undefined}
@@ -374,7 +398,7 @@ export default function CourseStudio() {
         </div>
       )}
       <fieldset
-        disabled={busy}
+        disabled={busy || imageUploads > 0}
         className="min-w-0 space-y-5 disabled:opacity-60"
       >
         {step === 0 && (
@@ -594,6 +618,28 @@ export default function CourseStudio() {
                   </div>
                 </div>
                 <CardContent className="p-6 space-y-6">
+                  <ImagePicker
+                    key={`${draft.id}-${lesson.id}`}
+                    label="صورة الدرس"
+                    disabled={busy || imageUploads > 0}
+                    onBusyChange={(uploading) =>
+                      setImageUploads((n) =>
+                        Math.max(0, n + (uploading ? 1 : -1)),
+                      )
+                    }
+                    value={
+                      lesson.imageUrl
+                        ? { url: lesson.imageUrl, path: "", name: lesson.title }
+                        : undefined
+                    }
+                    upload={(file) =>
+                      uploadLessonImage(draft.id, lesson.id, file)
+                    }
+                    onChange={(image) =>
+                      updateLesson(lesson.id, { imageUrl: image?.url || "" })
+                    }
+                  />
+
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="text-sm font-bold space-y-2">
                       عنوان الدرس
@@ -753,7 +799,7 @@ export default function CourseStudio() {
                             type="file"
                             accept="application/pdf"
                             className="sr-only"
-                            disabled={busy}
+                            disabled={busy || imageUploads > 0}
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
@@ -1064,11 +1110,17 @@ export default function CourseStudio() {
             السابق
           </Button>
           {step < 2 ? (
-            <Button disabled={busy} onClick={() => setStep(step + 1)}>
+            <Button
+              disabled={busy || imageUploads > 0}
+              onClick={() => setStep(step + 1)}
+            >
               الخطوة التالية
             </Button>
           ) : (
-            <Button disabled={busy} onClick={() => save(true)}>
+            <Button
+              disabled={busy || imageUploads > 0}
+              onClick={() => save(true)}
+            >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

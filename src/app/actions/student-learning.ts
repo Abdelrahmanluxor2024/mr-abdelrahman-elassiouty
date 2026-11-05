@@ -8,6 +8,11 @@ import {
   where,
   runTransaction,
 } from "firebase/firestore";
+import {
+  validateForumImage,
+  type ImageAttachment,
+} from "@/lib/image-attachments";
+import { firebaseConfig } from "@/lib/firebase/config";
 import { studentDatabase } from "@/lib/firebase/student-database";
 import { hasCourseAccess } from "@/lib/firebase/course-payment";
 export async function myExamHistory(token?: string) {
@@ -61,6 +66,13 @@ async function forumAccess(courseId: string, token?: string) {
     throw new Error("منتدى الكورس متاح للمشتركين فقط");
   return { ...context, profile: profile.data() };
 }
+export async function authorizeForumImageUpload(
+  courseId: string,
+  token?: string,
+) {
+  await forumAccess(courseId, token);
+  return { ok: true };
+}
 export async function courseForum(courseId: string, token?: string) {
   const { db } = await forumAccess(courseId, token);
   const rows = await getDocs(
@@ -75,13 +87,15 @@ export async function courseForum(courseId: string, token?: string) {
       return {
         id: r.id,
         title: String(d.title),
-        content: String(d.content),
+        content: String(d.content || ""),
+        image: d.image as ImageAttachment | undefined,
         author: String(d.author),
         createdAt: String(d.createdAt),
         replies: (d.replies || []) as {
           id: string;
           author: string;
           content: string;
+          image?: ImageAttachment;
           createdAt: string;
         }[],
       };
@@ -89,13 +103,29 @@ export async function courseForum(courseId: string, token?: string) {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 export async function writeCourseForum(
-  input: { courseId: string; postId?: string; title?: string; content: string },
+  input: {
+    courseId: string;
+    postId?: string;
+    title?: string;
+    content: string;
+    image?: ImageAttachment;
+  },
   token?: string,
 ) {
   const { db, uid, profile } = await forumAccess(input.courseId, token);
   const content = input.content.trim(),
     title = (input.title || "").trim();
-  if (!content || content.length > 10000 || title.length > 200)
+  const image = validateForumImage(
+    input.image,
+    input.courseId,
+    uid,
+    firebaseConfig.storageBucket,
+  );
+  if (
+    (!content && !image && (input.postId || !title)) ||
+    content.length > 10000 ||
+    title.length > 200
+  )
     throw new Error("راجع طول النص");
   const author = String(profile?.fullName || "عضو الكورس"),
     createdAt = new Date().toISOString();
@@ -113,20 +143,27 @@ export async function writeCourseForum(
       tx.update(ref, {
         replies: [
           ...replies,
-          { id: replyId, studentId: uid, author, content, createdAt },
+          {
+            id: replyId,
+            studentId: uid,
+            author,
+            content,
+            createdAt,
+            ...(image ? { image } : {}),
+          },
         ],
       });
     });
   } else {
-    if (!title) throw new Error("اكتب عنواناً");
     const ref = doc(collection(db, "course_forum_posts"));
     await runTransaction(db, async (tx) => {
       tx.set(ref, {
         courseId: input.courseId,
         studentId: uid,
         author,
-        title,
+        title: title || (image ? "سؤال بصورة" : content.slice(0, 80)),
         content,
+        ...(image ? { image } : {}),
         createdAt,
         replies: [],
       });

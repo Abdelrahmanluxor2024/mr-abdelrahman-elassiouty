@@ -128,6 +128,7 @@ test("publication requires lesson content and valid named resources", () => {
   const d = draft();
   d.lessons[0].videos = [];
   d.lessons[0].files = [];
+  d.lessons[0].examIds = [];
   assert.ok(validateCourseDraft(d, true).length);
   d.lessons[0].videos = [{ id: "x", title: "", url: "javascript:alert(1)" }];
   assert.ok(validateCourseDraft(d, true).length);
@@ -412,4 +413,13 @@ test("builder rejects sub-cent prices rather than publishing an unpurchasable co
   const d = draft();
   d.price = 0.001;
   assert.ok(validateCourseDraft(d, true).length);
+});
+
+test('lesson cover survives builder conversion; image-only and exam-only lessons may publish',()=>{
+ const converted=builderLesson({id:'l',title:'Lesson',courseId:'c',imageUrl:'https://example.com/cover.png'});
+ assert.equal(converted.imageUrl,'https://example.com/cover.png');
+ const d=draft();d.lessons[0].videos=[];d.lessons[0].files=[];
+ assert.equal(validateCourseDraft(d,true).length,0);
+ d.lessons[0].examIds=[];d.lessons[0].imageUrl='https://example.com/cover.png';assert.equal(validateCourseDraft(d,true).length,0);
+ d.lessons[0].imageUrl='javascript:alert(1)';assert.ok(validateCourseDraft(d,true).length>0);
 });
