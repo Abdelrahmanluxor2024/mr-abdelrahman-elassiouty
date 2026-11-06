@@ -12,7 +12,6 @@ import {
   validateForumImage,
   type ImageAttachment,
 } from "@/lib/image-attachments";
-import { firebaseConfig } from "@/lib/firebase/config";
 import { studentDatabase } from "@/lib/firebase/student-database";
 import { hasCourseAccess } from "@/lib/firebase/course-payment";
 export async function myExamHistory(token?: string) {
@@ -115,12 +114,7 @@ export async function writeCourseForum(
   const { db, uid, profile } = await forumAccess(input.courseId, token);
   const content = input.content.trim(),
     title = (input.title || "").trim();
-  const image = validateForumImage(
-    input.image,
-    input.courseId,
-    uid,
-    firebaseConfig.storageBucket,
-  );
+  const image = validateForumImage(input.image, input.courseId, uid);
   if (
     (!content && !image && (input.postId || !title)) ||
     content.length > 10000 ||

@@ -388,7 +388,8 @@ test('legacy phone lookup still rejects ambiguity and never selects an admin',as
 test('forum permits image-only post and reply with owned course storage path, rejects foreign paths',async()=>{
  const s=forumStore();
  const path='course-forums/c/s/image-1.png';
- const image={url:`https://firebasestorage.googleapis.com/v0/b/bucket/o/${encodeURIComponent(path)}?alt=media&token=test`,path,name:'test.png'};
+ // Files live in Vercel Blob now; the stored URL and the recorded path must agree.
+ const image={url:`https://s.public.blob.vercel-storage.com/${path}`,path,name:'test.png'};
  await s.forum.writeCourseForum({courseId:'c',content:'',image},'token');
  const post=[...s.data.values()].find(d=>d.image?.path===path);assert.ok(post);assert.equal(post.title,'سؤال بصورة');
  s.data.set('course_forum_posts/p',{courseId:'c',replies:[]});

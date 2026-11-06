@@ -1,7 +1,7 @@
 ﻿import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+
 
 export const DEFAULT_STORAGE_BUCKET = "mr-ass-4fc50.firebasestorage.app";
 export const firebaseConfig = {
@@ -29,8 +29,7 @@ const app = !getApps().length
   : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Firebase Storage is intentionally not initialised: this project has no bucket
+// and Firebase has required the paid Blaze plan for any bucket since Feb 2026.
+// Uploads go to Vercel Blob; see src/lib/uploads/policy.ts.
 export default app;
-// Bound retries so a denied/misconfigured bucket does not appear to upload forever.
-storage.maxUploadRetryTime = 60000;
-storage.maxOperationRetryTime = 30000;

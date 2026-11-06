@@ -292,7 +292,9 @@ function store() {
   const mocks = {
     "firebase/firestore": firestore,
     "firebase/storage": {},
-    "./storage-upload": {},
+    "../uploads/storage-upload": {
+      uploadStoredFile: async () => ({url: "https://blob.vercel-storage.com/x.pdf", path: "x.pdf"}),
+    },
     "./config": {
       db: {},
       auth: { authStateReady: async () => {}, currentUser: { uid: "admin" } },

@@ -22,11 +22,16 @@ export async function validateImageFile(file: File) {
     );
   return type;
 }
+/**
+ * Files live in Vercel Blob (see uploads/policy). Because the store is public,
+ * this check is not an authorization step on its own: it makes sure the saved
+ * attachment points at our own store and at this student's folder in this
+ * course, so a post cannot embed a foreign URL or somebody else's file.
+ */
 export function validateForumImage(
   image: ImageAttachment | undefined,
   courseId: string,
   uid: string,
-  bucket: string,
 ): ImageAttachment | undefined {
   if (!image) return undefined;
   if (
@@ -35,26 +40,36 @@ export function validateForumImage(
     typeof image.name !== "string"
   )
     throw new Error("مرفق غير صالح");
-  const prefix = `course-forums/${courseId}/${uid}/`;
-  if (
-    !image.path.startsWith(prefix) ||
-    !/^[-a-zA-Z0-9]+\.(jpg|png|webp)$/.test(image.path.slice(prefix.length))
-  )
-    throw new Error("الصورة ليست مرفوعة لهذا الحساب والكورس");
-  const url = new URL(image.url);
+  let url: URL;
+  try {
+    url = new URL(image.url);
+  } catch {
+    throw new Error("رابط الصورة غير صالح");
+  }
   if (
     url.protocol !== "https:" ||
-    url.hostname !== "firebasestorage.googleapis.com" ||
     url.username ||
     url.password ||
     url.port ||
-    url.pathname !== `/v0/b/${bucket}/o/${encodeURIComponent(image.path)}` ||
-    url.searchParams.get("alt") !== "media"
+    !(
+      url.hostname === "blob.vercel-storage.com" ||
+      url.hostname.endsWith(".public.blob.vercel-storage.com")
+    )
   )
     throw new Error("رابط الصورة غير صالح");
+  const prefix = `course-forums/${courseId}/${uid}/`;
+  const storedPath = decodeURIComponent(url.pathname.replace(/^\//, ""));
+  if (
+    !storedPath.startsWith(prefix) ||
+    storedPath !== image.path ||
+    !/^[-a-zA-Z0-9]+\.(jpg|png|webp)$/.test(
+      storedPath.slice(prefix.length),
+    )
+  )
+    throw new Error("الصورة ليست مرفوعة لهذا الحساب والكورس");
   return {
     url: url.toString(),
-    path: image.path,
+    path: storedPath,
     name: image.name.slice(0, 120),
   };
 }

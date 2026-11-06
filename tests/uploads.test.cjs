@@ -2,257 +2,187 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function load(path,mocks={},extra={}){
- const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];if(id==='../upload-step')return load('src/lib/upload-step.ts',mocks,extra);throw Error(id);},console,URL,Uint8Array,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
+ const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];if(id==='../upload-step')return load('src/lib/upload-step.ts',mocks,extra);if(id==='../uploads/policy')return load('src/lib/uploads/policy.ts',mocks,extra);throw Error(id);},console,URL,Uint8Array,Blob,File,Headers,fetch,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
 }
 const errors=load('src/lib/upload-errors.ts');
-// The preflight bucket probe is exercised on its own below; here it must simply
-// report a healthy bucket so the transport logic keeps its real error paths.
-const healthyBucket={checkStorageBucket:async()=>({ok:true,bucket:'mr-ass-4fc50.firebasestorage.app'}),missingBucketMessage:b=>`missing bucket ${b}`};
-function fixture({fail,metadataSize=4,anonymous=false,corrupt=false,directFail=false,partial=false,directStall=false}={}){
- const calls=[],timers=new Map();let canceled=false,n=0;
- const storage={uploadBytes:async(target,file,meta)=>{calls.push(['direct',target.path,file.size,meta.contentType]);if(directFail)throw {code:'storage/unauthorized'};if(directStall)return new Promise(()=>{});return{};},ref:(_,path)=>({path}),uploadBytesResumable:(target,file,meta)=>{calls.push(['upload',target.path,file.size,meta.contentType]);return{cancel:()=>{canceled=true;},on:(_event,progress,error,complete)=>{if(fail==='stall'){if(partial)queueMicrotask(()=>progress({bytesTransferred:1,totalBytes:4}));return;}queueMicrotask(()=>{if(fail){error({code:fail});return;}progress({bytesTransferred:4,totalBytes:4});complete();});}};},getMetadata:async()=>{calls.push(['metadata']);return{size:metadataSize,contentType:'image/png'};},getBytes:async()=>{calls.push(['bytes']);return new Uint8Array(corrupt?[9,2,3,4]:[1,2,3,4]).buffer;},getDownloadURL:async()=>{calls.push(['url']);return 'https://storage.test/image.png';},deleteObject:async()=>{}};
- const auth={authStateReady:async()=>{},currentUser:anonymous?null:{getIdToken:async()=>{calls.push(['token']);return'token';}}};
- const api=load('src/lib/firebase/storage-upload.ts',{'firebase/storage':storage,'./config':{auth,storage:{}},'../upload-errors':errors,'./storage-bucket':healthyBucket},{setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
- return {api,calls,timers,canceled:()=>canceled};
-}
-test('successful upload verifies remote metadata BEFORE returning URL and 100%',async()=>{
- const s=fixture(),progress=[];const r=await s.api.uploadStoredFile('images/a.png',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png',v=>progress.push(v));
- assert.equal(r.url,'https://storage.test/image.png');assert.equal(s.calls.map(x=>x[0]).join(','),'token,upload,metadata,bytes,url');assert.equal(progress.at(-1),100);assert.equal(s.timers.size,0);
-});
-test('unauthorized/quota failures and mismatching remote files never fabricate success',async()=>{
- for(const fail of ['storage/unauthorized','storage/quota-exceeded']){const s=fixture({fail});await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'),new RegExp(fail));assert.equal(s.calls.some(c=>c[0]==='url'),false);assert.equal(s.timers.size,0);}
- const s=fixture({metadataSize:2});await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));assert.equal(s.calls.some(c=>c[0]==='url'),false);
-});
-test('anonymous upload does not touch Storage; stalled upload cancels and returns an actionable error',async()=>{
- const a=fixture({anonymous:true});await assert.rejects(a.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));assert.equal(a.calls.length,0);
- const s=fixture({fail:'stall'}),pending=s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png');await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();assert.equal((await pending).url,'https://storage.test/image.png');assert.equal(s.canceled(),true);assert.equal(s.calls.filter(c=>c[0]==='direct').length,1);
-});
-function imageFixture(role='admin',decodeFailure=false){
- const calls=[];const image=load('src/lib/image-attachments.ts');const config={auth:{authStateReady:async()=>{},currentUser:{uid:'u',getIdToken:async()=>'token'}},db:{}};
- const store={uploadStoredFile:async(path,file,type,progress)=>{calls.push({path,type,size:file.size});progress?.(100);return{url:'https://storage.test/'+path};}};
- const mocks={'./storage-upload':store,'./config':config,'firebase/firestore':{doc:()=>({}),getDoc:async()=>({data:()=>({role})})},'@/lib/image-attachments':image,'@/app/actions/student-learning':{authorizeForumImageUpload:async course=>{calls.push({authorize:course});}}};
- return{calls,mocks,api:load('src/lib/firebase/image-upload.ts',mocks,{Image:class {set src(value){queueMicrotask(()=>decodeFailure?this.onerror?.():this.onload?.());}}})};
-}
-function file(type,bytes){return{name:'file',type,size:bytes.length,slice:()=>({arrayBuffer:async()=>new Uint8Array(bytes).buffer})};}
-test('all image upload destinations use verified storage, safe UUID names and admin checks',async()=>{
- const s=imageFixture(),f=file('image/png',[137,80,78,71,13,10,26,10]);
- await s.api.uploadCourseImage('c',f);await s.api.uploadLessonImage('c','l',f);await s.api.uploadAdminImage('community',f);await s.api.uploadAdminImage('notifications',f);await s.api.uploadAvatarImage(f);await s.api.uploadExamImage(f,'e');await s.api.uploadForumImage('c',f);
- for(const prefix of ['courses/c/images/','courses/c/lessons/l/images/','admin/community/images/','admin/notifications/images/','avatars/u/','questions/e/','course-forums/c/u/'])assert.ok(s.calls.some(c=>c.path?.startsWith(prefix)),prefix);
- assert.ok(s.calls.find(c=>c.authorize==='c'));assert.ok(s.calls.filter(c=>c.path).every(c=>c.type==='image/png'));
- const denied=imageFixture('student');await assert.rejects(denied.api.uploadCourseImage('c',f));assert.equal(denied.calls.length,0);
-});
-test('PDF upload validates signature and uses verified storage with progress',async()=>{
- const s=imageFixture();s.mocks['../course-builder']={};s.mocks['./services']={};
- s.mocks['firebase/firestore'].getDoc=async()=>({exists:()=>true,data:()=>({role:'admin'})});
- const api=load('src/lib/firebase/course-builder-service.ts',s.mocks);
- await api.uploadLessonPdf('c',file('application/octet-stream',[37,80,68,70,45]));assert.equal(s.calls[0].type,'application/pdf');assert.ok(s.calls[0].path.startsWith('courses/c/pdf/'));
- await assert.rejects(api.uploadLessonPdf('c',file('application/pdf',[60,104,116,109,108])));
-});
-test('active community, notification and avatar uploads no longer persist base64 previews',()=>{
- for(const path of ['src/app/admin/community/page.tsx','src/app/admin/notifications/page.tsx','src/components/student/student-avatar-uploader.tsx']){const s=fs.readFileSync(path,'utf8');assert.ok(!s.includes('readAsDataURL'),path);}
- const avatar=fs.readFileSync('src/components/student/student-avatar-uploader.tsx','utf8');assert.ok(avatar.includes('updateDoc'));assert.ok(!avatar.includes('updateStudentAvatar'));
- const course=fs.readFileSync('src/app/admin/courses/page.tsx','utf8');assert.ok(course.includes('uploadCourseImage'));assert.ok(course.includes('UploadDiagnostics'));
-});
-test('an uploaded object that cannot render as an image is not accepted as a successful image',async()=>{
- const s=imageFixture('admin',true);await assert.rejects(s.api.uploadCourseImage('c',file('image/png',[137,80,78,71,13,10,26,10])));assert.equal(s.calls.length,1);
-});
-test('diagnostic image is a valid PNG with CRC-correct chunks and a decodable one-pixel scanline',()=>{
- const source=fs.readFileSync('src/components/common/upload-diagnostics.tsx','utf8');
- const b=Buffer.from(source.match(/atob\(\s*["']([^"']+)/)[1],'base64');
- function crc32(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0;}
- let i=8;for(;i<b.length;){const n=b.readUInt32BE(i),kind=b.toString('ascii',i+4,i+8),data=b.subarray(i+8,i+8+n);assert.equal(crc32(b.subarray(i+4,i+8+n)),b.readUInt32BE(i+8+n));if(kind==='IDAT')assert.equal(require('node:zlib').inflateSync(data).length,4);i+=12+n;}assert.equal(i,b.length);
+const policy=load('src/lib/uploads/policy.ts');
+const PNG=[137,80,78,71,13,10,26,10];
+const PDF=[37,80,68,70,45];
+
+// ── policy: the server's only decision point ───────────────────────────────
+test('upload areas map to fixed folders and never to a caller-chosen path', () => {
+  const admin={uid:'admin1',isAdmin:true}, student={uid:'stud1',isAdmin:false};
+  assert.equal(policy.uploadTarget('course-cover',{courseId:'c1'},admin).prefix,'courses/c1/images');
+  assert.equal(policy.uploadTarget('lesson-image',{courseId:'c1',lessonId:'l1'},admin).prefix,'courses/c1/lessons/l1/images');
+  assert.equal(policy.uploadTarget('lesson-pdf',{courseId:'c1'},admin).prefix,'courses/c1/pdf');
+  assert.equal(policy.uploadTarget('exam-question',{examId:'e1'},admin).prefix,'questions/e1');
+  assert.equal(policy.uploadTarget('avatar',{},student).prefix,'avatars/stud1');
+  assert.equal(policy.uploadTarget('forum',{courseId:'c1'},student).prefix,'course-forums/c1/stud1');
+  // A student can never write where a teacher writes.
+  for (const [area,input] of [['course-cover',{courseId:'c1'}],['lesson-pdf',{courseId:'c1'}],['exam-question',{examId:'e1'}],['community',{}],['notification',{}]])
+    assert.throws(()=>policy.uploadTarget(area,input,student),/للأدمن فقط/,area);
+  // A student's own folders follow the verified uid, not anything they send.
+  assert.equal(policy.uploadTarget('avatar',{},student).prefix,'avatars/stud1');
+  assert.equal(policy.uploadTarget('avatar',{},admin).prefix,'avatars/admin1');
 });
 
-test('a byte-corrupted download fails verification even when metadata matches',async()=>{
- const s=fixture({corrupt:true}),progress=[];
- await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png',v=>progress.push(v)),/لا يطابق/);
- assert.equal(s.calls.some(c=>c[0]==='url'),false);assert.ok(!progress.includes(100));
-});
-test('Next image optimizer explicitly accepts Firebase Storage covers but not arbitrary hosts',()=>{
- const config=require('../next.config.js');
- const {matchRemotePattern}=require('next/dist/shared/lib/match-remote-pattern');
- const good=new URL('https://firebasestorage.googleapis.com/v0/b/bucket/o/courses%2Fc%2Fimages%2Fcover.png?alt=media&token=test');
- assert.ok(config.images.remotePatterns.some(p=>matchRemotePattern(p,good)));
- assert.ok(!config.images.remotePatterns.some(p=>matchRemotePattern(p,new URL('https://unknown.invalid/cover.png'))));
-});
-
-test('a stalled auth prerequisite fails promptly and a late auth success never starts an upload',async()=>{
- const timers=new Map();let n=0,resolveAuth,uploads=0;
- const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
- const auth={authStateReady:()=>new Promise(resolve=>{resolveAuth=resolve;}),currentUser:{getIdToken:async()=>'token'}};
- const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth,storage:{}},'../upload-errors':errors,'./storage-bucket':healthyBucket,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>{uploads++;throw Error('should not start');}}});
- const pending=api.uploadStoredFile('test',{size:1},'image/png');
- await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
- await assert.rejects(pending,/التحقق من جلسة Firebase.*upload\/step-timeout/);
- resolveAuth();await new Promise(setImmediate);assert.equal(uploads,0);assert.equal(timers.size,0);
-});
-test('admin profile lookup has a deadline before course/lesson/exam upload, not just the transfer',async()=>{
- const s=imageFixture(),timers=new Map();let n=0;
- s.mocks['firebase/firestore'].getDoc=()=>new Promise(()=>{});
- const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
- s.mocks['../upload-step']=stage;
- const api=load('src/lib/firebase/image-upload.ts',s.mocks);
- const pending=api.uploadCourseImage('c',file('image/png',[137,80,78,71,13,10,26,10]));
- await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
- await assert.rejects(pending,/صلاحية الأدمن/);assert.equal(s.calls.length,0);assert.equal(timers.size,0);
-});
-test('post-upload metadata verification also has a deadline and never reports 100 percent on timeout',async()=>{
- const timers=new Map();let n=0;
- const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
- const progress=[];
- const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth:{authStateReady:async()=>{},currentUser:{getIdToken:async()=>'token'}},storage:{}},'../upload-errors':errors,'./storage-bucket':healthyBucket,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>({on:(_e,p,_x,done)=>queueMicrotask(()=>{p({bytesTransferred:1,totalBytes:1});done();}),cancel:()=>{} }),getMetadata:()=>new Promise(()=>{})}});
- const pending=api.uploadStoredFile('test',{size:1},'image/png',p=>progress.push(p));
- await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
- await assert.rejects(pending,/قراءة بيانات الملف/);assert.ok(!progress.includes(100));
+test('path validation rejects traversal, wrong folders and wrong extensions', () => {
+  const admin={uid:'a',isAdmin:true};
+  const target=policy.uploadTarget('course-cover',{courseId:'c1'},admin);
+  assert.equal(policy.assertPathForTarget('courses/c1/images/1234.png',target),'courses/c1/images/1234.png');
+  for (const bad of ['courses/c2/images/1234.png','courses/c1/images/../x.png','courses/c1/images/x.exe','courses/c1/images/sub/x.png','courses/c1/pdf/x.pdf','courses/c1/images/x.png.bak'])
+    assert.throws(()=>policy.assertPathForTarget(bad,target),/غير صالح|خارج المجلد/,bad);
+  const pdf=policy.uploadTarget('lesson-pdf',{courseId:'c1'},admin);
+  assert.equal(policy.assertPathForTarget('courses/c1/pdf/a.pdf',pdf),'courses/c1/pdf/a.pdf');
+  assert.throws(()=>policy.assertPathForTarget('courses/c1/pdf/a.png',pdf),/امتداد/);
+  assert.throws(()=>policy.uploadTarget('course-cover',{courseId:'../etc'},admin),/غير صالح/);
 });
 
-test('explicit Storage denials never use the alternative transport',async()=>{
- for(const fail of ['storage/unauthorized','storage/unauthenticated','storage/quota-exceeded']){
-  const s=fixture({fail});await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));
-  assert.equal(s.calls.filter(c=>c[0]==='direct').length,0);
- }
-});
-test('fallback failure preserves real permission error and never accepts a URL',async()=>{
- const s=fixture({fail:'stall',directFail:true});
- const pending=s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png');
- await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
- await assert.rejects(pending,/storage\/unauthorized/);assert.equal(s.calls.filter(c=>c[0]==='direct').length,1);assert.equal(s.calls.some(c=>c[0]==='url'),false);
-});
-test('partially transferred files do not restart through a second transport',async()=>{
- const s=fixture({fail:'stall',partial:true});
- const pending=s.api.uploadStoredFile('a',{size:4},'image/png');
- await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
- await assert.rejects(pending,/٤٥/);assert.equal(s.canceled(),true);assert.equal(s.calls.some(c=>c[0]==='direct'),false);
-});
-test('direct fallback is bounded too and cannot create a late success UI',async()=>{
- const s=fixture({fail:'stall',directStall:true}),progress=[];
- const pending=s.api.uploadStoredFile('a',{size:4},'image/png',p=>progress.push(p));
- await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
- await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
- await assert.rejects(pending,/النقل المباشر البديل/);assert.equal(s.calls.some(c=>c[0]==='metadata'),false);assert.ok(!progress.includes(100));
+test('a renamed file is rejected by its first bytes, not by its declared type', async () => {
+  await policy.assertDeclaredType(new Blob([new Uint8Array(PNG)]),'image/png');
+  await policy.assertDeclaredType(new Blob([new Uint8Array(PDF)]),'application/pdf');
+  await assert.rejects(policy.assertDeclaredType(new Blob([new Uint8Array(PDF)]),'image/png'),/لا يطابق/);
+  await assert.rejects(policy.assertDeclaredType(new Blob([new Uint8Array([60,104,116,109,108])]),'application/pdf'),/لا يطابق/);
+  await assert.rejects(policy.assertDeclaredType(new Blob([new Uint8Array([77,90])]),'image/jpeg'),/لا يطابق/);
 });
 
-// ── The real cause of the 0% upload: a bucket name that does not exist ──────
-function bucketFixture(bucket, error) {
-  const listed = [];
-  const api = load('src/lib/firebase/storage-bucket.ts', {
-    'firebase/storage': {ref: (_, path) => ({path}), listAll: async target => {listed.push(target.path); if (error) throw error; return {items: [], prefixes: []};}},
-    './config': {storage: {app: {options: {storageBucket: bucket}}}},
-  });
-  return {api, listed};
-}
-const missingBucket = {code: 'storage/unknown', status: 404, serverResponse: '{"error":{"code":404,"message":"Not Found."}}', message: 'Firebase Storage: An unknown error occurred'};
-
-test('a bucket that does not exist is reported as a configuration error, not a network stall', async () => {
-  const s = bucketFixture('mr-ass-4fc50.firebasestorage.app', missingBucket);
-  const probe = await s.api.checkStorageBucket();
-  assert.equal(probe.ok, false);assert.equal(probe.missing, true);assert.equal(probe.bucket, 'mr-ass-4fc50.firebasestorage.app');
-  assert.match(s.api.missingBucketMessage(probe.bucket), /غير موجود/);
-  assert.equal(s.listed.length, 1);assert.equal(s.listed[0], 'upload-check');
-  assert.match(s.api.storageBucketEndpoint(), /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/mr-ass-4fc50\.firebasestorage\.app\/o$/);
+test('only our own Blob store URLs are accepted, and stored paths come back correctly', () => {
+  const good='https://abc123.public.blob.vercel-storage.com/courses/c1/images/a.png';
+  assert.ok(policy.isStoredFileUrl(good));
+  assert.equal(policy.storedPathFromUrl(good),'courses/c1/images/a.png');
+  for (const bad of ['http://abc123.public.blob.vercel-storage.com/x.png','https://evil.test/courses/c1/images/a.png','https://blob.vercel-storage.com.evil.test/a.png','javascript:alert(1)'])
+    assert.equal(policy.isStoredFileUrl(bad),false,bad);
+  assert.throws(()=>policy.storedPathFromUrl('https://evil.test/x.png'));
 });
 
-test('a healthy or merely-permission-denied bucket is not blamed for the failure', async () => {
-  for (const error of [null, {code: 'storage/unauthorized', status: 403}, {code: 'storage/retry-limit-exceeded'}, {code: 'storage/quota-exceeded', status: 402}]) {
-    const probe = await bucketFixture('ok.firebasestorage.app', error).api.checkStorageBucket();
-    assert.equal(probe.ok, true, String(error && error.code));
+test('upload limits match what the UI promises', () => {
+  const pdf=policy.uploadRules('lesson-pdf');
+  assert.equal(pdf.types.join(','),'application/pdf');
+  assert.equal(pdf.maxBytes,20*1024*1024);
+  for (const area of ['course-cover','lesson-image','exam-question','avatar','forum','community','notification']) {
+    const rules=policy.uploadRules(area);
+    assert.equal(rules.types.join(','),'image/jpeg,image/png,image/webp',area);
+    assert.equal(rules.maxBytes,3*1024*1024,area);
   }
 });
 
-test('an unset bucket name fails before any transfer with an explicit message', async () => {
-  const s = bucketFixture('', null);
-  const probe = await s.api.checkStorageBucket();
-  assert.equal(probe.ok, false);assert.equal(s.listed.length, 0);
-  assert.match(s.api.missingBucketMessage(''), /NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET/);
-});
-
-test('the upload path stops at the bucket probe when the bucket is missing', async () => {
-  const timers = new Map();let n = 0, transfers = 0;
-  const bucket = {checkStorageBucket: async () => ({ok: false, bucket: 'wrong.firebasestorage.app', missing: true, code: 'storage/unknown'}), missingBucketMessage: b => `الدلو ${b} غير موجود`};
-  const api = load('src/lib/firebase/storage-upload.ts', {
-    'firebase/storage': {ref: () => ({}), uploadBytesResumable: () => { transfers++; throw new Error('must not start'); }},
-    './config': {auth: {authStateReady: async () => {}, currentUser: {getIdToken: async () => 'token'}}, storage: {}},
-    '../upload-errors': errors,
-    './storage-bucket': bucket,
-  }, {setTimeout: fn => {timers.set(++n, fn);return n;}, clearTimeout: id => timers.delete(id)});
-  await assert.rejects(api.uploadStoredFile('a', {size: 4, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer}, 'image/png'), /غير موجود/);
-  assert.equal(transfers, 0);
-});
-
-test('the SDK "unknown" error keeps the server body and is explained, and an empty bucket is a first-class code', () => {
-  assert.match(errors.uploadErrorMessage({code: 'storage/unknown', serverResponse: '{"error":{"code":404,"message":"Not Found."}}'}), /الدلو غير موجود/);
-  assert.match(errors.uploadErrorMessage({code: 'storage/bucket-not-found'}), /bucket-not-found/);
-  assert.match(errors.uploadErrorMessage({code: 'storage/unauthorized-app'}), /App Check/);
-});
-
-// ── Moving a staged object must keep verified bytes ────────────────────────
-function moveFixture({downloadFails = false} = {}) {
-  const calls = [];
-  const bytes = new Uint8Array([1, 2, 3, 4]);
-  const storage = {
-    ref: (_, path) => ({path}),
-    uploadBytesResumable: (target, file, meta) => {
-      calls.push(['upload', target.path, meta.contentType, file.size]);
-      return {cancel() {}, on: (_e, progress, _error, complete) => queueMicrotask(() => {progress({bytesTransferred: 4, totalBytes: 4});complete();})};
-    },
-    uploadBytes: async () => ({}),
-    getMetadata: async () => ({size: 4, contentType: 'image/png'}),
-    getBytes: async () => bytes.buffer,
-    getDownloadURL: async target => {
-      calls.push(['url', target.path]);
-      return `https://firebasestorage.googleapis.com/v0/b/b/o/${encodeURIComponent(target.path)}?alt=media&token=t`;
-    },
-    deleteObject: async target => calls.push(['delete', target.path]),
-  };
-  const api = load('src/lib/firebase/storage-upload.ts', {
-    'firebase/storage': storage,
-    './config': {auth: {authStateReady: async () => {}, currentUser: {getIdToken: async () => 't'}}, storage: {}},
-    '../upload-errors': errors,
-    './storage-bucket': healthyBucket,
-  }, {
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
-    clearTimeout,
-    fetch: async url => {
-      calls.push(['fetch', url]);
-      if (downloadFails) return {ok: false, status: 403, blob: async () => new Blob([])};
-      return {ok: true, status: 200, blob: async () => new Blob([bytes], {type: 'image/png'})};
-    },
-    File: class {constructor(parts, name, options) {this.name = name;this.type = options?.type;this.size = parts[0].size;this.parts = parts;}arrayBuffer() {return Promise.resolve(bytes.buffer);}slice() {return {arrayBuffer: () => Promise.resolve(bytes.buffer)};}},
-  });
-  return {api, calls};
+// ── the browser upload path ────────────────────────────────────────────────
+function uploadFixture({fail=false,decodeFailure=false,storedSize=null,badToken=false}={}){
+ const calls=[],timers=new Map();let n=0,lastSize=0;
+ const blob={upload:async(path,file,options)=>{calls.push({path,type:options.contentType,size:file.size,payload:JSON.parse(options.clientPayload),auth:options.headers.authorization});options.onUploadProgress?.({percentage:0});options.onUploadProgress?.({percentage:55});lastSize=file.size;if(fail)throw Object.assign(new Error('denied'),{name:'BlobAccessError'});return{url:`https://store.public.blob.vercel-storage.com/${path}`,pathname:path,downloadUrl:''};}};
+ const config={auth:{authStateReady:async()=>{},currentUser:{uid:'u1',getIdToken:async()=>{if(badToken)throw new Error('token');return'tok';}}}};
+ const api=load('src/lib/uploads/storage-upload.ts',{'@vercel/blob/client':blob,'@/lib/firebase/config':config,'../upload-errors':errors,'../upload-step':load('src/lib/upload-step.ts')},{
+   fetch:async(_url,init)=>({ok:true,status:200,blob:async()=>({size:storedSize??lastSize,type:'image/png'})}),
+   Image:class{set src(v){queueMicrotask(()=>decodeFailure?this.onerror?.():this.onload?.());}},
+ });
+ return {calls,api};
 }
+const file=(type,bytes=type==='application/pdf'?PDF:PNG)=>({name:'x',type,size:bytes.length,slice:()=>({arrayBuffer:async()=>new Uint8Array(bytes).buffer})});
 
-test('a staged exam image is moved only after a verified download and upload', async () => {
-  const s = moveFixture();
-  const moved = await s.api.moveStoredFile('questions/temp-exam/a.png', 'questions/exam-1/a.png');
-  assert.equal(moved.path, 'questions/exam-1/a.png');
-  assert.ok(moved.url.includes('questions%2Fexam-1%2Fa.png'));
-  assert.ok(s.calls.some(c => c[0] === 'upload' && c[1] === 'questions/exam-1/a.png' && c[2] === 'image/png'));
-  assert.ok(s.calls.some(c => c[0] === 'delete' && c[1] === 'questions/temp-exam/a.png'));
+test('an image upload goes straight to Vercel Blob with a server token and progress', async () => {
+  const s=uploadFixture(),progress=[];
+  const result=await s.api.uploadStoredFile('course-cover',{courseId:'c1'},file('image/png'),(p,stage)=>progress.push([p,stage]));
+  assert.match(result.url,/^https:\/\/store\.public\.blob\.vercel-storage\.com\/courses\/c1\/images\/[a-f0-9-]+\.png$/);
+  assert.equal(result.path,decodeURIComponent(new URL(result.url).pathname.slice(1)));
+  assert.equal(s.calls[0].auth,'Bearer tok');
+  assert.deepEqual(s.calls[0].payload,{area:'course-cover',courseId:'c1'});
+  assert.ok(progress.some(([p])=>p===55));
+  assert.equal(progress.at(-1)[0],100);
 });
 
-test('a staged image that cannot be downloaded is never linked to the exam', async () => {
-  const s = moveFixture({downloadFails: true});
-  await assert.rejects(s.api.moveStoredFile('questions/temp-exam/a.png', 'questions/exam-1/a.png'), /403/);
-  assert.equal(s.calls.some(c => c[0] === 'upload'), false);
-  assert.equal(s.calls.some(c => c[0] === 'delete'), false);
+test('a server denial is reported once and never retried', async () => {
+  const s=uploadFixture({fail:true});
+  await assert.rejects(s.api.uploadStoredFile('exam-question',{examId:'e1'},file('image/png')),/صلاحية/);
+  assert.equal(s.calls.length,1);
 });
 
-test('a healthy bucket probe is reused briefly, but a failure is re-checked every time', async () => {
-  let listing = 0;
-  const ok = load('src/lib/firebase/storage-bucket.ts', {
-    'firebase/storage': {ref: () => ({}), listAll: async () => {listing++; return {items: [], prefixes: []};}},
-    './config': {storage: {app: {options: {storageBucket: 'b.firebasestorage.app'}}}},
-  });
-  await ok.checkStorageBucket();await ok.checkStorageBucket();
-  assert.equal(listing, 1);
+test('an image that cannot be decoded as an image is not accepted, but the PDF is', async () => {
+  const s=uploadFixture({decodeFailure:true});
+  await assert.rejects(s.api.uploadStoredFile('avatar',{},file('image/png')),/لم يستطع عرضه/);
+  const pdf=uploadFixture();
+  const out=await pdf.api.uploadStoredFile('lesson-pdf',{courseId:'c1'},file('application/pdf'));
+  assert.match(out.url,/\.pdf$/);
+});
 
-  let attempts = 0;
-  const flaky = load('src/lib/firebase/storage-bucket.ts', {
-    'firebase/storage': {ref: () => ({}), listAll: async () => {attempts++; throw {code: 'storage/unknown', status: 404, serverResponse: 'Not Found.'};}},
-    './config': {storage: {app: {options: {storageBucket: 'b.firebasestorage.app'}}}},
-  });
-  assert.equal((await flaky.checkStorageBucket()).ok, false);
-  assert.equal((await flaky.checkStorageBucket()).ok, false);
-  assert.equal(attempts, 2);
+test('a stored size that differs from the original is rejected', async () => {
+  const s=uploadFixture({storedSize:99});
+  await assert.rejects(s.api.uploadStoredFile('community',{},file('image/png')),/لا يطابق/);
+});
+
+test('oversized or wrong-typed files never reach the network', async () => {
+  const big=uploadFixture();
+  await assert.rejects(big.api.uploadStoredFile('lesson-pdf',{courseId:'c'},{name:'x',type:'application/pdf',size:21*1024*1024,slice:()=>({arrayBuffer:async()=>new Uint8Array(PDF).buffer})}),/٢٠ ميجابايت/);
+  assert.equal(big.calls.length,0);
+  const renamed=uploadFixture();
+  await assert.rejects(renamed.api.uploadStoredFile('course-cover',{courseId:'c'},{name:'x',type:'image/png',size:4,slice:()=>({arrayBuffer:async()=>new Uint8Array(PDF).buffer})}),/لا يطابق/);
+  assert.equal(renamed.calls.length,0);
+});
+
+test('every image destination is wired to the right area and folder', () => {
+  const image=fs.readFileSync('src/lib/firebase/image-upload.ts','utf8');
+  for (const pair of [['course-cover','{ courseId }'],['lesson-image','{ courseId, lessonId }'],['exam-question','{ examId }'],['avatar','{}'],['community','{}'],['notification','{}'],['forum','{ courseId }']])
+    assert.ok(image.includes(`"${pair[0]}", ${pair[1]}`)||image.includes(`area === "community" ? "community" : "notification"`),pair[0]);
+  const pdf=fs.readFileSync('src/lib/firebase/course-builder-service.ts','utf8');
+  assert.ok(pdf.includes('"lesson-pdf"'));
+  assert.ok(!pdf.includes('firebase/storage'));
+});
+
+test('the token route verifies the Firebase token before it issues anything', () => {
+  const route=fs.readFileSync('src/app/api/uploads/token/route.ts','utf8');
+  assert.ok(route.includes('verifyUploader(token)'));
+  assert.ok(route.includes('assertPathForTarget(pathname, target)'));
+  assert.ok(route.includes('maximumSizeInBytes'));
+  assert.ok(route.includes('allowedContentTypes'));
+  assert.ok(route.includes('validUntil'));
+  assert.ok(route.includes('assertForumAccess(token'));
+  // The completion callback must not attach a file to content on its own.
+  assert.ok(/onUploadCompleted:\s*async\s*\(\)\s*=>\s*\{\s*\}/.test(route));
+});
+
+test('the delete route only removes paths inside the caller\'s own folders', () => {
+  const route=fs.readFileSync('src/app/api/uploads/delete/route.ts','utf8');
+  assert.ok(route.includes('verifyUploader(bearerToken'));
+  assert.ok(route.includes('storedPathFromUrl(body.url)'));
+  assert.ok(route.includes('uploadTarget(body.area, body, uploader)'));
+});
+
+test('runtime files are never used as a storage backend', () => {
+  for (const path of ['src/lib/uploads/storage-upload.ts','src/app/api/uploads/token/route.ts','src/lib/firebase/image-upload.ts']) {
+    const source=fs.readFileSync(path,'utf8');
+    assert.ok(!/writeFile|fs\.write|readAsDataURL|base64/i.test(source),path);
+  }
+});
+
+test('forum image validation points at our own store and the student folder', () => {
+  const image=load('src/lib/image-attachments.ts');
+  const url='https://s.public.blob.vercel-storage.com/course-forums/c1/u1/a.png';
+  assert.equal(image.validateForumImage({url,path:'course-forums/c1/u1/a.png',name:'a'},'c1','u1').path,'course-forums/c1/u1/a.png');
+  assert.throws(()=>image.validateForumImage({url,path:'course-forums/c1/u2/a.png',name:'a'},'c1','u1'),/ليست مرفوعة/);
+  assert.throws(()=>image.validateForumImage({url:'https://evil.test/course-forums/c1/u1/a.png',path:'course-forums/c1/u1/a.png',name:'a'},'c1','u1'),/غير صالح/);
+});
+
+test('Next image optimizer accepts the Blob host and still rejects arbitrary hosts', () => {
+  const config=require('../next.config.js');
+  const {matchRemotePattern}=require('next/dist/shared/lib/match-remote-pattern');
+  assert.ok(config.images.remotePatterns.some(p=>matchRemotePattern(p,new URL('https://abc.public.blob.vercel-storage.com/courses/c/images/a.png'))));
+  assert.ok(!config.images.remotePatterns.some(p=>matchRemotePattern(p,new URL('https://unknown.invalid/a.png'))));
+});
+
+test('upload errors explain the Blob failures that actually happen', () => {
+  assert.match(errors.uploadErrorMessage({name:'BlobStoreNotFoundError'}),/Blob/);
+  assert.match(errors.uploadErrorMessage({name:'BlobContentTypeNotAllowedError'}),/نوع الملف غير مسموح/);
+  assert.match(errors.uploadErrorMessage({name:'BlobAccessError'}),/صلاحية/);
+  assert.match(errors.uploadErrorMessage({code:'no-token'}),/BLOB_READ_WRITE_TOKEN|Blob/);
+});
+
+test('the app no longer initialises Firebase Storage at all', () => {
+  const config=fs.readFileSync('src/lib/firebase/config.ts','utf8');
+  assert.ok(!/getStorage|maxUploadRetryTime/.test(config));
+  // Nothing in the client tree may still import the removed uploader module.
+  const files=[];
+  (function walk(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const full=`${dir}/${entry.name}`;if(entry.isDirectory())walk(full);else if(/\.(ts|tsx)$/.test(entry.name))files.push(full);}})('src');
+  for(const file of files){
+    const source=fs.readFileSync(file,'utf8');
+    assert.ok(!source.includes('firebase/storage-upload'),file);
+  }
 });

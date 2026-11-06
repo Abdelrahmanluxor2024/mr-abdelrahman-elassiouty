@@ -18,9 +18,9 @@ import {
   moveStoredFile,
   removeStoredFiles,
   type UploadProgress,
-} from "./storage-upload";
+} from "../uploads/storage-upload";
 import { hasCourseAccess } from "./course-payment";
-import { db, storage, auth } from "./config";
+import { db, auth } from "./config";
 import type {
   FirebaseCourse,
   FirebaseLesson,
@@ -220,6 +220,44 @@ export function newExamId(): string {
 /** Path of an image still sitting in questions/temp-exam/, if any. */
 export function stagedExamImagePath(imageUrl?: string) {
   return stagedQuestionPath(imageUrl || "");
+}
+
+/**
+ * Moves question images that were staged for a different exam id (an older
+ * editor uploaded everything to one temp folder) into this exam's folder.
+ * Returns the cleaned question list plus the URLs that were moved, so a failed
+ * save can delete them instead of leaving orphans.
+ */
+export async function relocateStagedExamImages(
+  questions: Omit<FirebaseQuestion, "id" | "examId">[],
+  examId: string,
+  onProgress?: UploadProgress,
+) {
+  const moved: string[] = [];
+  const cleaned: Omit<FirebaseQuestion, "id" | "examId">[] = [];
+  try {
+    for (const question of questions) {
+      const staged = stagedExamImagePath(question.imageUrl);
+      if (!staged) {
+        cleaned.push(question);
+        continue;
+      }
+      const fileName = staged.split("/").pop() || "question.png";
+      const file = await moveStoredFile(
+        question.imageUrl!,
+        "exam-question",
+        { examId },
+        fileName,
+        onProgress,
+      );
+      moved.push(file.url);
+      cleaned.push({ ...question, imageUrl: file.url });
+    }
+    return { questions: cleaned, moved };
+  } catch (error) {
+    await removeStoredFiles("exam-question", { examId }, moved);
+    throw error;
+  }
 }
 
 export async function createExamWithQuestions(

@@ -3,14 +3,35 @@ export function uploadErrorMessage(error: unknown) {
     typeof error === "object" && error
       ? (error as {
           code?: unknown;
+          name?: unknown;
           message?: unknown;
           serverResponse?: unknown;
           status?: unknown;
         })
       : {};
-  const code = String(raw.code || "");
+  // The Blob client reports its failures through the error name; keep the
+  // Firebase-style `code` for the paths that still throw one.
+  const code = String(raw.code || raw.name || "");
   const server = String(raw.serverResponse ?? "");
   const messages: Record<string, string> = {
+    "no-token":
+      "لم يُضبط Vercel Blob في هذا النشر: أنشئ Blob store من Vercel واربطه بالمشروع ثم أعد النشر.",
+    BlobStoreNotFoundError:
+      "مخزن الملفات في Vercel غير موجود أو غير مربوط بهذا المشروع. راجع Storage ← Blob في Vercel.",
+    BlobStoreSuspendedError:
+      "تم تعليق مخزن Vercel Blob. راجع لوحة Vercel ← Storage.",
+    BlobAccessError:
+      "Vercel رفض صلاحية الكتابة في المخزن. تحقق من مفتاح BLOB_READ_WRITE_TOKEN في المشروع.",
+    BlobContentTypeNotAllowedError:
+      "نوع الملف غير مسموح لهذا المسار (صور JPG/PNG/WebP أو PDF فقط).",
+    BlobFileTooLargeError:
+      "حجم الملف أكبر من الحد المسموح لهذا المسار.",
+    BlobServiceRateLimited:
+      "تم تجاوز حد الطلبات إلى Vercel Blob مؤقتاً؛ حاول بعد قليل.",
+    BlobServiceNotAvailable:
+      "خدمة Vercel Blob غير متاحة الآن؛ حاول بعد قليل.",
+    "upload/client-token":
+      "تعذر الحصول على تصريح الرفع من الخادم. أعد تسجيل الدخول وتأكد من صلاحيتك.",
     "storage/unauthorized":
       "Firebase Storage رفض الرفع: راجع قواعد التخزين وصلاحية الحساب للمسار المطلوب.",
     "storage/unauthenticated":

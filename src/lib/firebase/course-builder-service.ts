@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   getDocs,
   doc,
@@ -8,8 +8,8 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { runUploadStep } from "../upload-step";
-import { uploadStoredFile, type UploadProgress } from "./storage-upload";
-import { auth, db, storage } from "./config";
+import { uploadStoredFile, type UploadProgress } from "../uploads/storage-upload";
+import { auth, db } from "./config";
 import { normalizeCourse } from "./services";
 import {
   builderLesson,
@@ -191,11 +191,15 @@ export async function uploadLessonPdf(
     String.fromCharCode(...bytes) !== "%PDF-"
   )
     throw new Error("اختر ملف PDF حقيقياً بحجم لا يزيد عن ٢٠ ميجابايت");
+  // The bytes go straight from the browser to Vercel Blob; the server route
+  // checks the admin role and issues a token for this one path only.
   return (
     await uploadStoredFile(
-      `courses/${courseId}/pdf/${crypto.randomUUID()}.pdf`,
-      file,
-      "application/pdf",
+      "lesson-pdf",
+      { courseId },
+      new File([file], file.name.endsWith(".pdf") ? file.name : "lesson.pdf", {
+        type: "application/pdf",
+      }),
       onProgress,
     )
   ).url;
@@ -218,6 +222,7 @@ export async function saveCourseCover(
   // The catalogue renders covers through next/image; a host outside the
   // configured remotePatterns would save a cover that never displays.
   const allowedCoverHosts = [
+    "blob.vercel-storage.com",
     "firebasestorage.googleapis.com",
     "tkrygfflhrvgveiolhsl.supabase.co",
   ];
@@ -231,7 +236,7 @@ export async function saveCourseCover(
     if (
       parsed.protocol !== "https:" ||
       (allowedCoverHosts.every((host) => parsed.hostname !== host) &&
-        !/\.(supabase\.co|bunny\.net|vdocipher\.com|vimeo\.com|vimeocdn\.com)$/.test(
+        !/\.(supabase\.co|bunny\.net|vdocipher\.com|vimeo\.com|vimeocdn\.com|public\.blob\.vercel-storage\.com)$/.test(
           parsed.hostname,
         ))
     )
