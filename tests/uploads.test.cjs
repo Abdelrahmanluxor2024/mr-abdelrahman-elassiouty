@@ -186,3 +186,12 @@ test('the app no longer initialises Firebase Storage at all', () => {
     assert.ok(!source.includes('firebase/storage-upload'),file);
   }
 });
+
+test('a Private store is called out by name, since it rejects every public upload', () => {
+  const message = errors.uploadErrorMessage({name:'BlobAccessError'});
+  assert.match(message,/Private/);
+  assert.match(message,/Public/);
+  // The client always asks for public access; changing that would break every page.
+  const client=fs.readFileSync('src/lib/uploads/storage-upload.ts','utf8');
+  assert.ok(client.includes('access: "public"'));
+});
