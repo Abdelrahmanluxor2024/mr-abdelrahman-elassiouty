@@ -66,6 +66,15 @@ export function uploadErrorMessage(error: unknown) {
       "Firebase Storage رفض اسم الدلو المستخدم في الموقع (الدلو غير موجود). " +
       `هذا خلل إعدادات في Firebase وليس شبكة أو صلاحيات. (${code})`
     );
+  // The Blob SDK replies with this text whenever /api/uploads/token refuses the
+  // request (expired session, wrong role, missing store). The real reason is in
+  // that response body; point the user to it.
+  if (/failed to\s+retrieve the client token/i.test(String(raw.message ?? "")))
+    return (
+      "رفضت Vercel Blob تصريح الرفع من خادم الموقع. الأسباب الأشهر: انتهت جلسة الدخول (سجّل خروج ثم دخول)، " +
+      "أو حسابك ليس أدمن لهذا النوع من الرفع، أو لم يُربط مخزن Blob بالمشروع بعد. " +
+      "لمعرفة السبب بالضبط: F12 ← Network ← uploads/token ← Response."
+    );
   return messages[code]
     ? `${messages[code]} (${code})`
     : typeof raw.message === "string"
