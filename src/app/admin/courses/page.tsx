@@ -1,7 +1,11 @@
 "use client";
 
 import { ImagePicker } from "@/components/common/image-picker";
-import { uploadLessonImage } from "@/lib/firebase/image-upload";
+import { UploadDiagnostics } from "@/components/common/upload-diagnostics";
+import {
+  uploadCourseImage,
+  uploadLessonImage,
+} from "@/lib/firebase/image-upload";
 import { upgradeCourseLearning } from "@/app/actions/upgrade-course-learning";
 import { addFourthLesson } from "@/app/actions/add-fourth-lesson";
 import { auth } from "@/lib/firebase/config";
@@ -60,6 +64,7 @@ export default function CourseStudio() {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [imageUploads, setImageUploads] = useState(0);
+  const [pdfProgress, setPdfProgress] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -137,13 +142,20 @@ export default function CourseStudio() {
       setIssues([]);
     }
   }
-  function updateLesson(id: string, patch: Partial<BuilderLesson>) {
+  function updateLesson(
+    id: string,
+    patch:
+      | Partial<BuilderLesson>
+      | ((lesson: BuilderLesson) => Partial<BuilderLesson>),
+  ) {
     setDraft((current) =>
       current
         ? {
             ...current,
             lessons: current.lessons.map((l) =>
-              l.id === id ? { ...l, ...patch } : l,
+              l.id === id
+                ? { ...l, ...(typeof patch === "function" ? patch(l) : patch) }
+                : l,
             ),
           }
         : current,
@@ -455,6 +467,44 @@ export default function CourseStudio() {
                   onChange={(e) => update({ price: Number(e.target.value) })}
                 />
               </label>
+              <div className="sm:col-span-2">
+                <ImagePicker
+                  key={`course-cover-${draft.id}`}
+                  label="رفع صورة غلاف الكورس من جهازك"
+                  value={
+                    draft.thumbnailUrl
+                      ? { url: draft.thumbnailUrl, path: "", name: draft.title }
+                      : undefined
+                  }
+                  disabled={busy || imageUploads > 0}
+                  onBusyChange={(uploading) =>
+                    setImageUploads((n) =>
+                      Math.max(0, n + (uploading ? 1 : -1)),
+                    )
+                  }
+                  upload={(file, onProgress) =>
+                    uploadCourseImage(draft.id, file, onProgress)
+                  }
+                  onChange={(image) => {
+                    setDraft((current) =>
+                      current
+                        ? { ...current, thumbnailUrl: image?.url || "" }
+                        : current,
+                    );
+                    setDirty(true);
+                  }}
+                />
+              </div>
+              <p className="sm:col-span-2 text-sm text-muted">
+                بعد اكتمال رفع الغلاف، احفظ الكورس من خطوة المراجعة لظهوره
+                للطلاب.
+              </p>
+              <UploadDiagnostics
+                courseId={draft.id}
+                onBusyChange={(uploading) =>
+                  setImageUploads((n) => Math.max(0, n + (uploading ? 1 : -1)))
+                }
+              />
               <label className="sm:col-span-2 space-y-2 text-sm font-bold">
                 رابط صورة الغلاف
                 <Input
@@ -632,8 +682,8 @@ export default function CourseStudio() {
                         ? { url: lesson.imageUrl, path: "", name: lesson.title }
                         : undefined
                     }
-                    upload={(file) =>
-                      uploadLessonImage(draft.id, lesson.id, file)
+                    upload={(file, onProgress) =>
+                      uploadLessonImage(draft.id, lesson.id, file, onProgress)
                     }
                     onChange={(image) =>
                       updateLesson(lesson.id, { imageUrl: image?.url || "" })
@@ -794,7 +844,8 @@ export default function CourseStudio() {
                           + رابط ملف
                         </Button>
                         <label className="cursor-pointer rounded-xl border border-blue-200 px-4 py-2 text-sm font-bold text-blue-600 dark:text-cyan-300">
-                          رفع PDF
+                          رفع PDF{" "}
+                          {pdfProgress !== null ? ` — ${pdfProgress}%` : ""}
                           <input
                             type="file"
                             accept="application/pdf"
@@ -804,14 +855,17 @@ export default function CourseStudio() {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               setBusy(true);
+                              setPdfProgress(0);
+                              const input = e.currentTarget;
                               try {
                                 const url = await uploadLessonPdf(
                                   draft.id,
                                   file,
+                                  setPdfProgress,
                                 );
-                                updateLesson(lesson.id, {
+                                updateLesson(lesson.id, (current) => ({
                                   files: [
-                                    ...lesson.files,
+                                    ...current.files,
                                     {
                                       id: newId(),
                                       title: file.name.replace(/\.pdf$/i, ""),
@@ -819,7 +873,7 @@ export default function CourseStudio() {
                                       locked: false,
                                     },
                                   ],
-                                });
+                                }));
                                 toast.success(
                                   "تم رفع الملف؛ احفظ الكورس لربطه بالدرس",
                                 );
@@ -831,6 +885,8 @@ export default function CourseStudio() {
                                 );
                               } finally {
                                 setBusy(false);
+                                setPdfProgress(null);
+                                input.value = "";
                               }
                             }}
                           />

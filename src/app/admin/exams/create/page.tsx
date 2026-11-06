@@ -1,4 +1,5 @@
 "use client";
+import { validateImageFile } from "@/lib/image-attachments";
 import { Textarea } from "@/components/ui/textarea";
 
 import { useState, useEffect } from "react";
@@ -189,13 +190,19 @@ export default function AdminCreateExamPage() {
     setQuestions((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleImageChange = (
+  const handleImageChange = async (
     index: number,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    try {
+      await validateImageFile(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "صورة غير صالحة");
+      return;
+    }
     const previewUrl = URL.createObjectURL(file);
     setQuestions((prev) =>
       prev.map((q, idx) =>
@@ -294,7 +301,9 @@ export default function AdminCreateExamPage() {
           try {
             imageUrl = await uploadQuestionImage(q.imageFile, "temp-exam");
           } catch (err) {
-            throw new Error("تعذر رفع صورة السؤال. حاول مرة أخرى قبل النشر");
+            throw new Error(
+              `تعذر رفع صورة السؤال ${i + 1}: ${err instanceof Error ? err.message : "تحقق من التخزين"}`,
+            );
           }
         }
 
@@ -723,7 +732,7 @@ export default function AdminCreateExamPage() {
                     اختر صورة من جهازك
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={(e) => handleImageChange(qIndex, e)}
                     />

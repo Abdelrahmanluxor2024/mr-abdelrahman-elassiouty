@@ -7,7 +7,7 @@ import {
   where,
   runTransaction,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { uploadStoredFile, type UploadProgress } from "./storage-upload";
 import { auth, db, storage } from "./config";
 import { normalizeCourse } from "./services";
 import {
@@ -154,14 +154,26 @@ export async function saveCourseDraft(draft: CourseDraft, publish: boolean) {
       .forEach((id) => tx.update(doc(db, "exams", id), { isActive: false }));
   });
 }
-export async function uploadLessonPdf(courseId: string, file: File) {
+export async function uploadLessonPdf(
+  courseId: string,
+  file: File,
+  onProgress?: UploadProgress,
+) {
   await requireAdmin();
-  if (file.type !== "application/pdf" || file.size > 20 * 1024 * 1024)
-    throw new Error("اختر PDF بحجم لا يزيد عن ٢٠ ميجابايت");
-  const path = ref(
-    storage,
-    `courses/${courseId}/pdf/${crypto.randomUUID()}.pdf`,
-  );
-  await uploadBytes(path, file, { contentType: "application/pdf" });
-  return getDownloadURL(path);
+  if (!courseId || courseId.includes("/")) throw new Error("كورس غير صالح");
+  const bytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  if (
+    file.size === 0 ||
+    file.size > 20 * 1024 * 1024 ||
+    String.fromCharCode(...bytes) !== "%PDF-"
+  )
+    throw new Error("اختر ملف PDF حقيقياً بحجم لا يزيد عن ٢٠ ميجابايت");
+  return (
+    await uploadStoredFile(
+      `courses/${courseId}/pdf/${crypto.randomUUID()}.pdf`,
+      file,
+      "application/pdf",
+      onProgress,
+    )
+  ).url;
 }

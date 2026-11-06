@@ -289,6 +289,7 @@ function store() {
   const mocks = {
     "firebase/firestore": firestore,
     "firebase/storage": {},
+    "./storage-upload": {},
     "./config": {
       db: {},
       auth: { authStateReady: async () => {}, currentUser: { uid: "admin" } },
