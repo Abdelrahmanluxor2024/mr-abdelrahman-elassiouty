@@ -7,6 +7,7 @@ import {
   where,
   runTransaction,
 } from "firebase/firestore";
+import { runUploadStep } from "../upload-step";
 import { uploadStoredFile, type UploadProgress } from "./storage-upload";
 import { auth, db, storage } from "./config";
 import { normalizeCourse } from "./services";
@@ -159,9 +160,19 @@ export async function uploadLessonPdf(
   file: File,
   onProgress?: UploadProgress,
 ) {
-  await requireAdmin();
+  await runUploadStep(
+    "التحقق من جلسة وصلاحية رفع PDF",
+    () => requireAdmin(),
+    onProgress,
+  );
   if (!courseId || courseId.includes("/")) throw new Error("كورس غير صالح");
-  const bytes = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  const bytes = new Uint8Array(
+    await runUploadStep(
+      "فحص ملف PDF",
+      () => file.slice(0, 5).arrayBuffer(),
+      onProgress,
+    ),
+  );
   if (
     file.size === 0 ||
     file.size > 20 * 1024 * 1024 ||

@@ -9,7 +9,8 @@ import {
 } from "firebase/storage";
 import { auth, storage } from "./config";
 import { uploadErrorMessage } from "../upload-errors";
-export type UploadProgress = (percent: number) => void;
+import { runUploadStep, type UploadProgress } from "../upload-step";
+export type { UploadProgress } from "../upload-step";
 /** A selection/preview is NOT a successful upload. Verify the remote object before returning. */
 export async function uploadStoredFile(
   path: string,
@@ -18,11 +19,20 @@ export async function uploadStoredFile(
   onProgress?: UploadProgress,
 ) {
   try {
-    await auth.authStateReady();
+    await runUploadStep(
+      "التحقق من جلسة Firebase",
+      () => auth.authStateReady(),
+      onProgress,
+    );
     if (!auth.currentUser) throw new Error("سجل الدخول قبل رفع الملفات");
-    await auth.currentUser.getIdToken();
+    await runUploadStep(
+      "تجديد تصريح رفع الملف",
+      () => auth.currentUser!.getIdToken(),
+      onProgress,
+    );
     const target = ref(storage, path),
       task = uploadBytesResumable(target, file, { contentType: type });
+    onProgress?.(0, "الاتصال بخادم التخزين ورفع الملف");
     await new Promise<void>((resolve, reject) => {
       let last = -1,
         settled = false;
@@ -65,20 +75,41 @@ export async function uploadStoredFile(
                   Math.round((s.bytesTransferred / s.totalBytes) * 100),
                 )
               : 0,
+            "رفع الملف إلى Firebase Storage",
           );
         },
         finish,
         () => finish(),
       );
     });
-    const metadata = await getMetadata(target);
+    const metadata = await runUploadStep(
+      "قراءة بيانات الملف بعد الرفع",
+      () => getMetadata(target),
+      onProgress,
+      99,
+    );
     if (metadata.size !== file.size || metadata.contentType !== type)
       throw new Error(
         "الملف المحفوظ لا يطابق الحجم أو النوع المطلوب؛ لم يتم اعتماد الرابط",
       );
     // Metadata alone cannot prove that the stored file is downloadable and intact.
-    const downloaded = new Uint8Array(await getBytes(target, file.size));
-    const original = new Uint8Array(await file.arrayBuffer());
+    const downloaded = new Uint8Array(
+      await runUploadStep(
+        "تنزيل الملف للتحقق من سلامته",
+        () => getBytes(target, file.size),
+        onProgress,
+        99,
+        30000,
+      ),
+    );
+    const original = new Uint8Array(
+      await runUploadStep(
+        "مقارنة محتوى الملف",
+        () => file.arrayBuffer(),
+        onProgress,
+        99,
+      ),
+    );
     if (
       downloaded.length !== original.length ||
       !downloaded.every((byte, i) => byte === original[i])
@@ -86,8 +117,13 @@ export async function uploadStoredFile(
       throw new Error(
         "الملف رُفع لكن محتوى التنزيل لا يطابق الأصل؛ لم يتم اعتماد الرابط",
       );
-    const url = await getDownloadURL(target);
-    onProgress?.(100);
+    const url = await runUploadStep(
+      "استخراج رابط الملف المحفوظ",
+      () => getDownloadURL(target),
+      onProgress,
+      99,
+    );
+    onProgress?.(100, "اكتمل الرفع والتحقق من الملف");
     return {
       url,
       path,

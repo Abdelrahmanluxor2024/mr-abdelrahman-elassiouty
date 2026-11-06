@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function load(path,mocks={},extra={}){
- const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];throw Error(id);},console,URL,Uint8Array,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
+ const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];if(id==='../upload-step')return load('src/lib/upload-step.ts',mocks,extra);throw Error(id);},console,URL,Uint8Array,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
 }
 const errors=load('src/lib/upload-errors.ts');
 function fixture({fail,metadataSize=4,anonymous=false,corrupt=false}={}){
@@ -71,4 +71,34 @@ test('Next image optimizer explicitly accepts Firebase Storage covers but not ar
  const good=new URL('https://firebasestorage.googleapis.com/v0/b/bucket/o/courses%2Fc%2Fimages%2Fcover.png?alt=media&token=test');
  assert.ok(config.images.remotePatterns.some(p=>matchRemotePattern(p,good)));
  assert.ok(!config.images.remotePatterns.some(p=>matchRemotePattern(p,new URL('https://unknown.invalid/cover.png'))));
+});
+
+test('a stalled auth prerequisite fails promptly and a late auth success never starts an upload',async()=>{
+ const timers=new Map();let n=0,resolveAuth,uploads=0;
+ const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
+ const auth={authStateReady:()=>new Promise(resolve=>{resolveAuth=resolve;}),currentUser:{getIdToken:async()=>'token'}};
+ const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth,storage:{}},'../upload-errors':errors,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>{uploads++;throw Error('should not start');}}});
+ const pending=api.uploadStoredFile('test',{size:1},'image/png');
+ await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
+ await assert.rejects(pending,/التحقق من جلسة Firebase.*upload\/step-timeout/);
+ resolveAuth();await new Promise(setImmediate);assert.equal(uploads,0);assert.equal(timers.size,0);
+});
+test('admin profile lookup has a deadline before course/lesson/exam upload, not just the transfer',async()=>{
+ const s=imageFixture(),timers=new Map();let n=0;
+ s.mocks['firebase/firestore'].getDoc=()=>new Promise(()=>{});
+ const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
+ s.mocks['../upload-step']=stage;
+ const api=load('src/lib/firebase/image-upload.ts',s.mocks);
+ const pending=api.uploadCourseImage('c',file('image/png',[137,80,78,71,13,10,26,10]));
+ await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
+ await assert.rejects(pending,/صلاحية الأدمن/);assert.equal(s.calls.length,0);assert.equal(timers.size,0);
+});
+test('post-upload metadata verification also has a deadline and never reports 100 percent on timeout',async()=>{
+ const timers=new Map();let n=0;
+ const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
+ const progress=[];
+ const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth:{authStateReady:async()=>{},currentUser:{getIdToken:async()=>'token'}},storage:{}},'../upload-errors':errors,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>({on:(_e,p,_x,done)=>queueMicrotask(()=>{p({bytesTransferred:1,totalBytes:1});done();}),cancel:()=>{} }),getMetadata:()=>new Promise(()=>{})}});
+ const pending=api.uploadStoredFile('test',{size:1},'image/png',p=>progress.push(p));
+ await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
+ await assert.rejects(pending,/قراءة بيانات الملف/);assert.ok(!progress.includes(100));
 });
