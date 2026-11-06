@@ -5,9 +5,9 @@ function load(path,mocks={},extra={}){
  const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];if(id==='../upload-step')return load('src/lib/upload-step.ts',mocks,extra);throw Error(id);},console,URL,Uint8Array,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
 }
 const errors=load('src/lib/upload-errors.ts');
-function fixture({fail,metadataSize=4,anonymous=false,corrupt=false}={}){
+function fixture({fail,metadataSize=4,anonymous=false,corrupt=false,directFail=false,partial=false,directStall=false}={}){
  const calls=[],timers=new Map();let canceled=false,n=0;
- const storage={ref:(_,path)=>({path}),uploadBytesResumable:(target,file,meta)=>{calls.push(['upload',target.path,file.size,meta.contentType]);return{cancel:()=>{canceled=true;},on:(_event,progress,error,complete)=>{if(fail==='stall')return;queueMicrotask(()=>{if(fail){error({code:fail});return;}progress({bytesTransferred:4,totalBytes:4});complete();});}};},getMetadata:async()=>{calls.push(['metadata']);return{size:metadataSize,contentType:'image/png'};},getBytes:async()=>{calls.push(['bytes']);return new Uint8Array(corrupt?[9,2,3,4]:[1,2,3,4]).buffer;},getDownloadURL:async()=>{calls.push(['url']);return 'https://storage.test/image.png';},deleteObject:async()=>{}};
+ const storage={uploadBytes:async(target,file,meta)=>{calls.push(['direct',target.path,file.size,meta.contentType]);if(directFail)throw {code:'storage/unauthorized'};if(directStall)return new Promise(()=>{});return{};},ref:(_,path)=>({path}),uploadBytesResumable:(target,file,meta)=>{calls.push(['upload',target.path,file.size,meta.contentType]);return{cancel:()=>{canceled=true;},on:(_event,progress,error,complete)=>{if(fail==='stall'){if(partial)queueMicrotask(()=>progress({bytesTransferred:1,totalBytes:4}));return;}queueMicrotask(()=>{if(fail){error({code:fail});return;}progress({bytesTransferred:4,totalBytes:4});complete();});}};},getMetadata:async()=>{calls.push(['metadata']);return{size:metadataSize,contentType:'image/png'};},getBytes:async()=>{calls.push(['bytes']);return new Uint8Array(corrupt?[9,2,3,4]:[1,2,3,4]).buffer;},getDownloadURL:async()=>{calls.push(['url']);return 'https://storage.test/image.png';},deleteObject:async()=>{}};
  const auth={authStateReady:async()=>{},currentUser:anonymous?null:{getIdToken:async()=>{calls.push(['token']);return'token';}}};
  const api=load('src/lib/firebase/storage-upload.ts',{'firebase/storage':storage,'./config':{auth,storage:{}},'../upload-errors':errors},{setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
  return {api,calls,timers,canceled:()=>canceled};
@@ -22,7 +22,7 @@ test('unauthorized/quota failures and mismatching remote files never fabricate s
 });
 test('anonymous upload does not touch Storage; stalled upload cancels and returns an actionable error',async()=>{
  const a=fixture({anonymous:true});await assert.rejects(a.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));assert.equal(a.calls.length,0);
- const s=fixture({fail:'stall'}),pending=s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png');await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();await assert.rejects(pending,/٤٥/);assert.equal(s.canceled(),true);
+ const s=fixture({fail:'stall'}),pending=s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png');await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();assert.equal((await pending).url,'https://storage.test/image.png');assert.equal(s.canceled(),true);assert.equal(s.calls.filter(c=>c[0]==='direct').length,1);
 });
 function imageFixture(role='admin',decodeFailure=false){
  const calls=[];const image=load('src/lib/image-attachments.ts');const config={auth:{authStateReady:async()=>{},currentUser:{uid:'u',getIdToken:async()=>'token'}},db:{}};
@@ -101,4 +101,30 @@ test('post-upload metadata verification also has a deadline and never reports 10
  const pending=api.uploadStoredFile('test',{size:1},'image/png',p=>progress.push(p));
  await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
  await assert.rejects(pending,/قراءة بيانات الملف/);assert.ok(!progress.includes(100));
+});
+
+test('explicit Storage denials never use the alternative transport',async()=>{
+ for(const fail of ['storage/unauthorized','storage/unauthenticated','storage/quota-exceeded']){
+  const s=fixture({fail});await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));
+  assert.equal(s.calls.filter(c=>c[0]==='direct').length,0);
+ }
+});
+test('fallback failure preserves real permission error and never accepts a URL',async()=>{
+ const s=fixture({fail:'stall',directFail:true});
+ const pending=s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png');
+ await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
+ await assert.rejects(pending,/storage\/unauthorized/);assert.equal(s.calls.filter(c=>c[0]==='direct').length,1);assert.equal(s.calls.some(c=>c[0]==='url'),false);
+});
+test('partially transferred files do not restart through a second transport',async()=>{
+ const s=fixture({fail:'stall',partial:true});
+ const pending=s.api.uploadStoredFile('a',{size:4},'image/png');
+ await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
+ await assert.rejects(pending,/٤٥/);assert.equal(s.canceled(),true);assert.equal(s.calls.some(c=>c[0]==='direct'),false);
+});
+test('direct fallback is bounded too and cannot create a late success UI',async()=>{
+ const s=fixture({fail:'stall',directStall:true}),progress=[];
+ const pending=s.api.uploadStoredFile('a',{size:4},'image/png',p=>progress.push(p));
+ await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
+ await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
+ await assert.rejects(pending,/النقل المباشر البديل/);assert.equal(s.calls.some(c=>c[0]==='metadata'),false);assert.ok(!progress.includes(100));
 });

@@ -2,6 +2,7 @@
 import {
   ref,
   uploadBytesResumable,
+  uploadBytes,
   getDownloadURL,
   getMetadata,
   getBytes,
@@ -33,55 +34,69 @@ export async function uploadStoredFile(
     const target = ref(storage, path),
       task = uploadBytesResumable(target, file, { contentType: type });
     onProgress?.(0, "الاتصال بخادم التخزين ورفع الملف");
-    await new Promise<void>((resolve, reject) => {
-      let last = -1,
-        settled = false;
-      const finish = (error?: unknown) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        error ? reject(error) : resolve();
-      };
-      let timer = setTimeout(() => {
-        finish(
-          new Error(
-            "لم يتقدم رفع الملف خلال ٤٥ ثانية. تحقق من الشبكة وقواعد Storage وCORS.",
-          ),
-        );
-        task.cancel();
-      }, 45000);
-      const heartbeat = () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          finish(
-            new Error(
-              "توقف تقدم رفع الملف لمدة ٤٥ ثانية. تحقق من الشبكة وإعدادات Storage.",
-            ),
-          );
-          task.cancel();
-        }, 45000);
-      };
-      task.on(
-        "state_changed",
-        (s) => {
-          if (s.bytesTransferred !== last) {
-            last = s.bytesTransferred;
-            heartbeat();
-          }
-          onProgress?.(
-            s.totalBytes
-              ? Math.min(
-                  99,
-                  Math.round((s.bytesTransferred / s.totalBytes) * 100),
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let last = -1,
+          settled = false;
+        const finish = (error?: unknown) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          error ? reject(error) : resolve();
+        };
+        const stalled = () => {
+          const error =
+            last <= 0
+              ? Object.assign(
+                  new Error("رفع الاستئناف لم يبدأ؛ تجربة النقل المباشر"),
+                  { code: "upload/no-progress" },
                 )
-              : 0,
-            "رفع الملف إلى Firebase Storage",
-          );
-        },
-        finish,
-        () => finish(),
+              : new Error(
+                  "توقف نقل الملف لمدة ٤٥ ثانية. تحقق من الاتصال وأعد المحاولة.",
+                );
+          finish(error);
+          task.cancel();
+        };
+        let timer = setTimeout(stalled, 15000);
+        const heartbeat = () => {
+          clearTimeout(timer);
+          timer = setTimeout(stalled, last > 0 ? 45000 : 15000);
+        };
+        task.on(
+          "state_changed",
+          (s) => {
+            if (settled) return;
+            if (s.bytesTransferred !== last) {
+              last = s.bytesTransferred;
+              heartbeat();
+            }
+            onProgress?.(
+              s.totalBytes
+                ? Math.min(
+                    99,
+                    Math.round((s.bytesTransferred / s.totalBytes) * 100),
+                  )
+                : 0,
+              "رفع الملف إلى Firebase Storage",
+            );
+          },
+          finish,
+          () => finish(),
+        );
+      });
+    } catch (error) {
+      // Only a zero-byte transport stall retries. Never bypass an explicit permission,
+      // billing, checksum or authentication rejection, and never switch after partial transfer.
+      if ((error as { code?: string })?.code !== "upload/no-progress")
+        throw error;
+      await runUploadStep(
+        "النقل المباشر البديل (بدون جلسة استئناف)",
+        () => uploadBytes(target, file, { contentType: type }),
+        onProgress,
+        0,
+        45000,
       );
-    });
+    }
     const metadata = await runUploadStep(
       "قراءة بيانات الملف بعد الرفع",
       () => getMetadata(target),
