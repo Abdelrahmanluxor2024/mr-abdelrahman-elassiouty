@@ -21,7 +21,9 @@ export function uploadErrorMessage(error: unknown) {
     BlobStoreSuspendedError:
       "تم تعليق مخزن Vercel Blob. راجع لوحة Vercel ← Storage.",
     BlobAccessError:
-      "Vercel رفض صلاحية الكتابة في المخزن. تحقق من مفتاح BLOB_READ_WRITE_TOKEN في المشروع.",
+      "Vercel رفض الكتابة في المخزن. السبب الأشهر: المخزن أُنشئ بصلاحية Private والموقع يرفع ملفات عامة. " +
+      "أنشئ Blob store من نوع Public (Public: من يملك الرابط يفتحه، وهو المطلوب للصور وملفات PDF)، " +
+      "أو تحقق من BLOB_READ_WRITE_TOKEN إن كان المخزن Public بالفعل.",
     BlobContentTypeNotAllowedError:
       "نوع الملف غير مسموح لهذا المسار (صور JPG/PNG/WebP أو PDF فقط).",
     BlobFileTooLargeError:
