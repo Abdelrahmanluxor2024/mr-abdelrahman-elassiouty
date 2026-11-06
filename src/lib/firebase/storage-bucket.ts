@@ -90,8 +90,10 @@ export function missingBucketMessage(bucket: string) {
       "لذلك لا يستطيع المتصفح الاتصال بأي دلو. ضع اسم الدلو من Firebase Console ← Storage ثم أعد النشر."
     );
   return (
-    `Firebase Storage يرفض اسم الدلو «${bucket}»: الدلو غير موجود في المشروع mr-ass-4fc50 أو لم يُفعّل التخزين بعد. ` +
-    "هذا خلل إعدادات في Firebase، وليس شبكة أو صلاحيات الحساب. افتح Firebase Console ← Storage، فعّل/أعد ربط التخزين، " +
-    "انسخ اسم الدلو كما هو (عادة mr-ass-4fc50.firebasestorage.app) وضعه في NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ثم أعد النشر."
+    `Firebase Storage يرفض اسم الدلو «${bucket}»: الدلو غير موجود في المشروع mr-ass-4fc50. ` +
+    "السبب المرجح: منذ فبراير ٢٠٢٦ لا يمكن إنشاء دلو Storage في Firebase إلا على خطة Blaze (تفعيل الفوترة)، " +
+    "فمشروع على الخطة المجانية Spark لا يملك أي دلو إطلاقاً. هذا خلل إعدادات في Firebase وليس شبكة أو صلاحيات الحساب. " +
+    "افتح Firebase Console ← Storage، فعّل التخزين، واختر موقعاً أمريكياً (us-central1 / us-east1 / us-west1) " +
+    "حتى تبقى الاستخدامات داخل الحد المجاني، ثم انسخ اسم الدلو وضعه في NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET وأعد النشر."
   );
 }
