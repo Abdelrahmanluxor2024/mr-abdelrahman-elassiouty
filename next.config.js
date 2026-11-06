@@ -4,6 +4,10 @@ const nextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
+      // Vercel Blob store: uploads moved here because Firebase Storage needs
+      // a paid (Blaze) plan for any bucket since February 2026.
+      { protocol: "https", hostname: "blob.vercel-storage.com" },
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
       {
         protocol: "https",
         hostname: "firebasestorage.googleapis.com",

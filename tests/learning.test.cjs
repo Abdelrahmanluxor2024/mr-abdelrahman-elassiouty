@@ -6,7 +6,7 @@ const ts = require('typescript');
 function load(path, mocks = {}) {
   const exports = {};
   const js = ts.transpileModule(fs.readFileSync(path, 'utf8'), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
-  vm.runInNewContext(js, {exports, require: id => {if (id === './image-upload') return {}; if (id === '@/lib/exam-policy') return load('src/lib/exam-policy.ts', mocks); if (id === './course-payment' || id === '@/lib/firebase/course-payment') return load('src/lib/firebase/course-payment.ts', mocks); if (id in mocks) return mocks[id]; throw new Error(id);}, console, setTimeout, URL});
+  vm.runInNewContext(js, {exports, require: id => {if (id === './image-upload') return {}; if (id === '../uploads/storage-upload') return {moveStoredFile: async () => {throw new Error('no move');}, removeStoredFiles: async () => {}}; if (id === '@/lib/exam-policy') return load('src/lib/exam-policy.ts', mocks); if (id === './course-payment' || id === '@/lib/firebase/course-payment') return load('src/lib/firebase/course-payment.ts', mocks); if (id in mocks) return mocks[id]; throw new Error(id);}, console, setTimeout, URL});
   return exports;
 }
 const {getVideoSource} = load('src/lib/video-url.ts');

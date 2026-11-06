@@ -8,13 +8,13 @@ import {
   uploadExamImage,
   uploadForumImage,
 } from "@/lib/firebase/image-upload";
+import type { UploadArea } from "@/lib/uploads/policy";
 import { uploadLessonPdf } from "@/lib/firebase/course-builder-service";
-import { removeUpload } from "@/lib/firebase/storage-upload";
-import { firebaseConfig } from "@/lib/firebase/config";
+import { removeStoredUpload } from "@/lib/uploads/storage-upload";
 import {
+  UPLOAD_PROVIDER,
   checkStorageBucket,
-  missingBucketMessage,
-  storageBucketEndpoint,
+  missingStoreMessage,
 } from "@/lib/firebase/storage-bucket";
 export function UploadDiagnostics({
   courseId,
@@ -49,16 +49,22 @@ export function UploadDiagnostics({
     const checks: {
       label: string;
       file: File;
+      area: UploadArea;
+      input: Record<string, string | undefined>;
       upload: () => Promise<string>;
     }[] = [
       {
         label: "غلاف الكورس",
         file: image,
+        area: "course-cover",
+        input: { courseId },
         upload: async () => (await uploadCourseImage(courseId, image)).url,
       },
       {
         label: "ملفات PDF للدروس",
         file: pdf,
+        area: "lesson-pdf",
+        input: { courseId },
         upload: () => uploadLessonPdf(courseId, pdf),
       },
     ];
@@ -67,6 +73,8 @@ export function UploadDiagnostics({
         checks.push({
           label: "صورة الدرس",
           file: image,
+          area: "lesson-image",
+          input: { courseId, lessonId },
           upload: async () =>
             (await uploadLessonImage(courseId, lessonId, image)).url,
         });
@@ -74,49 +82,58 @@ export function UploadDiagnostics({
         checks.push({
           label: "صورة سؤال الامتحان",
           file: image,
+          area: "exam-question",
+          input: { examId },
           upload: async () => (await uploadExamImage(image, examId)).url,
         });
       checks.push(
         {
           label: "الصورة الشخصية — التخزين فقط",
           file: image,
+          area: "avatar",
+          input: {},
           upload: async () => (await uploadAvatarImage(image)).url,
         },
         {
           label: "صور منشورات المنصة",
           file: image,
+          area: "community",
+          input: {},
           upload: async () => (await uploadAdminImage("community", image)).url,
         },
         {
           label: "صور الإشعارات",
           file: image,
+          area: "notification",
+          input: {},
           upload: async () =>
             (await uploadAdminImage("notifications", image)).url,
         },
         {
           label: "صور المنتدى — بحساب الأدمن الحالي",
           file: image,
+          area: "forum",
+          input: { courseId },
           upload: async () => (await uploadForumImage(courseId, image)).url,
         },
       );
     }
     try {
-      setLines((x) => [...x, "فحص اسم الدلو وإتاحته من المتصفح…"]);
-      const bucket = await checkStorageBucket();
+      setLines((x) => [...x, "فحص مخزن الملفات في هذا النشر…"]);
+      const store = await checkStorageBucket();
       setLines((x) => [
         ...x,
-        bucket.ok
-          ? `الدلو متاح للاتصال: ${bucket.bucket}`
-          : `${missingBucketMessage(bucket.bucket)} [${bucket.code} | ${storageBucketEndpoint(bucket.bucket)}]`,
+        store.ok
+          ? `المخزن متاح: ${UPLOAD_PROVIDER}`
+          : `${missingStoreMessage(store.code)} [${store.code}]`,
       ]);
-      if (!bucket.ok) return;
+      if (!store.ok) return;
       for (const check of checks) {
         const file = check.file;
-        let path = "";
+        let url = "";
         try {
           setLines((x) => [...x, `جاري اختبار ${check.label} (${file.type})…`]);
-          const url = await check.upload();
-          path = decodeURIComponent(new URL(url).pathname.split("/o/")[1]);
+          url = await check.upload();
           const response = await fetch(url, {
             cache: "no-store",
             signal: AbortSignal.timeout(30000),
@@ -142,16 +159,9 @@ export function UploadDiagnostics({
             `${check.label}: ${e instanceof Error ? e.message : "فشل الاختبار"}`,
           ]);
         } finally {
-          if (path) {
-            try {
-              await removeUpload(path);
-              setLines((x) => [...x, "تم حذف ملف الاختبار فقط."]);
-            } catch {
-              setLines((x) => [
-                ...x,
-                `الرفع تم، لكن حذف ملف الاختبار رفضته القواعد: ${path}`,
-              ]);
-            }
+          if (url) {
+            await removeStoredUpload(check.area, check.input, url);
+            setLines((x) => [...x, "تم حذف ملف الاختبار فقط."]);
           }
         }
       }
@@ -166,9 +176,8 @@ export function UploadDiagnostics({
         تشخيص رفع الصور وPDF
       </summary>
       <p className="my-3 text-sm text-muted">
-        الدلو: {firebaseConfig.storageBucket}. الاختبار يرفع ملفين صغيرين،
-        ينزلهما ويقارن محتواهما ثم يحذف ملفي الاختبار فقط. لا يعدّل الكورس أو
-        الملفات القديمة.
+        المخزن: {UPLOAD_PROVIDER}. الاختبار يرفع ملفين صغيرين، ينزلهما ويقارن
+        محتواهما ثم يحذف ملفي الاختبار فقط. لا يعدّل الكورس أو الملفات القديمة.
       </p>
       <label className="my-3 flex gap-2 text-sm">
         <input
@@ -195,7 +204,7 @@ export function UploadDiagnostics({
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(
-                `Bucket: ${firebaseConfig.storageBucket}\n${lines.join("\n")}`,
+                `Store: ${UPLOAD_PROVIDER}\n${lines.join("\n")}`,
               );
             } catch {
               setLines((x) => [
