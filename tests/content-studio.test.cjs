@@ -14,12 +14,14 @@ function load(path, mocks = {}) {
   vm.runInNewContext(js, {
     exports,
     require: (id) => {
+      if(id === "../upload-step") return load("src/lib/upload-step.ts",mocks);
       if (id in mocks) return mocks[id];
       if (id === "./learning-content")
         return load("src/lib/learning-content.ts");
       throw Error(id);
     },
     console,
+    setTimeout, clearTimeout,
     URL,
     Intl,
     Date,

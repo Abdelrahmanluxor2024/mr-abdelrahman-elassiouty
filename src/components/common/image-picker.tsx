@@ -14,7 +14,7 @@ export function ImagePicker({
   onChange: (image?: ImageAttachment) => void;
   upload: (
     file: File,
-    onProgress?: (percent: number) => void,
+    onProgress?: (percent: number, stage?: string) => void,
   ) => Promise<ImageAttachment>;
   disabled?: boolean;
   label?: string;
@@ -23,6 +23,7 @@ export function ImagePicker({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+  const [stage, setStage] = useState("");
   const active = useRef(true);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -47,11 +48,15 @@ export function ImagePicker({
             if (!file) return;
             setBusy(true);
             setProgress(0);
+            setStage("بدء فحص الصورة والصلاحيات");
             setError("");
             onBusyChange?.(true);
             try {
-              const image = await upload(file, (percent) => {
-                if (active.current) setProgress(percent);
+              const image = await upload(file, (percent, nextStage) => {
+                if (active.current) {
+                  setProgress(percent);
+                  if (nextStage) setStage(nextStage);
+                }
               });
               if (active.current) onChange(image);
             } catch (err) {
@@ -75,7 +80,7 @@ export function ImagePicker({
       </label>
       <p className="text-xs text-muted">
         JPG / PNG / WebP — حتى ٣ ميجابايت
-        {busy ? ` · رفع ${progress}% والتحقق من الحفظ…` : ""}
+        {busy ? ` · ${stage} (${progress}%)` : ""}
       </p>
       {busy && (
         <progress
@@ -95,6 +100,11 @@ export function ImagePicker({
       )}
       {value && (
         <div className="space-y-2">
+          {busy && (
+            <p className="text-xs text-muted">
+              الصورة التالية هي الصورة المحفوظة سابقاً، وليست الملف الجاري رفعه.
+            </p>
+          )}
           <img
             src={value.url}
             alt={value.name || "الصورة المختارة"}

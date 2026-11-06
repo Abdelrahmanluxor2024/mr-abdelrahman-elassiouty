@@ -66,6 +66,11 @@ export default function CourseStudio() {
   const [busy, setBusy] = useState(false);
   const [imageUploads, setImageUploads] = useState(0);
   const [pdfProgress, setPdfProgress] = useState<number | null>(null);
+  const [pdfUpload, setPdfUpload] = useState<{
+    lessonId: string;
+    stage: string;
+    error: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -898,12 +903,24 @@ export default function CourseStudio() {
                               if (!file) return;
                               setBusy(true);
                               setPdfProgress(0);
+                              setPdfUpload({
+                                lessonId: lesson.id,
+                                stage: "بدء فحص PDF والصلاحيات",
+                                error: "",
+                              });
                               const input = e.currentTarget;
                               try {
                                 const url = await uploadLessonPdf(
                                   draft.id,
                                   file,
-                                  setPdfProgress,
+                                  (percent, stage) => {
+                                    setPdfProgress(percent);
+                                    setPdfUpload({
+                                      lessonId: lesson.id,
+                                      stage: stage || "رفع الملف",
+                                      error: "",
+                                    });
+                                  },
                                 );
                                 updateLesson(lesson.id, (current) => ({
                                   files: [
@@ -916,10 +933,27 @@ export default function CourseStudio() {
                                     },
                                   ],
                                 }));
+                                setPdfUpload({
+                                  lessonId: lesson.id,
+                                  stage:
+                                    "تم رفع الملف والتحقق منه؛ احفظ الكورس لربطه بالدرس",
+                                  error: "",
+                                });
                                 toast.success(
                                   "تم رفع الملف؛ احفظ الكورس لربطه بالدرس",
                                 );
                               } catch (e) {
+                                setPdfUpload((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        error:
+                                          e instanceof Error
+                                            ? e.message
+                                            : "فشل رفع PDF",
+                                      }
+                                    : current,
+                                );
                                 toast.error(
                                   e instanceof Error
                                     ? e.message
@@ -935,6 +969,18 @@ export default function CourseStudio() {
                         </label>
                       </div>
                     </div>
+                    {pdfUpload?.lessonId === lesson.id && (
+                      <p
+                        role={pdfUpload.error ? "alert" : "status"}
+                        className={
+                          pdfUpload.error
+                            ? "rounded-xl border border-red-500/40 p-3 text-sm text-red-500"
+                            : "text-sm text-muted"
+                        }
+                      >
+                        {pdfUpload.error || pdfUpload.stage}
+                      </p>
+                    )}
                     {lesson.files.map((f, i) => (
                       <div
                         key={f.id}
