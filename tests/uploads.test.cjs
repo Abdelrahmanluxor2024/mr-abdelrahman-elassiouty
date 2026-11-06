@@ -5,24 +5,24 @@ function load(path,mocks={},extra={}){
  const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];throw Error(id);},console,URL,Uint8Array,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
 }
 const errors=load('src/lib/upload-errors.ts');
-function fixture({fail,metadataSize=4,anonymous=false}={}){
+function fixture({fail,metadataSize=4,anonymous=false,corrupt=false}={}){
  const calls=[],timers=new Map();let canceled=false,n=0;
- const storage={ref:(_,path)=>({path}),uploadBytesResumable:(target,file,meta)=>{calls.push(['upload',target.path,file.size,meta.contentType]);return{cancel:()=>{canceled=true;},on:(_event,progress,error,complete)=>{if(fail==='stall')return;queueMicrotask(()=>{if(fail){error({code:fail});return;}progress({bytesTransferred:4,totalBytes:4});complete();});}};},getMetadata:async()=>{calls.push(['metadata']);return{size:metadataSize,contentType:'image/png'};},getDownloadURL:async()=>{calls.push(['url']);return 'https://storage.test/image.png';},deleteObject:async()=>{}};
+ const storage={ref:(_,path)=>({path}),uploadBytesResumable:(target,file,meta)=>{calls.push(['upload',target.path,file.size,meta.contentType]);return{cancel:()=>{canceled=true;},on:(_event,progress,error,complete)=>{if(fail==='stall')return;queueMicrotask(()=>{if(fail){error({code:fail});return;}progress({bytesTransferred:4,totalBytes:4});complete();});}};},getMetadata:async()=>{calls.push(['metadata']);return{size:metadataSize,contentType:'image/png'};},getBytes:async()=>{calls.push(['bytes']);return new Uint8Array(corrupt?[9,2,3,4]:[1,2,3,4]).buffer;},getDownloadURL:async()=>{calls.push(['url']);return 'https://storage.test/image.png';},deleteObject:async()=>{}};
  const auth={authStateReady:async()=>{},currentUser:anonymous?null:{getIdToken:async()=>{calls.push(['token']);return'token';}}};
  const api=load('src/lib/firebase/storage-upload.ts',{'firebase/storage':storage,'./config':{auth,storage:{}},'../upload-errors':errors},{setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
  return {api,calls,timers,canceled:()=>canceled};
 }
 test('successful upload verifies remote metadata BEFORE returning URL and 100%',async()=>{
- const s=fixture(),progress=[];const r=await s.api.uploadStoredFile('images/a.png',{size:4},'image/png',v=>progress.push(v));
- assert.equal(r.url,'https://storage.test/image.png');assert.equal(s.calls.map(x=>x[0]).join(','),'token,upload,metadata,url');assert.equal(progress.at(-1),100);assert.equal(s.timers.size,0);
+ const s=fixture(),progress=[];const r=await s.api.uploadStoredFile('images/a.png',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png',v=>progress.push(v));
+ assert.equal(r.url,'https://storage.test/image.png');assert.equal(s.calls.map(x=>x[0]).join(','),'token,upload,metadata,bytes,url');assert.equal(progress.at(-1),100);assert.equal(s.timers.size,0);
 });
 test('unauthorized/quota failures and mismatching remote files never fabricate success',async()=>{
- for(const fail of ['storage/unauthorized','storage/quota-exceeded']){const s=fixture({fail});await assert.rejects(s.api.uploadStoredFile('a',{size:4},'image/png'),new RegExp(fail));assert.equal(s.calls.some(c=>c[0]==='url'),false);assert.equal(s.timers.size,0);}
- const s=fixture({metadataSize:2});await assert.rejects(s.api.uploadStoredFile('a',{size:4},'image/png'));assert.equal(s.calls.some(c=>c[0]==='url'),false);
+ for(const fail of ['storage/unauthorized','storage/quota-exceeded']){const s=fixture({fail});await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'),new RegExp(fail));assert.equal(s.calls.some(c=>c[0]==='url'),false);assert.equal(s.timers.size,0);}
+ const s=fixture({metadataSize:2});await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));assert.equal(s.calls.some(c=>c[0]==='url'),false);
 });
 test('anonymous upload does not touch Storage; stalled upload cancels and returns an actionable error',async()=>{
- const a=fixture({anonymous:true});await assert.rejects(a.api.uploadStoredFile('a',{size:4},'image/png'));assert.equal(a.calls.length,0);
- const s=fixture({fail:'stall'}),pending=s.api.uploadStoredFile('a',{size:4},'image/png');await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();await assert.rejects(pending,/٤٥/);assert.equal(s.canceled(),true);
+ const a=fixture({anonymous:true});await assert.rejects(a.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png'));assert.equal(a.calls.length,0);
+ const s=fixture({fail:'stall'}),pending=s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png');await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();await assert.rejects(pending,/٤٥/);assert.equal(s.canceled(),true);
 });
 function imageFixture(role='admin',decodeFailure=false){
  const calls=[];const image=load('src/lib/image-attachments.ts');const config={auth:{authStateReady:async()=>{},currentUser:{uid:'u',getIdToken:async()=>'token'}},db:{}};
@@ -58,4 +58,17 @@ test('diagnostic image is a valid PNG with CRC-correct chunks and a decodable on
  const b=Buffer.from(source.match(/atob\(\s*["']([^"']+)/)[1],'base64');
  function crc32(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0;}
  let i=8;for(;i<b.length;){const n=b.readUInt32BE(i),kind=b.toString('ascii',i+4,i+8),data=b.subarray(i+8,i+8+n);assert.equal(crc32(b.subarray(i+4,i+8+n)),b.readUInt32BE(i+8+n));if(kind==='IDAT')assert.equal(require('node:zlib').inflateSync(data).length,4);i+=12+n;}assert.equal(i,b.length);
+});
+
+test('a byte-corrupted download fails verification even when metadata matches',async()=>{
+ const s=fixture({corrupt:true}),progress=[];
+ await assert.rejects(s.api.uploadStoredFile('a',{size:4,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer},'image/png',v=>progress.push(v)),/لا يطابق/);
+ assert.equal(s.calls.some(c=>c[0]==='url'),false);assert.ok(!progress.includes(100));
+});
+test('Next image optimizer explicitly accepts Firebase Storage covers but not arbitrary hosts',()=>{
+ const config=require('../next.config.js');
+ const {matchRemotePattern}=require('next/dist/shared/lib/match-remote-pattern');
+ const good=new URL('https://firebasestorage.googleapis.com/v0/b/bucket/o/courses%2Fc%2Fimages%2Fcover.png?alt=media&token=test');
+ assert.ok(config.images.remotePatterns.some(p=>matchRemotePattern(p,good)));
+ assert.ok(!config.images.remotePatterns.some(p=>matchRemotePattern(p,new URL('https://unknown.invalid/cover.png'))));
 });

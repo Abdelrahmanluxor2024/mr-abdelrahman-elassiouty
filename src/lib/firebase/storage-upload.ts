@@ -4,6 +4,7 @@ import {
   uploadBytesResumable,
   getDownloadURL,
   getMetadata,
+  getBytes,
   deleteObject,
 } from "firebase/storage";
 import { auth, storage } from "./config";
@@ -74,6 +75,16 @@ export async function uploadStoredFile(
     if (metadata.size !== file.size || metadata.contentType !== type)
       throw new Error(
         "الملف المحفوظ لا يطابق الحجم أو النوع المطلوب؛ لم يتم اعتماد الرابط",
+      );
+    // Metadata alone cannot prove that the stored file is downloadable and intact.
+    const downloaded = new Uint8Array(await getBytes(target, file.size));
+    const original = new Uint8Array(await file.arrayBuffer());
+    if (
+      downloaded.length !== original.length ||
+      !downloaded.every((byte, i) => byte === original[i])
+    )
+      throw new Error(
+        "الملف رُفع لكن محتوى التنزيل لا يطابق الأصل؛ لم يتم اعتماد الرابط",
       );
     const url = await getDownloadURL(target);
     onProgress?.(100);
