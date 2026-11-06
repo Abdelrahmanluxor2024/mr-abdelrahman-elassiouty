@@ -5,11 +5,14 @@ function load(path,mocks={},extra={}){
  const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require:id=>{if(id in mocks)return mocks[id];if(id==='../upload-step')return load('src/lib/upload-step.ts',mocks,extra);throw Error(id);},console,URL,Uint8Array,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,queueMicrotask,...extra});return exports;
 }
 const errors=load('src/lib/upload-errors.ts');
+// The preflight bucket probe is exercised on its own below; here it must simply
+// report a healthy bucket so the transport logic keeps its real error paths.
+const healthyBucket={checkStorageBucket:async()=>({ok:true,bucket:'mr-ass-4fc50.firebasestorage.app'}),missingBucketMessage:b=>`missing bucket ${b}`};
 function fixture({fail,metadataSize=4,anonymous=false,corrupt=false,directFail=false,partial=false,directStall=false}={}){
  const calls=[],timers=new Map();let canceled=false,n=0;
  const storage={uploadBytes:async(target,file,meta)=>{calls.push(['direct',target.path,file.size,meta.contentType]);if(directFail)throw {code:'storage/unauthorized'};if(directStall)return new Promise(()=>{});return{};},ref:(_,path)=>({path}),uploadBytesResumable:(target,file,meta)=>{calls.push(['upload',target.path,file.size,meta.contentType]);return{cancel:()=>{canceled=true;},on:(_event,progress,error,complete)=>{if(fail==='stall'){if(partial)queueMicrotask(()=>progress({bytesTransferred:1,totalBytes:4}));return;}queueMicrotask(()=>{if(fail){error({code:fail});return;}progress({bytesTransferred:4,totalBytes:4});complete();});}};},getMetadata:async()=>{calls.push(['metadata']);return{size:metadataSize,contentType:'image/png'};},getBytes:async()=>{calls.push(['bytes']);return new Uint8Array(corrupt?[9,2,3,4]:[1,2,3,4]).buffer;},getDownloadURL:async()=>{calls.push(['url']);return 'https://storage.test/image.png';},deleteObject:async()=>{}};
  const auth={authStateReady:async()=>{},currentUser:anonymous?null:{getIdToken:async()=>{calls.push(['token']);return'token';}}};
- const api=load('src/lib/firebase/storage-upload.ts',{'firebase/storage':storage,'./config':{auth,storage:{}},'../upload-errors':errors},{setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
+ const api=load('src/lib/firebase/storage-upload.ts',{'firebase/storage':storage,'./config':{auth,storage:{}},'../upload-errors':errors,'./storage-bucket':healthyBucket},{setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
  return {api,calls,timers,canceled:()=>canceled};
 }
 test('successful upload verifies remote metadata BEFORE returning URL and 100%',async()=>{
@@ -77,7 +80,7 @@ test('a stalled auth prerequisite fails promptly and a late auth success never s
  const timers=new Map();let n=0,resolveAuth,uploads=0;
  const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
  const auth={authStateReady:()=>new Promise(resolve=>{resolveAuth=resolve;}),currentUser:{getIdToken:async()=>'token'}};
- const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth,storage:{}},'../upload-errors':errors,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>{uploads++;throw Error('should not start');}}});
+ const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth,storage:{}},'../upload-errors':errors,'./storage-bucket':healthyBucket,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>{uploads++;throw Error('should not start');}}});
  const pending=api.uploadStoredFile('test',{size:1},'image/png');
  await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
  await assert.rejects(pending,/التحقق من جلسة Firebase.*upload\/step-timeout/);
@@ -97,7 +100,7 @@ test('post-upload metadata verification also has a deadline and never reports 10
  const timers=new Map();let n=0;
  const stage=load('src/lib/upload-step.ts',{}, {setTimeout:fn=>{timers.set(++n,fn);return n;},clearTimeout:id=>timers.delete(id)});
  const progress=[];
- const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth:{authStateReady:async()=>{},currentUser:{getIdToken:async()=>'token'}},storage:{}},'../upload-errors':errors,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>({on:(_e,p,_x,done)=>queueMicrotask(()=>{p({bytesTransferred:1,totalBytes:1});done();}),cancel:()=>{} }),getMetadata:()=>new Promise(()=>{})}});
+ const api=load('src/lib/firebase/storage-upload.ts',{'../upload-step':stage,'./config':{auth:{authStateReady:async()=>{},currentUser:{getIdToken:async()=>'token'}},storage:{}},'../upload-errors':errors,'./storage-bucket':healthyBucket,'firebase/storage':{ref:()=>({}),uploadBytesResumable:()=>({on:(_e,p,_x,done)=>queueMicrotask(()=>{p({bytesTransferred:1,totalBytes:1});done();}),cancel:()=>{} }),getMetadata:()=>new Promise(()=>{})}});
  const pending=api.uploadStoredFile('test',{size:1},'image/png',p=>progress.push(p));
  await new Promise(setImmediate);for(const fn of [...timers.values()])fn();
  await assert.rejects(pending,/قراءة بيانات الملف/);assert.ok(!progress.includes(100));
@@ -127,4 +130,129 @@ test('direct fallback is bounded too and cannot create a late success UI',async(
  await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
  await new Promise(setImmediate);for(const fn of [...s.timers.values()])fn();
  await assert.rejects(pending,/النقل المباشر البديل/);assert.equal(s.calls.some(c=>c[0]==='metadata'),false);assert.ok(!progress.includes(100));
+});
+
+// ── The real cause of the 0% upload: a bucket name that does not exist ──────
+function bucketFixture(bucket, error) {
+  const listed = [];
+  const api = load('src/lib/firebase/storage-bucket.ts', {
+    'firebase/storage': {ref: (_, path) => ({path}), listAll: async target => {listed.push(target.path); if (error) throw error; return {items: [], prefixes: []};}},
+    './config': {storage: {app: {options: {storageBucket: bucket}}}},
+  });
+  return {api, listed};
+}
+const missingBucket = {code: 'storage/unknown', status: 404, serverResponse: '{"error":{"code":404,"message":"Not Found."}}', message: 'Firebase Storage: An unknown error occurred'};
+
+test('a bucket that does not exist is reported as a configuration error, not a network stall', async () => {
+  const s = bucketFixture('mr-ass-4fc50.firebasestorage.app', missingBucket);
+  const probe = await s.api.checkStorageBucket();
+  assert.equal(probe.ok, false);assert.equal(probe.missing, true);assert.equal(probe.bucket, 'mr-ass-4fc50.firebasestorage.app');
+  assert.match(s.api.missingBucketMessage(probe.bucket), /غير موجود/);
+  assert.equal(s.listed.length, 1);assert.equal(s.listed[0], 'upload-check');
+  assert.match(s.api.storageBucketEndpoint(), /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/mr-ass-4fc50\.firebasestorage\.app\/o$/);
+});
+
+test('a healthy or merely-permission-denied bucket is not blamed for the failure', async () => {
+  for (const error of [null, {code: 'storage/unauthorized', status: 403}, {code: 'storage/retry-limit-exceeded'}, {code: 'storage/quota-exceeded', status: 402}]) {
+    const probe = await bucketFixture('ok.firebasestorage.app', error).api.checkStorageBucket();
+    assert.equal(probe.ok, true, String(error && error.code));
+  }
+});
+
+test('an unset bucket name fails before any transfer with an explicit message', async () => {
+  const s = bucketFixture('', null);
+  const probe = await s.api.checkStorageBucket();
+  assert.equal(probe.ok, false);assert.equal(s.listed.length, 0);
+  assert.match(s.api.missingBucketMessage(''), /NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET/);
+});
+
+test('the upload path stops at the bucket probe when the bucket is missing', async () => {
+  const timers = new Map();let n = 0, transfers = 0;
+  const bucket = {checkStorageBucket: async () => ({ok: false, bucket: 'wrong.firebasestorage.app', missing: true, code: 'storage/unknown'}), missingBucketMessage: b => `الدلو ${b} غير موجود`};
+  const api = load('src/lib/firebase/storage-upload.ts', {
+    'firebase/storage': {ref: () => ({}), uploadBytesResumable: () => { transfers++; throw new Error('must not start'); }},
+    './config': {auth: {authStateReady: async () => {}, currentUser: {getIdToken: async () => 'token'}}, storage: {}},
+    '../upload-errors': errors,
+    './storage-bucket': bucket,
+  }, {setTimeout: fn => {timers.set(++n, fn);return n;}, clearTimeout: id => timers.delete(id)});
+  await assert.rejects(api.uploadStoredFile('a', {size: 4, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer}, 'image/png'), /غير موجود/);
+  assert.equal(transfers, 0);
+});
+
+test('the SDK "unknown" error keeps the server body and is explained, and an empty bucket is a first-class code', () => {
+  assert.match(errors.uploadErrorMessage({code: 'storage/unknown', serverResponse: '{"error":{"code":404,"message":"Not Found."}}'}), /الدلو غير موجود/);
+  assert.match(errors.uploadErrorMessage({code: 'storage/bucket-not-found'}), /bucket-not-found/);
+  assert.match(errors.uploadErrorMessage({code: 'storage/unauthorized-app'}), /App Check/);
+});
+
+// ── Moving a staged object must keep verified bytes ────────────────────────
+function moveFixture({downloadFails = false} = {}) {
+  const calls = [];
+  const bytes = new Uint8Array([1, 2, 3, 4]);
+  const storage = {
+    ref: (_, path) => ({path}),
+    uploadBytesResumable: (target, file, meta) => {
+      calls.push(['upload', target.path, meta.contentType, file.size]);
+      return {cancel() {}, on: (_e, progress, _error, complete) => queueMicrotask(() => {progress({bytesTransferred: 4, totalBytes: 4});complete();})};
+    },
+    uploadBytes: async () => ({}),
+    getMetadata: async () => ({size: 4, contentType: 'image/png'}),
+    getBytes: async () => bytes.buffer,
+    getDownloadURL: async target => {
+      calls.push(['url', target.path]);
+      return `https://firebasestorage.googleapis.com/v0/b/b/o/${encodeURIComponent(target.path)}?alt=media&token=t`;
+    },
+    deleteObject: async target => calls.push(['delete', target.path]),
+  };
+  const api = load('src/lib/firebase/storage-upload.ts', {
+    'firebase/storage': storage,
+    './config': {auth: {authStateReady: async () => {}, currentUser: {getIdToken: async () => 't'}}, storage: {}},
+    '../upload-errors': errors,
+    './storage-bucket': healthyBucket,
+  }, {
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout,
+    fetch: async url => {
+      calls.push(['fetch', url]);
+      if (downloadFails) return {ok: false, status: 403, blob: async () => new Blob([])};
+      return {ok: true, status: 200, blob: async () => new Blob([bytes], {type: 'image/png'})};
+    },
+    File: class {constructor(parts, name, options) {this.name = name;this.type = options?.type;this.size = parts[0].size;this.parts = parts;}arrayBuffer() {return Promise.resolve(bytes.buffer);}slice() {return {arrayBuffer: () => Promise.resolve(bytes.buffer)};}},
+  });
+  return {api, calls};
+}
+
+test('a staged exam image is moved only after a verified download and upload', async () => {
+  const s = moveFixture();
+  const moved = await s.api.moveStoredFile('questions/temp-exam/a.png', 'questions/exam-1/a.png');
+  assert.equal(moved.path, 'questions/exam-1/a.png');
+  assert.ok(moved.url.includes('questions%2Fexam-1%2Fa.png'));
+  assert.ok(s.calls.some(c => c[0] === 'upload' && c[1] === 'questions/exam-1/a.png' && c[2] === 'image/png'));
+  assert.ok(s.calls.some(c => c[0] === 'delete' && c[1] === 'questions/temp-exam/a.png'));
+});
+
+test('a staged image that cannot be downloaded is never linked to the exam', async () => {
+  const s = moveFixture({downloadFails: true});
+  await assert.rejects(s.api.moveStoredFile('questions/temp-exam/a.png', 'questions/exam-1/a.png'), /403/);
+  assert.equal(s.calls.some(c => c[0] === 'upload'), false);
+  assert.equal(s.calls.some(c => c[0] === 'delete'), false);
+});
+
+test('a healthy bucket probe is reused briefly, but a failure is re-checked every time', async () => {
+  let listing = 0;
+  const ok = load('src/lib/firebase/storage-bucket.ts', {
+    'firebase/storage': {ref: () => ({}), listAll: async () => {listing++; return {items: [], prefixes: []};}},
+    './config': {storage: {app: {options: {storageBucket: 'b.firebasestorage.app'}}}},
+  });
+  await ok.checkStorageBucket();await ok.checkStorageBucket();
+  assert.equal(listing, 1);
+
+  let attempts = 0;
+  const flaky = load('src/lib/firebase/storage-bucket.ts', {
+    'firebase/storage': {ref: () => ({}), listAll: async () => {attempts++; throw {code: 'storage/unknown', status: 404, serverResponse: 'Not Found.'};}},
+    './config': {storage: {app: {options: {storageBucket: 'b.firebasestorage.app'}}}},
+  });
+  assert.equal((await flaky.checkStorageBucket()).ok, false);
+  assert.equal((await flaky.checkStorageBucket()).ok, false);
+  assert.equal(attempts, 2);
 });

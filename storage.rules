@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// Firebase Storage rules for mr-ass-4fc50.
+// Targeted, not public: every write needs an authenticated user, and each
+// path checks that the signed-in account is the admin (or the owner).
+//
+// Deploy with:
+//   firebase deploy --only storage --project mr-ass-4fc50
+//
+// Nothing here opens Storage to anonymous writes or makes a folder world-writable.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isImage() {
+      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+    }
+    function isPdf() {
+      return request.resource.contentType == 'application/pdf';
+    }
+    function under3MiB() {
+      return request.resource.size <= 3 * 1024 * 1024;
+    }
+    function under20MiB() {
+      return request.resource.size <= 20 * 1024 * 1024;
+    }
+    // Covers are shown in the catalogue to every signed-in student.
+    function canReadCourseImage() {
+      return signedIn();
+    }
+
+    // Course cover: courses/{courseId}/images/{file}
+    match /courses/{courseId}/images/{file} {
+      allow read: if canReadCourseImage() || isAdmin();
+      allow create, update: if isAdmin() && isImage() && under3MiB();
+      allow delete: if isAdmin();
+    }
+
+    // Lesson images.
+    match /courses/{courseId}/lessons/{lessonId}/images/{file} {
+      allow read: if canReadCourseImage() || isAdmin();
+      allow create, update: if isAdmin() && isImage() && under3MiB();
+      allow delete: if isAdmin();
+    }
+
+    // Lesson PDF attachments.
+    match /courses/{courseId}/pdf/{file} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isPdf() && under20MiB();
+      allow delete: if isAdmin();
+    }
+
+    // Exam question images.
+    match /questions/{examId}/{file} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isImage() && under3MiB();
+      allow delete: if isAdmin();
+    }
+
+    // Platform posts and notification images.
+    match /admin/community/images/{file} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isImage() && under3MiB();
+      allow delete: if isAdmin();
+    }
+    match /admin/notifications/images/{file} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && isImage() && under3MiB();
+      allow delete: if isAdmin();
+    }
+
+    // Account avatar: only the owner writes under their own uid.
+    match /avatars/{uid}/{file} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid && isImage() && under3MiB();
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Course forum images: the owner writes, subscribed students read.
+    match /course-forums/{courseId}/{uid}/{file} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid && isImage() && under3MiB();
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+    }
+
+    // The bucket probe in storage-bucket.ts lists this prefix; it is empty by
+    // design and stays admin-only so it never exposes a file list.
+    match /upload-check/{file=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Anything else is denied until rules are written for it on purpose.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

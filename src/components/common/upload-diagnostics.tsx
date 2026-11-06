@@ -11,6 +11,11 @@ import {
 import { uploadLessonPdf } from "@/lib/firebase/course-builder-service";
 import { removeUpload } from "@/lib/firebase/storage-upload";
 import { firebaseConfig } from "@/lib/firebase/config";
+import {
+  checkStorageBucket,
+  missingBucketMessage,
+  storageBucketEndpoint,
+} from "@/lib/firebase/storage-bucket";
 export function UploadDiagnostics({
   courseId,
   lessonId,
@@ -96,6 +101,15 @@ export function UploadDiagnostics({
       );
     }
     try {
+      setLines((x) => [...x, "فحص اسم الدلو وإتاحته من المتصفح…"]);
+      const bucket = await checkStorageBucket();
+      setLines((x) => [
+        ...x,
+        bucket.ok
+          ? `الدلو متاح للاتصال: ${bucket.bucket}`
+          : `${missingBucketMessage(bucket.bucket)} [${bucket.code} | ${storageBucketEndpoint(bucket.bucket)}]`,
+      ]);
+      if (!bucket.ok) return;
       for (const check of checks) {
         const file = check.file;
         let path = "";

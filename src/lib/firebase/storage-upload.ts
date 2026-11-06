@@ -11,6 +11,7 @@ import {
 import { auth, storage } from "./config";
 import { uploadErrorMessage } from "../upload-errors";
 import { runUploadStep, type UploadProgress } from "../upload-step";
+import { checkStorageBucket, missingBucketMessage } from "./storage-bucket";
 export type { UploadProgress } from "../upload-step";
 /** A selection/preview is NOT a successful upload. Verify the remote object before returning. */
 export async function uploadStoredFile(
@@ -31,6 +32,17 @@ export async function uploadStoredFile(
       () => auth.currentUser!.getIdToken(),
       onProgress,
     );
+    // The SDK reports a missing bucket as `storage/unknown`, so probe first and
+    // fail with the real cause instead of an endless 0% transfer.
+    const bucket = await runUploadStep(
+      "التأكد من وجود دلو التخزين",
+      () => checkStorageBucket(),
+      onProgress,
+    );
+    if (!bucket.ok)
+      throw Object.assign(new Error(missingBucketMessage(bucket.bucket)), {
+        code: "upload/bucket-not-found",
+      });
     const target = ref(storage, path),
       task = uploadBytesResumable(target, file, { contentType: type });
     onProgress?.(0, "الاتصال بخادم التخزين ورفع الملف");
@@ -151,4 +163,61 @@ export async function uploadStoredFile(
 }
 export async function removeUpload(path: string) {
   await deleteObject(ref(storage, path));
+}
+/**
+ * Move an object that was uploaded before its final id existed (for example an
+ * exam question image staged under a temp folder). The bytes go through the
+ * same verified upload, so the moved object is proven readable and intact.
+ */
+export async function moveStoredFile(
+  fromPath: string,
+  toPath: string,
+  onProgress?: UploadProgress,
+) {
+  if (!fromPath || !toPath || fromPath === toPath || toPath.includes(".."))
+    throw new Error("مسار نقل الملف غير صالح");
+  const source = ref(storage, fromPath);
+  const url = await runUploadStep(
+    "قراءة الملف المؤقت قبل نقله",
+    () => getDownloadURL(source),
+    onProgress,
+  );
+  const response = await runUploadStep(
+    "تنزيل الملف المؤقت لنقله للمسار النهائي",
+    async () => {
+      const result = await fetch(url, { cache: "no-store" });
+      if (!result.ok)
+        throw new Error(
+          `تعذر تنزيل الملف المؤقت قبل نقله (HTTP ${result.status})`,
+        );
+      return result;
+    },
+    onProgress,
+  );
+  const blob = await response.blob();
+  const metadata = await getMetadata(source).catch(() => null);
+  const type = metadata?.contentType || blob.type || "application/octet-stream";
+  const file = new File([blob], toPath.split("/").pop() || "upload", {
+    type,
+  });
+  const result = await uploadStoredFile(toPath, file, type, onProgress);
+  await deleteObject(source).catch(() => {
+    /* The final object exists; a refused cleanup must not fail the save. */
+  });
+  return result;
+}
+
+/** Best-effort cleanup for staged objects that will never be referenced. */
+export async function removeStoredFiles(paths: string[]) {
+  for (const path of paths) await removeStoredUpload(path);
+}
+
+/** Best-effort cleanup for a browser-side selection that was never saved. */
+export async function removeStoredUpload(path: string) {
+  if (!path) return;
+  try {
+    await removeUpload(path);
+  } catch {
+    /* Nothing to clean up, or the rules refuse deletes: leave the object alone. */
+  }
 }

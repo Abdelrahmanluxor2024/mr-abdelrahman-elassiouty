@@ -1,13 +1,22 @@
 export function uploadErrorMessage(error: unknown) {
-  const code =
+  const raw =
     typeof error === "object" && error
-      ? String((error as { code?: unknown }).code || "")
-      : "";
+      ? (error as {
+          code?: unknown;
+          message?: unknown;
+          serverResponse?: unknown;
+          status?: unknown;
+        })
+      : {};
+  const code = String(raw.code || "");
+  const server = String(raw.serverResponse ?? "");
   const messages: Record<string, string> = {
     "storage/unauthorized":
       "Firebase Storage رفض الرفع: راجع قواعد التخزين وصلاحية الحساب للمسار المطلوب.",
     "storage/unauthenticated":
       "جلسة الدخول غير صالحة لرفع الملفات. سجل الدخول مرة أخرى.",
+    "storage/unauthorized-app":
+      "Firebase App Check رفض الطلب. راجع تفعيل App Check للموقع أو أوقفه للتخزين.",
     "storage/bucket-not-found":
       "دلو Firebase Storage غير موجود. فعّل Storage وتحقق من اسم الدلو في إعدادات الموقع.",
     "storage/project-not-found":
@@ -21,12 +30,22 @@ export function uploadErrorMessage(error: unknown) {
     "storage/invalid-checksum": "الملف لم يصل سليماً للتخزين؛ أعد رفعه.",
     "storage/object-not-found":
       "لم يوجد الملف بعد الرفع؛ لم يتم اعتماد الرابط.",
+    "storage/server-file-wrong-size":
+      "التخزين استلم حجماً مختلفاً عن الملف؛ لم يتم اعتماد الرابط.",
+    "upload/bucket-not-found":
+      "دلو Firebase Storage المستخدم في الموقع غير موجود. راجع اسم الدلو في إعدادات Firebase.",
   };
+  // `storage/unknown` is what the SDK throws when the bucket name does not
+  // exist, because it only maps 401/402/403/404 for object reads. Show the
+  // server body so the real cause is visible instead of "unknown error".
+  if (code === "storage/unknown" && /does not exist|no such bucket|not ?found/i.test(server))
+    return (
+      "Firebase Storage رفض اسم الدلو المستخدم في الموقع (الدلو غير موجود). " +
+      `هذا خلل إعدادات في Firebase وليس شبكة أو صلاحيات. (${code})`
+    );
   return messages[code]
     ? `${messages[code]} (${code})`
-    : typeof error === "object" &&
-        error &&
-        typeof (error as { message?: unknown }).message === "string"
-      ? String((error as { message: string }).message)
+    : typeof raw.message === "string"
+      ? String(raw.message)
       : "تعذر رفع الملف. تحقق من الشبكة وإعدادات Firebase Storage.";
 }

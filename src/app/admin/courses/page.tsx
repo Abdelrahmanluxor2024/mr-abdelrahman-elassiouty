@@ -198,7 +198,9 @@ export default function CourseStudio() {
   async function edit(id: string) {
     setBusy(true);
     try {
-      setDraft(await loadCourseDraft(id));
+      // Do not lose the editor (and the cover upload) because one exam document
+      // is unreadable: the strict load is still used for every save.
+      setDraft(await loadCourseDraft(id, { allowIncomplete: true }));
       setStep(0);
       setDirty(false);
       setSaved(true);
@@ -249,7 +251,14 @@ export default function CourseStudio() {
     setBusy(true);
     try {
       await saveCourseDraft(draft, publish);
-      setDraft(await loadCourseDraft(draft.id));
+      const savedThumbnail = draft.thumbnailUrl;
+      const reloaded = await loadCourseDraft(draft.id, { allowIncomplete: true });
+      // A cover uploaded moments ago must not disappear from the form just
+      // because a related read failed or lagged.
+      setDraft({
+        ...reloaded,
+        thumbnailUrl: reloaded.thumbnailUrl || savedThumbnail,
+      });
       setSaved(true);
       setDirty(false);
       toast.success(
@@ -505,6 +514,14 @@ export default function CourseStudio() {
               <div className="sm:col-span-2">
                 <ImagePicker
                   key={`course-cover-${draft.id}`}
+                  // Open with the cover the teacher lives with, not only with the
+                  // last saved field: a successful upload must be visible here.
+                  initialUrl={(() => {
+                    const saved = courses.find((c) => c.id === draft.id);
+                    if (!draft.thumbnailUrl && saved?.thumbnailUrl)
+                      return saved.thumbnailUrl;
+                    return "";
+                  })()}
                   label="رفع صورة غلاف الكورس من جهازك"
                   value={
                     draft.thumbnailUrl

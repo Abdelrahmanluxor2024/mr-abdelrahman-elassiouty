@@ -9,6 +9,7 @@ export function ImagePicker({
   disabled = false,
   label = "إرفاق صورة",
   onBusyChange,
+  initialUrl = "",
 }: {
   value?: ImageAttachment;
   onChange: (image?: ImageAttachment) => void;
@@ -19,6 +20,8 @@ export function ImagePicker({
   disabled?: boolean;
   label?: string;
   onBusyChange?: (busy: boolean) => void;
+  /** Cover the form already holds, shown even before the field is touched. */
+  initialUrl?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -26,6 +29,7 @@ export function ImagePicker({
   const [stage, setStage] = useState("");
   const active = useRef(true);
   const input = useRef<HTMLInputElement>(null);
+  const shown = value?.url || initialUrl || "";
   useEffect(() => {
     active.current = true;
     return () => {
@@ -98,7 +102,7 @@ export function ImagePicker({
           {error}
         </p>
       )}
-      {value && (
+      {shown && (
         <div className="space-y-2">
           {busy && (
             <p className="text-xs text-muted">
@@ -106,8 +110,8 @@ export function ImagePicker({
             </p>
           )}
           <img
-            src={value.url}
-            alt={value.name || "الصورة المختارة"}
+            src={shown}
+            alt={value?.name || label}
             className="max-h-56 max-w-full rounded-xl object-contain"
           />
           <button
