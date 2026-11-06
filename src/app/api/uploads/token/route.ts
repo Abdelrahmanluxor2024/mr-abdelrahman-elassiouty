@@ -75,6 +75,9 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "تعذر تجهيز طلب الرفع";
+    // The Blob SDK hides this body from the browser, so keep the real reason in
+    // the server logs (Vercel → Logs) where it can be read.
+    console.error("[uploads/token] refused:", message, error);
     return NextResponse.json({ error: message }, { status: 403 });
   }
 }
