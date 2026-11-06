@@ -275,7 +275,7 @@ function store() {
     }),
     runTransaction: async (_, fn) => {
       const staged = [];
-      await fn({
+      const result = await fn({
         get: firestore.getDoc,
         set: (r, v, o) => staged.push([r, v, o]),
         update: (r, v) => staged.push([r, v, { merge: true }]),
@@ -284,6 +284,7 @@ function store() {
         data.set(r.key, o?.merge ? { ...data.get(r.key), ...v } : v),
       );
       writes += staged.length;
+      return result;
     },
   };
   const mocks = {
@@ -423,4 +424,13 @@ test('lesson cover survives builder conversion; image-only and exam-only lessons
  assert.equal(validateCourseDraft(d,true).length,0);
  d.lessons[0].examIds=[];d.lessons[0].imageUrl='https://example.com/cover.png';assert.equal(validateCourseDraft(d,true).length,0);
  d.lessons[0].imageUrl='javascript:alert(1)';assert.ok(validateCourseDraft(d,true).length>0);
+});
+
+test('saving cover only preserves course publication, content and price while updating both cover aliases',async()=>{
+ const s=store();s.data.set('courses/c',{revision:3,title:'Keep me',price:200,isPublished:true,modules:[{id:'m',title:'M'}]});
+ const result=await s.api().saveCourseCover('c','https://example.com/cover.png',3);
+ const c=s.data.get('courses/c');assert.equal(result,4);assert.equal(c.revision,4);assert.equal(c.thumbnailUrl,c.thumbnail_url);assert.equal(c.price,200);assert.equal(c.title,'Keep me');assert.equal(c.isPublished,true);assert.equal(c.modules.length,1);
+ await assert.rejects(s.api().saveCourseCover('c','https://example.com/stale.png',3));assert.equal(s.data.get('courses/c').thumbnailUrl,'https://example.com/cover.png');
+ await assert.rejects(s.api().saveCourseCover('c','javascript:alert(1)',4));
+ s.data.set('users/admin',{role:'student'});await assert.rejects(s.api().saveCourseCover('c','https://example.com/new.png',4));
 });

@@ -19,6 +19,7 @@ import { normalizeCourse } from "@/lib/firebase/services";
 import {
   loadCourseDraft,
   saveCourseDraft,
+  saveCourseCover,
   uploadLessonPdf,
 } from "@/lib/firebase/course-builder-service";
 import {
@@ -198,6 +199,35 @@ export default function CourseStudio() {
       setSaved(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "تعذر فتح الكورس");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveCover() {
+    if (!draft || busy || imageUploads > 0) return;
+    const selected = draft;
+    setBusy(true);
+    try {
+      const revision = await saveCourseCover(
+        selected.id,
+        selected.thumbnailUrl,
+        selected.revision,
+      );
+      setDraft((current) =>
+        current?.id === selected.id ? { ...current, revision } : current,
+      );
+      setCourses((current) =>
+        current.map((c) =>
+          c.id === selected.id
+            ? { ...c, thumbnailUrl: selected.thumbnailUrl }
+            : c,
+        ),
+      );
+      toast.success(
+        "تم حفظ صورة غلاف الكورس فعلياً. باقي تعديلات الكورس تحتاج الحفظ المعتاد.",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذر حفظ الغلاف");
     } finally {
       setBusy(false);
     }
@@ -499,8 +529,20 @@ export default function CourseStudio() {
                 بعد اكتمال رفع الغلاف، احفظ الكورس من خطوة المراجعة لظهوره
                 للطلاب.
               </p>
+              {courses.some((c) => c.id === draft.id) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || imageUploads > 0}
+                  onClick={saveCover}
+                >
+                  حفظ صورة الغلاف فقط دون تغيير بقية الكورس
+                </Button>
+              )}
               <UploadDiagnostics
                 courseId={draft.id}
+                lessonId={draft.lessons[0]?.id}
+                examId={draft.lessons.flatMap((l) => l.examIds)[0]}
                 onBusyChange={(uploading) =>
                   setImageUploads((n) => Math.max(0, n + (uploading ? 1 : -1)))
                 }

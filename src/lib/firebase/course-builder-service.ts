@@ -177,3 +177,46 @@ export async function uploadLessonPdf(
     )
   ).url;
 }
+
+/** Save only the cover; never change publication, lessons, price or student data. */
+export async function saveCourseCover(
+  courseId: string,
+  url: string,
+  revision: number,
+) {
+  await requireAdmin();
+  if (
+    !courseId ||
+    courseId.includes("/") ||
+    !Number.isSafeInteger(revision) ||
+    revision < 0
+  )
+    throw new Error("بيانات الكورس غير صالحة");
+  if (url && !url.startsWith("/images/")) {
+    try {
+      if (new URL(url).protocol !== "https:") throw new Error();
+    } catch {
+      throw new Error("رابط الغلاف غير صالح");
+    }
+  } else if (url && (url.includes("..") || /[\\\s]/.test(url)))
+    throw new Error("رابط الغلاف غير صالح");
+  const courseRef = doc(db, "courses", courseId);
+  return runTransaction(db, async (tx) => {
+    const [course, admin] = await Promise.all([
+      tx.get(courseRef),
+      tx.get(doc(db, "users", auth.currentUser!.uid)),
+    ]);
+    if (admin.data()?.role !== "admin")
+      throw new Error("صلاحيات المسؤول تغيرت");
+    if (!course.exists()) throw new Error("احفظ الكورس الجديد أولاً");
+    if ((course.data().revision || 0) !== revision)
+      throw new Error("الكورس اتعدل من مكان آخر؛ أعد فتحه قبل حفظ الغلاف");
+    tx.update(courseRef, {
+      thumbnailUrl: url,
+      thumbnail_url: url,
+      revision: revision + 1,
+      updatedAt: new Date().toISOString(),
+    });
+    return revision + 1;
+  });
+}
