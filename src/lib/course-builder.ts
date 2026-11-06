@@ -34,6 +34,14 @@ export function builderLesson(
   lesson: FirebaseLesson,
   examIds: string[] = [],
 ): BuilderLesson {
+  // `files: []` next to a valid legacy `pdfUrl` means an earlier save stored an
+  // empty array while the link lived in `pdfUrl`. Treating that as "no files"
+  // silently dropped the lesson PDF from the editor, and the next save erased
+  // the link for students. Keep the working link until it is cleared on purpose.
+  const files =
+    lesson.files && lesson.files.some((file) => !!file.url)
+      ? lesson.files
+      : lessonFiles({ pdfUrl: lesson.pdfUrl, isPdfLocked: lesson.isPdfLocked });
   return {
     id: lesson.id,
     title: lesson.title,
@@ -41,7 +49,7 @@ export function builderLesson(
     imageUrl: lesson.imageUrl || "",
     moduleId: lesson.moduleId || "",
     videos: lesson.videos ?? lessonVideos(lesson),
-    files: lesson.files ?? lessonFiles(lesson),
+    files,
     examIds,
   };
 }

@@ -236,3 +236,32 @@ test('essay grading honors two-mark snapshot, half marks and real admin role',as
  assert.equal(s.data.get('exam_attempts/a').score,1.5);assert.equal(s.data.get('exam_attempts/a').percentage,50);assert.equal(s.data.get('exam_attempts/a').status,'passed');
  s.data.get('users/admin').role='student';await assert.rejects(services.gradeEssayAnswer('essay',2,''));
 });
+
+test('question images are stored under the real exam id, never a hard-coded temp folder', async () => {
+  const state = database(); const services = load('src/lib/firebase/services.ts', state.mocks);
+  const examId = 'exam-123';
+  const returned = await services.createExamWithQuestions({title: 'Exam'}, [{questionText: 'Q', imageUrl: `https://firebasestorage.googleapis.com/v0/b/b/o/${encodeURIComponent(`questions/${examId}/a.png`)}?alt=media`}], examId);
+  assert.equal(returned, examId);
+  assert.ok(state.data.has(`exams/${examId}`));
+  const question = [...state.data.values()].find(row => row.questionText === 'Q');
+  assert.equal(question.examId, examId);
+  assert.ok(question.imageUrl.includes(`questions%2F${examId}%2Fa.png`) || question.imageUrl.includes(`questions/${examId}/a.png`));
+  await assert.rejects(services.createExamWithQuestions({title: 'Bad'}, [{questionText: 'Q'}], 'bad/id'));
+});
+
+test('only images in questions/temp-exam/ are treated as awaiting their final place', () => {
+  const state = database(); const services = load('src/lib/firebase/services.ts', state.mocks);
+  const url = path => `https://firebasestorage.googleapis.com/v0/b/b/o/${encodeURIComponent(path)}?alt=media&token=t`;
+  assert.equal(services.stagedExamImagePath(url('questions/temp-exam/a.png')), 'questions/temp-exam/a.png');
+  assert.equal(services.stagedExamImagePath(url('questions/real/a.png')), '');
+  assert.equal(services.stagedExamImagePath(undefined), '');
+  assert.equal(services.stagedExamImagePath('javascript:alert(1)'), '');
+});
+
+test('the exam editor uploads each question image into its own exam folder', () => {
+  const page = fs.readFileSync('src/app/admin/exams/create/page.tsx', 'utf8');
+  assert.ok(!/uploadQuestionImage\([^)]*"temp-exam"/.test(page));
+  assert.ok(page.includes('const examId = newExamId()'));
+  assert.ok(page.includes('uploadQuestionImage(q.imageFile, examId)'));
+  assert.ok(page.includes('createExamWithQuestions(') && page.includes('examId,\n      );'));
+});

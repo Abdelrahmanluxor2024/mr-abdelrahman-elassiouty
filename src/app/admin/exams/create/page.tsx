@@ -8,8 +8,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   createExamWithQuestions,
+  newExamId,
+  stagedExamImagePath,
   uploadQuestionImage,
 } from "@/lib/firebase/services";
+import { moveStoredFile, removeStoredFiles } from "@/lib/firebase/storage-upload";
 import type { FirebaseQuestion, QuestionOption } from "@/lib/firebase/types";
 import {
   Plus,
@@ -286,20 +289,22 @@ export default function AdminCreateExamPage() {
     try {
       toast.loading("جاري رفع الصور ونشر الامتحان في قاعدة بيانات Firebase...");
 
-      // 1. Prepare questions data & upload images if any
+      // 1. Upload question images straight into questions/{examId}/.
+      // The exam document does not exist yet, but its id does: uploading to a
+      // hard-coded "temp-exam" folder meant the saved question pointed at a
+      // folder that no rule and no reader expected.
+      const examId = newExamId();
       const formattedQuestions: Omit<FirebaseQuestion, "id" | "examId">[] = [];
 
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
-        let imageUrl: string | undefined = q.imagePreview?.startsWith(
-          "https://",
-        )
+        let url: string | undefined = q.imagePreview?.startsWith("https://")
           ? q.imagePreview
           : undefined;
 
         if (q.imageFile) {
           try {
-            imageUrl = await uploadQuestionImage(q.imageFile, "temp-exam");
+            url = await uploadQuestionImage(q.imageFile, examId);
           } catch (err) {
             throw new Error(
               `تعذر رفع صورة السؤال ${i + 1}: ${err instanceof Error ? err.message : "تحقق من التخزين"}`,
@@ -307,10 +312,24 @@ export default function AdminCreateExamPage() {
           }
         }
 
+        const staged = stagedExamImagePath(url);
+        if (staged) {
+          const target = `questions/${examId}/${staged.split("/").pop()}`;
+          try {
+            url = (await moveStoredFile(staged, target)).url;
+          } catch (err) {
+            // The image is not saved yet; do not leave it behind an error.
+            await removeStoredFiles([staged]);
+            throw new Error(
+              `تعذر تجهيز صورة السؤال ${i + 1} لمكانها النهائي: ${err instanceof Error ? err.message : "تحقق من التخزين"}`,
+            );
+          }
+        }
+
         formattedQuestions.push({
           questionText: q.text,
           questionType: q.type,
-          imageUrl,
+          imageUrl: url,
           marks: q.type === "essay" ? 2 : 1,
           explanation: q.explanation || "",
           options: q.type === "mcq" ? q.options : [],
@@ -319,7 +338,7 @@ export default function AdminCreateExamPage() {
         });
       }
 
-      // 2. Publish to Firestore
+      // 2. Publish the exam and its questions with the same exam id.
       await createExamWithQuestions(
         {
           lessonId,
@@ -335,6 +354,7 @@ export default function AdminCreateExamPage() {
           isActive: true,
         },
         formattedQuestions,
+        examId,
       );
 
       toast.dismiss();

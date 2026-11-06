@@ -24,12 +24,24 @@ async function requireAdmin() {
   if (!user.exists() || user.data().role !== "admin")
     throw new Error("هذا الإجراء للأدمن فقط");
 }
-export async function loadCourseDraft(id: string): Promise<CourseDraft> {
+/**
+ * `allowIncomplete` is used by the admin editor: an unreadable exam list must
+ * not block loading the course and uploading its cover. Saving always calls the
+ * strict version, so incomplete data can never be written back.
+ */
+export async function loadCourseDraft(
+  id: string,
+  options: { allowIncomplete?: boolean } = {},
+): Promise<CourseDraft> {
   await requireAdmin();
+  const safe = <T>(promise: Promise<T>) =>
+    options.allowIncomplete ? promise.catch(() => null) : promise;
   const [course, lessons, exams] = await Promise.all([
     getDoc(doc(db, "courses", id)),
-    getDocs(query(collection(db, "lessons"), where("courseId", "==", id))),
-    getDocs(query(collection(db, "exams"), where("courseId", "==", id))),
+    safe(
+      getDocs(query(collection(db, "lessons"), where("courseId", "==", id))),
+    ),
+    safe(getDocs(query(collection(db, "exams"), where("courseId", "==", id)))),
   ]);
   if (!course.exists()) throw new Error("الكورس غير موجود");
   const c = normalizeCourse(id, course.data());
@@ -43,14 +55,14 @@ export async function loadCourseDraft(id: string): Promise<CourseDraft> {
     thumbnailUrl: c.thumbnailUrl || "",
     durationHours: c.durationHours,
     modules: c.modules || [],
-    originalLessonIds: lessons.docs.map((d) => d.id),
-    originalExamIds: exams.docs.map((d) => d.id),
-    lessons: lessons.docs
+    originalLessonIds: lessons?.docs.map((d) => d.id) || [],
+    originalExamIds: exams?.docs.map((d) => d.id) || [],
+    lessons: (lessons?.docs || [])
       .filter((d) => d.data().isPublished !== false)
       .map((d) =>
         builderLesson(
           { id: d.id, ...d.data() } as FirebaseLesson,
-          exams.docs
+          (exams?.docs || [])
             .filter(
               (e) => e.data().lessonId === d.id && e.data().isActive !== false,
             )
@@ -59,8 +71,8 @@ export async function loadCourseDraft(id: string): Promise<CourseDraft> {
       )
       .sort(
         (a, b) =>
-          (lessons.docs.find((d) => d.id === a.id)?.data().orderIndex || 0) -
-          (lessons.docs.find((d) => d.id === b.id)?.data().orderIndex || 0),
+          (lessons?.docs.find((d) => d.id === a.id)?.data().orderIndex || 0) -
+          (lessons?.docs.find((d) => d.id === b.id)?.data().orderIndex || 0),
       ),
   };
 }
@@ -203,12 +215,29 @@ export async function saveCourseCover(
     revision < 0
   )
     throw new Error("بيانات الكورس غير صالحة");
+  // The catalogue renders covers through next/image; a host outside the
+  // configured remotePatterns would save a cover that never displays.
+  const allowedCoverHosts = [
+    "firebasestorage.googleapis.com",
+    "tkrygfflhrvgveiolhsl.supabase.co",
+  ];
   if (url && !url.startsWith("/images/")) {
+    let parsed: URL;
     try {
-      if (new URL(url).protocol !== "https:") throw new Error();
+      parsed = new URL(url);
     } catch {
       throw new Error("رابط الغلاف غير صالح");
     }
+    if (
+      parsed.protocol !== "https:" ||
+      (allowedCoverHosts.every((host) => parsed.hostname !== host) &&
+        !/\.(supabase\.co|bunny\.net|vdocipher\.com|vimeo\.com|vimeocdn\.com)$/.test(
+          parsed.hostname,
+        ))
+    )
+      throw new Error(
+        "رابط الغلاف غير صالح: استخدم صورة مرفوعة من جهازك أو رابط Firebase Storage",
+      );
   } else if (url && (url.includes("..") || /[\\\s]/.test(url)))
     throw new Error("رابط الغلاف غير صالح");
   const courseRef = doc(db, "courses", courseId);

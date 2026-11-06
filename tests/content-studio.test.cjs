@@ -430,9 +430,46 @@ test('lesson cover survives builder conversion; image-only and exam-only lessons
 
 test('saving cover only preserves course publication, content and price while updating both cover aliases',async()=>{
  const s=store();s.data.set('courses/c',{revision:3,title:'Keep me',price:200,isPublished:true,modules:[{id:'m',title:'M'}]});
- const result=await s.api().saveCourseCover('c','https://example.com/cover.png',3);
+ const cover='https://firebasestorage.googleapis.com/v0/b/mr-ass-4fc50.firebasestorage.app/o/courses%2Fc%2Fimages%2Fcover.png?alt=media&token=t';
+ const result=await s.api().saveCourseCover('c',cover,3);
  const c=s.data.get('courses/c');assert.equal(result,4);assert.equal(c.revision,4);assert.equal(c.thumbnailUrl,c.thumbnail_url);assert.equal(c.price,200);assert.equal(c.title,'Keep me');assert.equal(c.isPublished,true);assert.equal(c.modules.length,1);
- await assert.rejects(s.api().saveCourseCover('c','https://example.com/stale.png',3));assert.equal(s.data.get('courses/c').thumbnailUrl,'https://example.com/cover.png');
+ await assert.rejects(s.api().saveCourseCover('c','https://firebasestorage.googleapis.com/v0/b/mr-ass-4fc50.firebasestorage.app/o/stale.png?alt=media',3));assert.equal(s.data.get('courses/c').thumbnailUrl,cover);
  await assert.rejects(s.api().saveCourseCover('c','javascript:alert(1)',4));
- s.data.set('users/admin',{role:'student'});await assert.rejects(s.api().saveCourseCover('c','https://example.com/new.png',4));
+ // A host outside next/image remotePatterns would save a cover that never renders.
+ await assert.rejects(s.api().saveCourseCover('c','https://example.com/cover.png',4),/رابط الغلاف غير صالح/);
+ await assert.rejects(s.api().saveCourseCover('c','/images/../secret.png',4),/رابط الغلاف غير صالح/);
+ s.data.set('users/admin',{role:'student'});await assert.rejects(s.api().saveCourseCover('c',cover,4));
+});
+
+test("an empty files array never hides a lesson PDF that still lives in pdfUrl", () => {
+  // Saving with files:[] used to drop the link from the editor, and the next
+  // save erased a PDF that students were still opening.
+  const kept = builderLesson({id: "l", title: "L", courseId: "c", pdfUrl: "/files/basic-intro.pdf", files: []});
+  assert.equal(kept.files.length, 1);
+  assert.equal(kept.files[0].url, "/files/basic-intro.pdf");
+  const explicit = builderLesson({id: "l", title: "L", courseId: "c", pdfUrl: "/files/basic-intro.pdf", files: [{id: "new", title: "New", url: "https://example.com/new.pdf"}]});
+  assert.deepEqual(explicit.files.map(f => f.url), ["https://example.com/new.pdf"]);
+  const cleared = builderLesson({id: "l", title: "L", courseId: "c"});
+  assert.equal(cleared.files.length, 0);
+});
+
+test("an unreadable exam list does not block opening the course editor and its cover upload", async () => {
+  const s = store();
+  s.data.set("courses/c", {revision: 2, title: "Course", price: 0, is_free: true, is_published: true});
+  s.mocks["firebase/firestore"] = Object.assign({}, s.mocks["firebase/firestore"], {
+    where: (field, op, value) => ({field, value}),
+    query: (source, filter) => ({name: source.name, filter}),
+    getDocs: async q => {if (q.name === "exams") throw {code: "permission-denied"}; return {empty: true, docs: []};},
+  });
+  s.mocks["./services"] = {
+    normalizeCourse: (id, data) => ({ id, title: data.title || "", isFree: !!data.is_free, isPublished: true, thumbnailUrl: data.thumbnail_url || data.thumbnailUrl || "", durationHours: 0, modules: []}),
+  };
+  const api = s.api();
+  // Strict loading still refuses, so nothing incomplete can be written back.
+  await assert.rejects(api.loadCourseDraft("c"));
+  const draft = await api.loadCourseDraft("c", {allowIncomplete: true});
+  assert.equal(draft.id, "c");
+  assert.equal(draft.revision, 2);
+  assert.equal(draft.lessons.length, 0);
+  assert.equal(draft.originalExamIds.length, 0);
 });

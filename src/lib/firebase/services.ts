@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   doc,
   getDoc,
@@ -14,6 +14,11 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { uploadExamImage } from "./image-upload";
+import {
+  moveStoredFile,
+  removeStoredFiles,
+  type UploadProgress,
+} from "./storage-upload";
 import { hasCourseAccess } from "./course-payment";
 import { db, storage, auth } from "./config";
 import type {
@@ -193,14 +198,40 @@ export async function getQuestionsByExam(
 }
 
 // ======================== ADMIN CREATE EXAM ========================
+const TEMP_QUESTION_FOLDER = "temp-exam";
+
+function stagedQuestionPath(imageUrl: string) {
+  if (!imageUrl.startsWith("https://") || !imageUrl.includes("/o/")) return "";
+  try {
+    const path = decodeURIComponent(
+      new URL(imageUrl).pathname.split("/o/")[1] || "",
+    );
+    return path.startsWith(`questions/${TEMP_QUESTION_FOLDER}/`) ? path : "";
+  } catch {
+    return "";
+  }
+}
+
+/** A new exam document id, so question images can be stored under it first. */
+export function newExamId(): string {
+  return doc(collection(db, "exams")).id;
+}
+
+/** Path of an image still sitting in questions/temp-exam/, if any. */
+export function stagedExamImagePath(imageUrl?: string) {
+  return stagedQuestionPath(imageUrl || "");
+}
+
 export async function createExamWithQuestions(
   examData: Omit<FirebaseExam, "id" | "createdAt">,
   questions: Omit<FirebaseQuestion, "id" | "examId">[],
+  examId = newExamId(),
 ): Promise<string> {
   if (!questions.length || questions.length > 450)
     throw new Error("عدد الأسئلة يجب أن يكون بين 1 و450");
+  if (!examId || examId.includes("/")) throw new Error("معرّف الامتحان غير صالح");
+  const examRef = doc(db, "exams", examId);
   const batch = writeBatch(db);
-  const examRef = doc(collection(db, "exams"));
   batch.set(examRef, {
     ...examData,
     maxAttempts: examData.maxAttempts ?? 0,
