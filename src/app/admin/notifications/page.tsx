@@ -1,15 +1,35 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { Bell, Upload, Send, Trash2, Pencil, X, Check, Users } from 'lucide-react';
-import { collection, getDocs, addDoc, doc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { ImagePicker } from "@/components/common/image-picker";
+import { uploadAdminImage } from "@/lib/firebase/image-upload";
+import { useState, useEffect, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import {
+  Bell,
+  Upload,
+  Send,
+  Trash2,
+  Pencil,
+  X,
+  Check,
+  Users,
+} from "lucide-react";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  deleteDoc,
+  updateDoc,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
 type NotificationGroup = {
   id?: string;
@@ -22,26 +42,31 @@ type NotificationGroup = {
 };
 
 export default function AdminNotificationsPage() {
-  const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
-  const [targetGrade, setTargetGrade] = useState('all');
-  const [imageUrl, setImageUrl] = useState('');
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [targetGrade, setTargetGrade] = useState("all");
+  const [imageUrl, setImageUrl] = useState("");
   const [pending, setPending] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<NotificationGroup | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editMessage, setEditMessage] = useState('');
-  const [deletingGroup, setDeletingGroup] = useState<NotificationGroup | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<NotificationGroup | null>(
+    null,
+  );
+  const [editTitle, setEditTitle] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [deletingGroup, setDeletingGroup] = useState<NotificationGroup | null>(
+    null,
+  );
   const [rawNotifications, setRawNotifications] = useState<any[]>([]);
   const [loadingList, setLoadingList] = useState(true);
 
   async function loadNotifications() {
     setLoadingList(true);
     try {
-      const snap = await getDocs(collection(db, 'notifications'));
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const snap = await getDocs(collection(db, "notifications"));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setRawNotifications(list);
     } catch (err) {
-      console.error('Error loading notifications:', err);
+      console.error("Error loading notifications:", err);
     } finally {
       setLoadingList(false);
     }
@@ -56,50 +81,61 @@ export default function AdminNotificationsPage() {
     for (const n of rawNotifications) {
       const key = `${n.title}|||${n.message}`;
       if (!map.has(key)) {
-        map.set(key, { 
+        map.set(key, {
           id: n.id,
-          title: n.title, 
-          message: n.message, 
-          link: n.link, 
-          count: 0, 
-          readCount: 0, 
-          createdAt: n.createdAt || n.created_at || new Date().toISOString() 
+          title: n.title,
+          message: n.message,
+          link: n.link,
+          count: 0,
+          readCount: 0,
+          createdAt: n.createdAt || n.created_at || new Date().toISOString(),
         });
       }
       const g = map.get(key)!;
       g.count += 1;
       if (n.isRead || n.is_read) g.readCount += 1;
     }
-    return Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }, [rawNotifications]);
 
   async function onSend() {
-    if (!title.trim() || !message.trim()) { toast.error('يرجى ملء عنوان الإشعار والرسالة'); return; }
+    if (uploading) return;
+    if (!title.trim() || !message.trim()) {
+      toast.error("يرجى ملء عنوان الإشعار والرسالة");
+      return;
+    }
     setPending(true);
     try {
       // Create broadcast notification record
-      await addDoc(collection(db, 'notifications'), {
+      await addDoc(collection(db, "notifications"), {
         title: title.trim(),
         message: message.trim(),
         targetGrade,
         link: imageUrl.trim() ? `image:${imageUrl.trim()}` : null,
-        type: 'broadcast',
+        type: "broadcast",
         isRead: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
-      toast.success('تم إرسال الإشعار بنجاح إلى الطلاب 🎉');
-      setTitle(''); setMessage(''); setImageUrl('');
+      toast.success("تم إرسال الإشعار بنجاح إلى الطلاب 🎉");
+      setTitle("");
+      setMessage("");
+      setImageUrl("");
       await loadNotifications();
     } catch (err: any) {
-      console.error('Error sending notification:', err);
-      toast.error(err.message || 'حدث خطأ أثناء الإرسال');
+      console.error("Error sending notification:", err);
+      toast.error(err.message || "حدث خطأ أثناء الإرسال");
     } finally {
       setPending(false);
     }
   }
 
   function startEdit(group: NotificationGroup) {
-    setEditingGroup(group); setEditTitle(group.title); setEditMessage(group.message);
+    setEditingGroup(group);
+    setEditTitle(group.title);
+    setEditMessage(group.message);
   }
 
   async function onSaveEdit() {
@@ -107,16 +143,16 @@ export default function AdminNotificationsPage() {
     setPending(true);
     try {
       if (editingGroup.id) {
-        await updateDoc(doc(db, 'notifications', editingGroup.id), {
+        await updateDoc(doc(db, "notifications", editingGroup.id), {
           title: editTitle.trim(),
-          message: editMessage.trim()
+          message: editMessage.trim(),
         });
       }
-      toast.success('تم تعديل الإشعار بنجاح ✅');
+      toast.success("تم تعديل الإشعار بنجاح ✅");
       setEditingGroup(null);
       await loadNotifications();
     } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ أثناء التعديل');
+      toast.error(err.message || "حدث خطأ أثناء التعديل");
     } finally {
       setPending(false);
     }
@@ -127,13 +163,13 @@ export default function AdminNotificationsPage() {
     setPending(true);
     try {
       if (deletingGroup.id) {
-        await deleteDoc(doc(db, 'notifications', deletingGroup.id));
+        await deleteDoc(doc(db, "notifications", deletingGroup.id));
       }
-      toast.success('تم حذف الإشعار بنجاح ✅');
+      toast.success("تم حذف الإشعار بنجاح ✅");
       setDeletingGroup(null);
       await loadNotifications();
     } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ أثناء الحذف');
+      toast.error(err.message || "حدث خطأ أثناء الحذف");
     } finally {
       setPending(false);
     }
@@ -146,15 +182,28 @@ export default function AdminNotificationsPage() {
           <Bell className="h-6 w-6 text-blue-600 dark:text-cyan-400" />
           إرسال إشعارات ورسائل للطلاب
         </h1>
-        <p className="text-xs text-muted mt-1">أرسل إشعارات مخصصة لصف دراسي معين أو لجميع الطلاب، وعدّل أو احذف الإشعارات المرسلة.</p>
+        <p className="text-xs text-muted mt-1">
+          أرسل إشعارات مخصصة لصف دراسي معين أو لجميع الطلاب، وعدّل أو احذف
+          الإشعارات المرسلة.
+        </p>
       </div>
 
       <Card className="rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <CardHeader><CardTitle className="text-base font-bold">إنشاء إشعار جماعي جديد</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base font-bold">
+            إنشاء إشعار جماعي جديد
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label className="font-bold text-ink dark:text-slate-200">الفئة المستهدفة (الصف الدراسي)</Label>
-            <select value={targetGrade} onChange={(e) => setTargetGrade(e.target.value)} className="mt-1.5 h-11 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 text-sm font-bold text-ink dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <Label className="font-bold text-ink dark:text-slate-200">
+              الفئة المستهدفة (الصف الدراسي)
+            </Label>
+            <select
+              value={targetGrade}
+              onChange={(e) => setTargetGrade(e.target.value)}
+              className="mt-1.5 h-11 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 text-sm font-bold text-ink dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
               <option value="all">📢 إرسال لجميع الطلاب في كل الصفوف</option>
               <option value="1st_secondary">🎓 أولى ثانوي فقط</option>
               <option value="2nd_secondary">🎓 تانية ثانوي فقط</option>
@@ -162,34 +211,75 @@ export default function AdminNotificationsPage() {
             </select>
           </div>
           <div>
-            <Label className="font-bold text-ink dark:text-slate-200">عنوان الإشعار</Label>
-            <Input placeholder="مثال: تنبيه هام بخصوص موعد الامتحان الأسبوعي" value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1.5 font-bold text-ink dark:text-white bg-slate-50 dark:bg-slate-900 rounded-2xl" />
+            <Label className="font-bold text-ink dark:text-slate-200">
+              عنوان الإشعار
+            </Label>
+            <Input
+              placeholder="مثال: تنبيه هام بخصوص موعد الامتحان الأسبوعي"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1.5 font-bold text-ink dark:text-white bg-slate-50 dark:bg-slate-900 rounded-2xl"
+            />
           </div>
           <div>
-            <Label className="font-bold text-ink dark:text-slate-200">نص الرسالة / الإشعار</Label>
-            <Textarea placeholder="اكتب تفاصيل التنبيه أو التعليمات للطلاب هنا..." value={message} onChange={(e) => setMessage(e.target.value)} className="mt-1.5 min-h-[120px] text-sm text-ink dark:text-white bg-slate-50 dark:bg-slate-900 rounded-2xl" />
+            <Label className="font-bold text-ink dark:text-slate-200">
+              نص الرسالة / الإشعار
+            </Label>
+            <Textarea
+              placeholder="اكتب تفاصيل التنبيه أو التعليمات للطلاب هنا..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="mt-1.5 min-h-[120px] text-sm text-ink dark:text-white bg-slate-50 dark:bg-slate-900 rounded-2xl"
+            />
           </div>
           <div className="space-y-2">
-            <Label className="font-bold text-ink dark:text-slate-200">إرفاق صورة مع الإشعار (اختياري)</Label>
+            <Label className="font-bold text-ink dark:text-slate-200">
+              إرفاق صورة مع الإشعار (اختياري)
+            </Label>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer rounded-2xl theme-inverse bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-xs font-bold text-ink shadow hover:from-blue-500 transition">
-                <Upload className="h-4 w-4" /><span>اختر صورة من جهاز الكمبيوتر</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => { setImageUrl(ev.target?.result as string); toast.success('تم اختيار الصورة للإشعار'); }; reader.readAsDataURL(file); } }} />
-              </label>
+              <ImagePicker
+                label="رفع صورة من جهازك"
+                value={
+                  imageUrl
+                    ? { url: imageUrl, path: "", name: "صورة" }
+                    : undefined
+                }
+                upload={(file, onProgress) =>
+                  uploadAdminImage("notifications", file, onProgress)
+                }
+                onChange={(image) => setImageUrl(image?.url || "")}
+                disabled={pending || uploading}
+                onBusyChange={setUploading}
+              />
               <span className="text-xs text-muted">أو رابط صورة مباشر:</span>
             </div>
-            <Input placeholder="رابط الصورة https://..." value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="text-xs bg-slate-50 dark:bg-slate-900 rounded-2xl" />
+            <Input
+              placeholder="رابط الصورة https://..."
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="text-xs bg-slate-50 dark:bg-slate-900 rounded-2xl"
+            />
             {imageUrl && (
               <div className="mt-2 relative h-36 w-60 rounded-2xl overflow-hidden border-2 border-blue-500 shadow-md theme-inverse bg-black">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt="معاينة صورة الإشعار" className="h-full w-full object-cover" />
+                <img
+                  src={imageUrl}
+                  alt="معاينة صورة الإشعار"
+                  className="h-full w-full object-cover"
+                />
               </div>
             )}
           </div>
           <div className="pt-3">
-            <Button onClick={onSend} disabled={pending} className="w-full theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold py-3 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
+            <Button
+              onClick={onSend}
+              disabled={pending || uploading}
+              className="w-full theme-inverse bg-blue-600 hover:bg-blue-700 text-ink font-bold py-3 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
+            >
               <Send className="h-4 w-4" />
-              {pending ? 'جاري إرسال الإشعار للطلاب...' : 'إرسال الإشعار الآن 🚀'}
+              {pending
+                ? "جاري إرسال الإشعار للطلاب..."
+                : "إرسال الإشعار الآن 🚀"}
             </Button>
           </div>
         </CardContent>
@@ -198,31 +288,76 @@ export default function AdminNotificationsPage() {
       <Card className="rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
           <CardTitle className="text-base font-bold flex items-center gap-2">
-            <Bell className="h-4 w-4 text-blue-500" />الإشعارات المرسلة ({notificationGroups.length})
+            <Bell className="h-4 w-4 text-blue-500" />
+            الإشعارات المرسلة ({notificationGroups.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loadingList ? (
-            <div className="p-6 space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 w-full rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}</div>
+            <div className="p-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-20 w-full rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse"
+                />
+              ))}
+            </div>
           ) : notificationGroups.length === 0 ? (
-            <div className="p-10 text-center text-muted"><Bell className="mx-auto h-8 w-8 mb-2 opacity-40" /><p className="text-sm font-semibold">لم يتم إرسال أي إشعارات بعد</p></div>
+            <div className="p-10 text-center text-muted">
+              <Bell className="mx-auto h-8 w-8 mb-2 opacity-40" />
+              <p className="text-sm font-semibold">
+                لم يتم إرسال أي إشعارات بعد
+              </p>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {notificationGroups.map((group, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-cyan-400"><Bell className="h-4 w-4" /></div>
+                <div
+                  key={idx}
+                  className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition"
+                >
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-cyan-400">
+                    <Bell className="h-4 w-4" />
+                  </div>
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="font-bold text-ink dark:text-white text-sm leading-tight">{group.title}</p>
-                    <p className="text-xs text-muted leading-relaxed line-clamp-2">{group.message}</p>
+                    <p className="font-bold text-ink dark:text-white text-sm leading-tight">
+                      {group.title}
+                    </p>
+                    <p className="text-xs text-muted leading-relaxed line-clamp-2">
+                      {group.message}
+                    </p>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="flex items-center gap-1 text-[11px] text-muted"><Users className="h-3 w-3" />{group.count} طالب استقبله</span>
-                      <span className="text-[11px] text-emerald-500 font-medium">{group.readCount} قرأه</span>
-                      <span className="text-[11px] text-muted font-mono">{new Date(group.createdAt).toLocaleString('ar-EG')}</span>
+                      <span className="flex items-center gap-1 text-[11px] text-muted">
+                        <Users className="h-3 w-3" />
+                        {group.count} طالب استقبله
+                      </span>
+                      <span className="text-[11px] text-emerald-500 font-medium">
+                        {group.readCount} قرأه
+                      </span>
+                      <span className="text-[11px] text-muted font-mono">
+                        {new Date(group.createdAt).toLocaleString("ar-EG")}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => startEdit(group)} className="h-8 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 text-xs px-2.5 gap-1"><Pencil className="h-3.5 w-3.5" />تعديل</Button>
-                    <Button size="sm" variant="outline" onClick={() => setDeletingGroup(group)} className="h-8 rounded-xl border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 text-xs px-2.5 gap-1"><Trash2 className="h-3.5 w-3.5" />حذف</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => startEdit(group)}
+                      className="h-8 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 text-xs px-2.5 gap-1"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      تعديل
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDeletingGroup(group)}
+                      className="h-8 rounded-xl border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 text-xs px-2.5 gap-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      حذف
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -235,17 +370,61 @@ export default function AdminNotificationsPage() {
         <div className="fixed inset-0 z-50 grid place-items-center theme-inverse bg-black/60 backdrop-blur-sm p-4">
           <Card className="w-full max-w-lg rounded-3xl border-2 border-amber-400 bg-white dark:bg-[#0E172A] shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-black text-ink dark:text-white flex items-center gap-2"><Pencil className="h-5 w-5 text-amber-500" />تعديل الإشعار</h3>
-              <Button size="sm" variant="ghost" onClick={() => setEditingGroup(null)} className="rounded-xl h-8 w-8 p-0 text-muted hover:text-red-500"><X className="h-4 w-4" /></Button>
+              <h3 className="font-display text-lg font-black text-ink dark:text-white flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-amber-500" />
+                تعديل الإشعار
+              </h3>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingGroup(null)}
+                className="rounded-xl h-8 w-8 p-0 text-muted hover:text-red-500"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-xl p-3 font-medium">⚠️ سيتم تعديل الإشعار لدى جميع الطلاب الذين استقبلوه ({editingGroup.count} طالب)</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-xl p-3 font-medium">
+              ⚠️ سيتم تعديل الإشعار لدى جميع الطلاب الذين استقبلوه (
+              {editingGroup.count} طالب)
+            </p>
             <div className="space-y-3">
-              <div><Label className="text-xs font-bold text-ink dark:text-slate-300">العنوان الجديد</Label><Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="mt-1 font-bold rounded-2xl bg-slate-50 dark:bg-slate-900" /></div>
-              <div><Label className="text-xs font-bold text-ink dark:text-slate-300">نص الرسالة الجديد</Label><Textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} className="mt-1 min-h-[100px] rounded-2xl bg-slate-50 dark:bg-slate-900 text-sm" /></div>
+              <div>
+                <Label className="text-xs font-bold text-ink dark:text-slate-300">
+                  العنوان الجديد
+                </Label>
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="mt-1 font-bold rounded-2xl bg-slate-50 dark:bg-slate-900"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-bold text-ink dark:text-slate-300">
+                  نص الرسالة الجديد
+                </Label>
+                <Textarea
+                  value={editMessage}
+                  onChange={(e) => setEditMessage(e.target.value)}
+                  className="mt-1 min-h-[100px] rounded-2xl bg-slate-50 dark:bg-slate-900 text-sm"
+                />
+              </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => setEditingGroup(null)} className="rounded-xl text-xs">إلغاء</Button>
-              <Button onClick={onSaveEdit} disabled={pending} className="theme-inverse bg-amber-500 hover:bg-amber-600 text-ink font-bold rounded-xl text-xs gap-1.5"><Check className="h-3.5 w-3.5" />{pending ? 'جاري الحفظ...' : 'حفظ التعديلات'}</Button>
+              <Button
+                variant="ghost"
+                onClick={() => setEditingGroup(null)}
+                className="rounded-xl text-xs"
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={onSaveEdit}
+                disabled={pending || uploading}
+                className="theme-inverse bg-amber-500 hover:bg-amber-600 text-ink font-bold rounded-xl text-xs gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" />
+                {pending ? "جاري الحفظ..." : "حفظ التعديلات"}
+              </Button>
             </div>
           </Card>
         </div>
@@ -255,17 +434,48 @@ export default function AdminNotificationsPage() {
         <div className="fixed inset-0 z-50 grid place-items-center theme-inverse bg-black/60 backdrop-blur-sm p-4">
           <Card className="w-full max-w-md rounded-3xl border-2 border-red-500 bg-white dark:bg-[#0E172A] shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-black text-red-600 flex items-center gap-2"><Trash2 className="h-5 w-5" />تأكيد الحذف</h3>
-              <Button size="sm" variant="ghost" onClick={() => setDeletingGroup(null)} className="rounded-xl h-8 w-8 p-0 text-muted"><X className="h-4 w-4" /></Button>
+              <h3 className="font-display text-lg font-black text-red-600 flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                تأكيد الحذف
+              </h3>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDeletingGroup(null)}
+                className="rounded-xl h-8 w-8 p-0 text-muted"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
             <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-3 space-y-1">
-              <p className="font-bold text-ink dark:text-white text-sm">{deletingGroup.title}</p>
-              <p className="text-xs text-muted line-clamp-2">{deletingGroup.message}</p>
+              <p className="font-bold text-ink dark:text-white text-sm">
+                {deletingGroup.title}
+              </p>
+              <p className="text-xs text-muted line-clamp-2">
+                {deletingGroup.message}
+              </p>
             </div>
-            <p className="text-sm text-red-600 dark:text-red-400 font-medium">سيتم حذف هذا الإشعار نهائياً من قائمة <span className="font-black">{deletingGroup.count} طالب</span>. هذا الإجراء لا يمكن التراجع عنه.</p>
+            <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+              سيتم حذف هذا الإشعار نهائياً من قائمة{" "}
+              <span className="font-black">{deletingGroup.count} طالب</span>.
+              هذا الإجراء لا يمكن التراجع عنه.
+            </p>
             <div className="flex items-center justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => setDeletingGroup(null)} className="rounded-xl text-xs">إلغاء</Button>
-              <Button onClick={onConfirmDelete} disabled={pending} className="theme-inverse bg-red-600 hover:bg-red-700 text-ink font-bold rounded-xl text-xs gap-1.5"><Trash2 className="h-3.5 w-3.5" />{pending ? 'جاري الحذف...' : 'نعم، احذف الإشعار'}</Button>
+              <Button
+                variant="ghost"
+                onClick={() => setDeletingGroup(null)}
+                className="rounded-xl text-xs"
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={onConfirmDelete}
+                disabled={pending || uploading}
+                className="theme-inverse bg-red-600 hover:bg-red-700 text-ink font-bold rounded-xl text-xs gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {pending ? "جاري الحذف..." : "نعم، احذف الإشعار"}
+              </Button>
             </div>
           </Card>
         </div>

@@ -13,7 +13,7 @@ import {
   writeBatch,
   runTransaction,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { uploadExamImage } from "./image-upload";
 import { hasCourseAccess } from "./course-payment";
 import { db, storage, auth } from "./config";
 import type {
@@ -268,12 +268,7 @@ export async function uploadQuestionImage(
   file: File,
   examId: string,
 ): Promise<string> {
-  const storageRef = ref(
-    storage,
-    `questions/${examId}/${Date.now()}_${file.name}`,
-  );
-  await uploadBytes(storageRef, file);
-  return await getDownloadURL(storageRef);
+  return (await uploadExamImage(file, examId)).url;
 }
 
 // ======================== ENROLLMENTS ========================

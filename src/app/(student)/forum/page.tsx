@@ -171,7 +171,9 @@ export default function ForumPage() {
                 key={courseId}
                 label="أرفق صورة السؤال (اختياري)"
                 value={image}
-                upload={(file) => uploadForumImage(courseId, file)}
+                upload={(file, onProgress) =>
+                  uploadForumImage(courseId, file, onProgress)
+                }
                 onChange={setImage}
                 disabled={pending || uploads > 0}
                 onBusyChange={imageBusy}
@@ -256,7 +258,9 @@ export default function ForumPage() {
                       key={`${courseId}-${p.id}`}
                       label="إرفاق صورة للرد"
                       value={replyImages[p.id]}
-                      upload={(file) => uploadForumImage(courseId, file)}
+                      upload={(file, onProgress) =>
+                        uploadForumImage(courseId, file, onProgress)
+                      }
                       onChange={(image) =>
                         setReplyImages((r) => ({ ...r, [p.id]: image }))
                       }

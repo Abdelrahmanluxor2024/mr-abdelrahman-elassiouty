@@ -12,12 +12,17 @@ export function ImagePicker({
 }: {
   value?: ImageAttachment;
   onChange: (image?: ImageAttachment) => void;
-  upload: (file: File) => Promise<ImageAttachment>;
+  upload: (
+    file: File,
+    onProgress?: (percent: number) => void,
+  ) => Promise<ImageAttachment>;
   disabled?: boolean;
   label?: string;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
   const active = useRef(true);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -41,17 +46,23 @@ export function ImagePicker({
             const file = e.target.files?.[0];
             if (!file) return;
             setBusy(true);
+            setProgress(0);
+            setError("");
             onBusyChange?.(true);
             try {
-              const image = await upload(file);
+              const image = await upload(file, (percent) => {
+                if (active.current) setProgress(percent);
+              });
               if (active.current) onChange(image);
             } catch (err) {
-              if (active.current)
+              if (active.current) {
+                setError(err instanceof Error ? err.message : "تعذر الرفع");
                 toast.error(
                   err instanceof Error
                     ? err.message
                     : "تعذر رفع الصورة؛ تحقق من الاتصال وصلاحيات التخزين",
                 );
+              }
             } finally {
               if (active.current) {
                 setBusy(false);
@@ -63,8 +74,25 @@ export function ImagePicker({
         />
       </label>
       <p className="text-xs text-muted">
-        JPG / PNG / WebP — حتى ٣ ميجابايت{busy ? " · جاري رفع الصورة…" : ""}
+        JPG / PNG / WebP — حتى ٣ ميجابايت
+        {busy ? ` · رفع ${progress}% والتحقق من الحفظ…` : ""}
       </p>
+      {busy && (
+        <progress
+          aria-label="تقدم الرفع"
+          value={progress}
+          max={100}
+          className="w-full"
+        />
+      )}
+      {error && (
+        <p
+          role="alert"
+          className="rounded-xl border border-red-500/40 p-3 text-sm text-red-500"
+        >
+          {error}
+        </p>
+      )}
       {value && (
         <div className="space-y-2">
           <img
