@@ -6,8 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { collection, getDocs, doc, updateDoc, query } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  query,
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase/config";
 import { formatArabicNumber, formatCurrencyEGP } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -20,6 +27,7 @@ import {
   User,
   Sparkles,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 
 export default function AdminStudentsPage() {
@@ -97,6 +105,35 @@ export default function AdminStudentsPage() {
     } catch (err: any) {
       console.error("Recharge error:", err);
       toast.error(err.message || "فشل شحن الرصيد");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDeleteStudent(student: any) {
+    if (student.role === "admin") {
+      toast.error("لا يمكن حذف حساب مسؤول من هذه الصفحة");
+      return;
+    }
+    if (student.id === auth.currentUser?.uid) {
+      toast.error("لا يمكنك حذف حسابك الشخصي");
+      return;
+    }
+    const label = student.full_name || student.phone || student.id;
+    if (
+      !confirm(
+        `هل تريد حذف بيانات الطالب "${label}"؟\nلا يمكن التراجع عن هذا الإجراء.`,
+      )
+    )
+      return;
+    setPending(true);
+    try {
+      await deleteDoc(doc(db, "users", student.id));
+      toast.success(`تم حذف بيانات الطالب ${label}`);
+      await loadStudents();
+    } catch (err: any) {
+      console.error("Delete student error:", err);
+      toast.error(err.message || "فشل حذف الطالب");
     } finally {
       setPending(false);
     }
@@ -344,6 +381,18 @@ export default function AdminStudentsPage() {
                           >
                             <MessageCircle className="h-4 w-4" />
                           </a>
+                        </Button>
+
+                        {/* Delete profile */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteStudent(s)}
+                          disabled={pending}
+                          className="h-8 w-8 p-0 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                          title="حذف الطالب"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
