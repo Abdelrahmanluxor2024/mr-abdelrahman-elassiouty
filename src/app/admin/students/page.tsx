@@ -11,12 +11,12 @@ import {
   getDocs,
   doc,
   updateDoc,
-  deleteDoc,
   query,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/config";
 import { formatArabicNumber, formatCurrencyEGP } from "@/lib/utils";
 import { toast } from "sonner";
+import { deleteStudentAccount } from "@/app/actions/delete-student";
 import {
   Search,
   Phone,
@@ -122,14 +122,16 @@ export default function AdminStudentsPage() {
     const label = student.full_name || student.phone || student.id;
     if (
       !confirm(
-        `هل تريد حذف بيانات الطالب "${label}"؟\nلا يمكن التراجع عن هذا الإجراء.`,
+        `هل تريد حذف حساب الطالب "${label}" نهائياً؟\nهيتمسح تسجيل دخوله وكل بياناته وملفاته، ولا يمكن التراجع.`,
       )
     )
       return;
     setPending(true);
     try {
-      await deleteDoc(doc(db, "users", student.id));
-      toast.success(`تم حذف بيانات الطالب ${label}`);
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("انتهت الجلسة؛ سجّل الدخول من جديد");
+      await deleteStudentAccount({ idToken, targetUid: student.id });
+      toast.success(`تم حذف حساب الطالب ${label} نهائياً`);
       await loadStudents();
     } catch (err: any) {
       console.error("Delete student error:", err);
